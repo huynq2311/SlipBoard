@@ -1,0 +1,16 @@
+# ── Design & planning docs (internal, not for public repo) ──
+design/*
+*.md
+
+# ── macOS ──
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Xcode ──
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+.build/
+
