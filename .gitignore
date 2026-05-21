@@ -1,7 +1,9 @@
 # ── Design & planning docs (internal, not for public repo) ──
-design/*
-!design/components/*
-!design/architecture/*
+design/vn
+design/slipboard_app.html
+design/Slipboard_Design_Doc.md
+design/slipboard_menubar_settings.html
+design/slipboard-db-design-v1.md
 *.md
 
 # ── macOS ──

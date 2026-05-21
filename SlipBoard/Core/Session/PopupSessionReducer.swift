@@ -1,13 +1,20 @@
 import Foundation
 
-final class PopupSessionReducer: ClipboardSessionRouting {
+final class PopupSessionReducer: PopupShellRouting {
+    private let adapter: PopupShellAdapter
+    private let fallbackPreset: PopupShellPreset?
     private var seed: PopupSessionSeed
+    private var localState: PopupShellLocalState
     private(set) var session: SlipBoardAppSession
+    private(set) var snapshot: PopupPanelSnapshot
 
-    init(session: SlipBoardAppSession) {
+    init(
+        session: SlipBoardAppSession,
+        adapter: PopupShellAdapter = PopupShellAdapter(),
+        fallbackPreset: PopupShellPreset? = nil
+    ) {
         let seed = PopupSessionSeed(session: session)
-        self.seed = seed
-        self.session = Self.materialize(
+        let normalizedSession = Self.materialize(
             from: session,
             seed: seed,
             searchQuery: session.popupChrome.searchQuery,
@@ -15,46 +22,93 @@ final class PopupSessionReducer: ClipboardSessionRouting {
             selectedItemID: session.popupChrome.selectedItemID,
             pasteMenuItemID: session.popupChrome.pasteMenuItemID
         )
-    }
 
-    func selectItem(id: ClipboardItemID?) {
-        session = applyPopupInteraction(
-            searchQuery: session.popupChrome.searchQuery,
-            activeFilter: session.popupChrome.activeFilter,
-            selectedItemID: seed.contains(id) ? id : nil,
-            pasteMenuItemID: session.popupChrome.pasteMenuItemID
+        var localState = PopupShellLocalState()
+        if let pasteMenuItemID = normalizedSession.popupChrome.pasteMenuItemID,
+           let item = seed.item(for: pasteMenuItemID) {
+            localState.selectedTransformOptions[pasteMenuItemID] = PopupShellProjection.defaultTransformOption(for: item)
+        }
+        if fallbackPreset == .noteEditing {
+            localState.editingNoteItemID = normalizedSession.popupChrome.selectedItemID
+        }
+
+        self.adapter = adapter
+        self.fallbackPreset = fallbackPreset
+        self.seed = seed
+        self.localState = localState
+        self.session = normalizedSession
+        self.snapshot = adapter.adaptedSnapshot(
+            from: normalizedSession,
+            localState: localState,
+            fallbackPreset: fallbackPreset
         )
     }
 
+    func selectItem(id: ClipboardItemID?) {
+        let selectedItemID = seed.contains(id) ? id : nil
+        let pasteMenuItemID = session.popupChrome.pasteMenuItemID == selectedItemID
+            ? session.popupChrome.pasteMenuItemID
+            : nil
+
+        refreshState(
+            searchQuery: session.popupChrome.searchQuery,
+            activeFilter: session.popupChrome.activeFilter,
+            selectedItemID: selectedItemID,
+            pasteMenuItemID: pasteMenuItemID
+        ) { localState, _ in
+            localState.activeContextMenuItemID = nil
+            if localState.editingNoteItemID != selectedItemID {
+                localState.editingNoteItemID = nil
+            }
+        }
+    }
+
     func changeFilter(to filter: ClipboardFilter) {
-        session = applyPopupInteraction(
+        refreshState(
             searchQuery: session.popupChrome.searchQuery,
             activeFilter: filter,
             selectedItemID: session.popupChrome.selectedItemID,
             pasteMenuItemID: session.popupChrome.pasteMenuItemID
-        )
+        ) { localState, _ in
+            localState.activeContextMenuItemID = nil
+        }
     }
 
     func updateSearchQuery(_ query: String) {
-        session = applyPopupInteraction(
+        refreshState(
             searchQuery: query,
             activeFilter: session.popupChrome.activeFilter,
             selectedItemID: session.popupChrome.selectedItemID,
             pasteMenuItemID: session.popupChrome.pasteMenuItemID
-        )
+        ) { localState, _ in
+            localState.activeContextMenuItemID = nil
+        }
     }
 
     func openPasteMenu(for itemID: ClipboardItemID) {
-        session = applyPopupInteraction(
+        guard seed.contains(itemID) else {
+            return
+        }
+
+        refreshState(
             searchQuery: session.popupChrome.searchQuery,
             activeFilter: session.popupChrome.activeFilter,
-            selectedItemID: session.popupChrome.selectedItemID,
-            pasteMenuItemID: seed.contains(itemID) ? itemID : nil
-        )
+            selectedItemID: itemID,
+            pasteMenuItemID: itemID
+        ) { localState, seed in
+            localState.activeContextMenuItemID = nil
+            if localState.editingNoteItemID != itemID {
+                localState.editingNoteItemID = nil
+            }
+            if localState.selectedTransformOptions[itemID] == nil,
+               let item = seed.item(for: itemID) {
+                localState.selectedTransformOptions[itemID] = PopupShellProjection.defaultTransformOption(for: item)
+            }
+        }
     }
 
     func dismissPasteMenu() {
-        session = applyPopupInteraction(
+        refreshState(
             searchQuery: session.popupChrome.searchQuery,
             activeFilter: session.popupChrome.activeFilter,
             selectedItemID: session.popupChrome.selectedItemID,
@@ -64,7 +118,7 @@ final class PopupSessionReducer: ClipboardSessionRouting {
 
     func togglePin(for itemID: ClipboardItemID) {
         seed.togglePin(for: itemID)
-        session = applyPopupInteraction(
+        refreshState(
             searchQuery: session.popupChrome.searchQuery,
             activeFilter: session.popupChrome.activeFilter,
             selectedItemID: session.popupChrome.selectedItemID,
@@ -74,21 +128,91 @@ final class PopupSessionReducer: ClipboardSessionRouting {
 
     func updateNote(for itemID: ClipboardItemID, note: String?) {
         seed.updateNote(for: itemID, note: note)
-        session = applyPopupInteraction(
+        refreshState(
             searchQuery: session.popupChrome.searchQuery,
             activeFilter: session.popupChrome.activeFilter,
             selectedItemID: session.popupChrome.selectedItemID,
             pasteMenuItemID: session.popupChrome.pasteMenuItemID
-        )
+        ) { localState, _ in
+            if localState.editingNoteItemID == itemID {
+                localState.editingNoteItemID = nil
+            }
+        }
     }
 
-    private func applyPopupInteraction(
+    func openContextMenu(for itemID: ClipboardItemID) {
+        guard seed.contains(itemID) else {
+            return
+        }
+
+        refreshState(
+            searchQuery: session.popupChrome.searchQuery,
+            activeFilter: session.popupChrome.activeFilter,
+            selectedItemID: itemID,
+            pasteMenuItemID: nil
+        ) { localState, _ in
+            localState.activeContextMenuItemID = itemID
+        }
+    }
+
+    func dismissContextMenu() {
+        localState.activeContextMenuItemID = nil
+        refreshSnapshot()
+    }
+
+    func selectPasteTransformOption(_ optionID: PasteTransformOptionID, for itemID: ClipboardItemID) {
+        guard seed.contains(itemID) else {
+            return
+        }
+
+        refreshState(
+            searchQuery: session.popupChrome.searchQuery,
+            activeFilter: session.popupChrome.activeFilter,
+            selectedItemID: itemID,
+            pasteMenuItemID: itemID
+        ) { localState, _ in
+            localState.activeContextMenuItemID = nil
+            localState.selectedTransformOptions[itemID] = optionID
+            if localState.editingNoteItemID != itemID {
+                localState.editingNoteItemID = nil
+            }
+        }
+    }
+
+    func beginInlineNoteEdit(for itemID: ClipboardItemID) {
+        guard seed.contains(itemID) else {
+            return
+        }
+
+        refreshState(
+            searchQuery: session.popupChrome.searchQuery,
+            activeFilter: session.popupChrome.activeFilter,
+            selectedItemID: itemID,
+            pasteMenuItemID: nil
+        ) { localState, _ in
+            localState.activeContextMenuItemID = nil
+            localState.editingNoteItemID = itemID
+        }
+    }
+
+    func cancelInlineNoteEdit(for itemID: ClipboardItemID) {
+        guard localState.editingNoteItemID == itemID else {
+            return
+        }
+
+        localState.editingNoteItemID = nil
+        refreshSnapshot()
+    }
+
+    private func refreshState(
         searchQuery: String,
         activeFilter: ClipboardFilter,
         selectedItemID: ClipboardItemID?,
-        pasteMenuItemID: ClipboardItemID?
-    ) -> SlipBoardAppSession {
-        var nextSession = Self.materialize(
+        pasteMenuItemID: ClipboardItemID?,
+        mutateLocalState: (inout PopupShellLocalState, PopupSessionSeed) -> Void = { _, _ in }
+    ) {
+        mutateLocalState(&localState, seed)
+        session = Self.materialize(
             from: session,
             seed: seed,
             searchQuery: searchQuery,
@@ -96,14 +220,40 @@ final class PopupSessionReducer: ClipboardSessionRouting {
             selectedItemID: selectedItemID,
             pasteMenuItemID: pasteMenuItemID
         )
-        nextSession = SlipBoardAppSession(
-            activeSurface: .popup,
-            theme: nextSession.theme,
-            clipboard: nextSession.clipboard,
-            popupChrome: nextSession.popupChrome,
-            settings: nextSession.settings
+        localState = sanitize(localState, for: session)
+        refreshSnapshot()
+    }
+
+    private func sanitize(
+        _ localState: PopupShellLocalState,
+        for session: SlipBoardAppSession
+    ) -> PopupShellLocalState {
+        let visibleIDs = Set(session.clipboard.pinnedItems.map(\.id) + session.clipboard.recentItems.map(\.id))
+        var sanitizedState = localState
+
+        if let itemID = sanitizedState.activeContextMenuItemID, !visibleIDs.contains(itemID) {
+            sanitizedState.activeContextMenuItemID = nil
+        }
+
+        if let itemID = sanitizedState.editingNoteItemID, !visibleIDs.contains(itemID) {
+            sanitizedState.editingNoteItemID = nil
+        }
+
+        if let pasteMenuItemID = session.popupChrome.pasteMenuItemID,
+           sanitizedState.selectedTransformOptions[pasteMenuItemID] == nil,
+           let item = seed.item(for: pasteMenuItemID) {
+            sanitizedState.selectedTransformOptions[pasteMenuItemID] = PopupShellProjection.defaultTransformOption(for: item)
+        }
+
+        return sanitizedState
+    }
+
+    private func refreshSnapshot() {
+        snapshot = adapter.adaptedSnapshot(
+            from: session,
+            localState: localState,
+            fallbackPreset: fallbackPreset
         )
-        return nextSession
     }
 
     private static func materialize(
@@ -136,7 +286,7 @@ final class PopupSessionReducer: ClipboardSessionRouting {
         )
 
         return SlipBoardAppSession(
-            activeSurface: session.activeSurface,
+            activeSurface: .popup,
             theme: session.theme,
             clipboard: clipboard,
             popupChrome: popupChrome,
@@ -151,6 +301,7 @@ final class PopupSessionReducer: ClipboardSessionRouting {
         guard let candidate, visibleIDs.contains(candidate) else {
             return nil
         }
+
         return candidate
     }
 }
@@ -190,7 +341,12 @@ private struct PopupSessionSeed {
         guard let id else {
             return false
         }
+
         return itemsByID[id] != nil
+    }
+
+    func item(for id: ClipboardItemID) -> ClipboardItem? {
+        itemsByID[id]
     }
 
     func pinnedItems(matching query: String, filter: ClipboardFilter) -> [ClipboardItem] {
@@ -234,6 +390,7 @@ private struct PopupSessionSeed {
             guard let item = itemsByID[id], Self.matches(item, query: query, filter: filter) else {
                 return nil
             }
+
             return item
         }
     }
@@ -247,6 +404,7 @@ private struct PopupSessionSeed {
             if left.capturedAt == right.capturedAt {
                 return left.id.rawValue < right.id.rawValue
             }
+
             return left.capturedAt > right.capturedAt
         }
     }
