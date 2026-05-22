@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		528CBD592FBF296D0076472C /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 52FA1D512FBA13A200B48B7E /* KeyboardShortcuts */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		52FA1D212FBA13A200B48B7E /* SlipBoard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlipBoard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				528CBD592FBF296D0076472C /* KeyboardShortcuts in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = SlipBoard;
 			packageProductDependencies = (
+				52FA1D512FBA13A200B48B7E /* KeyboardShortcuts */,
 			);
 			productName = SlipBoard;
 			productReference = 52FA1D212FBA13A200B48B7E /* SlipBoard.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 52FA1D182FBA13A200B48B7E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				52FA1D502FBA13A200B48B7E /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 52FA1D222FBA13A200B48B7E /* Products */;
 			projectDirPath = "";
@@ -331,6 +340,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		52FA1D502FBA13A200B48B7E /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		52FA1D512FBA13A200B48B7E /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 52FA1D502FBA13A200B48B7E /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 52FA1D192FBA13A200B48B7E /* Project object */;
 }
