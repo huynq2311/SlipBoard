@@ -4,6 +4,7 @@ import SwiftUI
 public enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "General"
     case bridge = "iCloud Bridge"
+    case security = "Security"
     case retention = "Retention"
     case exclusions = "Exclusions"
     case hotkeys = "Hotkeys"
@@ -15,6 +16,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "slider.horizontal.3"
         case .bridge: return "icloud.and.arrow.up"
+        case .security: return "shield.lock"
         case .retention: return "clock"
         case .exclusions: return "nosign"
         case .hotkeys: return "keyboard"
@@ -119,6 +121,8 @@ public struct SettingsWindowView<Store: SettingsStoreProtocol>: View {
                     GeneralSettingsView(settings: settings)
                 case .bridge:
                     BridgeSettingsView(settings: settings)
+                case .security:
+                    SecuritySettingsView(settings: settings)
                 case .retention:
                     RetentionSettingsView(settings: settings)
                 case .exclusions:
