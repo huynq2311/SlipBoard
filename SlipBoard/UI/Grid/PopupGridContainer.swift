@@ -4,9 +4,12 @@ import Combine
 
 public struct PopupGridContainer: View {
     @ObservedObject public var engine: MockHistoryEngine
+    @ObservedObject public var settings: MockSettingsStore
+    @ObservedObject var securityManager = SecurityManager.shared
     
     @State private var selectedItem: ClipItem?
     @State private var activePasteAsItem: ClipItem?
+    @State private var isExposeBlurred: Bool = false
     @State private var showPasteAs = false
     
     @State private var editingNoteItem: ClipItem?
@@ -24,25 +27,31 @@ public struct PopupGridContainer: View {
     @State private var toastMessage: String? = nil
     @State private var eventMonitor: Any? = nil
     
-    public init(engine: MockHistoryEngine) {
+    public init(engine: MockHistoryEngine, settings: MockSettingsStore) {
         self.engine = engine
+        self.settings = settings
     }
     
     public var body: some View {
         ZStack {
-            // Main Glassmorphic Backdrop
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Theme.bgPrimary.opacity(0.85))
-                .background(
-                    SlipVisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Theme.borderPrimary.opacity(0.4), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-            
-            VStack(spacing: 0) {
+            if securityManager.isLocked {
+                AppLockScreenView(onUnlock: {
+                    self.validateSelection()
+                })
+            } else {
+                // Main Glassmorphic Backdrop
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Theme.bgPrimary.opacity(0.85))
+                    .background(
+                        SlipVisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Theme.borderPrimary.opacity(0.4), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+                
+                VStack(spacing: 0) {
                 // 1. Top Filtering Bar
                 TopFilterBar(
                     activeFilter: Binding(
@@ -431,14 +440,47 @@ public struct PopupGridContainer: View {
                 }
                 .zIndex(100)
             }
+            }
+            
+            // Exposé Privacy Blur View
+            if isExposeBlurred && settings.hidePreviewsInMissionControl {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.clear)
+                    .background(
+                        SlipVisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
+                    )
+                    .cornerRadius(16)
+                    .zIndex(101)
+            }
         }
         .frame(width: 800, height: 400)
         .onAppear {
             validateSelection()
             setupKeyboardMonitor()
+            if settings.lockSlipboard && !securityManager.isLocked {
+                securityManager.resetInactivityTimer()
+            }
         }
         .onDisappear {
             removeKeyboardMonitor()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            if settings.hidePreviewsInMissionControl {
+                isExposeBlurred = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isExposeBlurred = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
+            if let window = notification.object as? NSWindow, window.className.contains("PopupPanel") || window == NSApp.keyWindow {
+                if settings.hidePreviewsInMissionControl {
+                    isExposeBlurred = true
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            isExposeBlurred = false
         }
     }
     
@@ -556,6 +598,14 @@ public struct PopupGridContainer: View {
     }
     
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        if securityManager.isLocked {
+            if event.keyCode == 53 { // Escape
+                NSApp.keyWindow?.orderOut(nil)
+                return true
+            }
+            return false
+        }
+        
         // Prevent key events when popovers or sheets are open
         if showNoteEditor || showPasteAs || showTagEditor || showFolderEditor {
             if event.keyCode == 53 { // Esc to close popovers

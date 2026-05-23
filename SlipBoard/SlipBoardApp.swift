@@ -19,10 +19,19 @@ public class PopupPanelManager {
     private var popupPanel: PopupPanel?
     private let historyEngine = MockHistoryEngine()
     private var clipboardMonitor: ClipboardMonitor?
+    private var settingsStore: MockSettingsStore?
     
     private init() {}
     
     public func setup(settingsStore: MockSettingsStore) {
+        self.settingsStore = settingsStore
+        
+        // Configure security manager and lock on launch if enabled
+        SecurityManager.shared.configure(with: settingsStore)
+        if settingsStore.lockSlipboard {
+            SecurityManager.shared.lock()
+        }
+        
         KeyboardShortcuts.onKeyUp(for: .togglePopup) { [weak self] in
             self?.toggle()
         }
@@ -34,8 +43,9 @@ public class PopupPanelManager {
     }
     
     public func toggle() {
+        guard let settingsStore = settingsStore else { return }
         if popupPanel == nil {
-            let gridView = PopupGridContainer(engine: historyEngine)
+            let gridView = PopupGridContainer(engine: historyEngine, settings: settingsStore)
             let hostingView = NSHostingView(rootView: gridView)
             let panel = PopupPanel(contentView: hostingView)
             popupPanel = panel
@@ -46,6 +56,9 @@ public class PopupPanelManager {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
+            // Reset inactivity timer on show
+            SecurityManager.shared.resetInactivityTimer()
+            
             let mouseLocation = NSEvent.mouseLocation
             let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
                 ?? NSScreen.main
