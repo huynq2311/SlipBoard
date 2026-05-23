@@ -85,6 +85,7 @@ public class ClipboardMonitor {
     private func checkPasteboard() {
         // Obey pause settings check
         guard !settingsStore.pauseCapture else { return }
+        if let pauseUntil = settingsStore.pauseUntil, pauseUntil > Date() { return }
         
         let currentCount = NSPasteboard.general.changeCount
         guard currentCount != lastChangeCount else { return }

@@ -12,6 +12,7 @@ public class MockSettingsStore: SettingsStoreProtocol {
     @Published public var retentionPeriod: RetentionOption = .threeMonths
     @Published public var excludedApps: [ExcludedApp] = []
     @Published public var pauseCapture: Bool = false
+    @Published public var pauseUntil: Date? = nil
     @Published public var lockSlipboard: Bool = false
     @Published public var unlockMethod: UnlockMethod = .touchID
     @Published public var autoLockTime: AutoLockOption = .never

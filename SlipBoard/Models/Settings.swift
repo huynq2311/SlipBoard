@@ -55,6 +55,7 @@ public protocol SettingsStoreProtocol: ObservableObject {
     var retentionPeriod: RetentionOption { get set }
     var excludedApps: [ExcludedApp] { get set }
     var pauseCapture: Bool { get set }
+    var pauseUntil: Date? { get set }
     var lockSlipboard: Bool { get set }
     var unlockMethod: UnlockMethod { get set }
     var autoLockTime: AutoLockOption { get set }
