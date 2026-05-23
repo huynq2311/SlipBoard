@@ -17,6 +17,7 @@ public class PopupPanelManager {
     public static let shared = PopupPanelManager()
     
     private var popupPanel: PopupPanel?
+    private let historyEngine = MockHistoryEngine()
     
     private init() {}
     
@@ -28,7 +29,8 @@ public class PopupPanelManager {
     
     public func toggle() {
         if popupPanel == nil {
-            let hostingView = NSHostingView(rootView: PopupPanelPlaceholderView())
+            let gridView = PopupGridContainer(engine: historyEngine)
+            let hostingView = NSHostingView(rootView: gridView)
             let panel = PopupPanel(contentView: hostingView)
             popupPanel = panel
         }
@@ -38,7 +40,21 @@ public class PopupPanelManager {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
-            panel.center()
+            let mouseLocation = NSEvent.mouseLocation
+            let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+                ?? NSScreen.main
+                ?? NSScreen.screens.first
+            
+            if let screen = screen {
+                let screenFrame = screen.frame
+                let panelSize = panel.frame.size
+                let x = screenFrame.minX + (screenFrame.width - panelSize.width) / 2
+                let y = screenFrame.minY + (screenFrame.height - panelSize.height) / 2
+                panel.setFrameOrigin(NSPoint(x: x, y: y))
+            } else {
+                panel.center()
+            }
+            
             panel.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
         }
