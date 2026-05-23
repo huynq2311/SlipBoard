@@ -17,6 +17,8 @@ public struct ClipItem: Identifiable, Hashable, Codable {
     public let timestamp: Date
     public var isPinned: Bool
     public var note: String?
+    public var tags: [String]
+    public var folder: String?
     
     public init(
         id: UUID = UUID(),
@@ -26,7 +28,9 @@ public struct ClipItem: Identifiable, Hashable, Codable {
         sourceAppIcon: String,
         timestamp: Date = Date(),
         isPinned: Bool = false,
-        note: String? = nil
+        note: String? = nil,
+        tags: [String] = [],
+        folder: String? = nil
     ) {
         self.id = id
         self.contentType = contentType
@@ -36,6 +40,8 @@ public struct ClipItem: Identifiable, Hashable, Codable {
         self.timestamp = timestamp
         self.isPinned = isPinned
         self.note = note
+        self.tags = tags
+        self.folder = folder
     }
     
     public var formattedTime: String {

@@ -12,4 +12,7 @@ public protocol HistoryEngineProtocol: ObservableObject {
     func pinItem(_ item: ClipItem)
     func deleteItem(_ item: ClipItem)
     func saveNote(for item: ClipItem, note: String)
+    func addTag(to item: ClipItem, tag: String)
+    func removeTag(from item: ClipItem, tag: String)
+    func assignFolder(to item: ClipItem, folder: String?)
 }

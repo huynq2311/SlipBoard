@@ -62,13 +62,25 @@ public struct ClipCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Source & Type Badge
             HStack(spacing: 5) {
-                HStack(spacing: 4) {
-                    Image(systemName: item.sourceAppIcon)
-                        .font(.system(size: 10))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(item.sourceApp)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(Theme.textSecondary)
+                if let note = item.note, !note.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Theme.accent)
+                            .frame(width: 5, height: 5)
+                        Text(note)
+                            .font(.system(size: 10).italic())
+                            .foregroundColor(Theme.accent)
+                            .lineLimit(1)
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: item.sourceAppIcon)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                        Text(item.sourceApp)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
                 Spacer()
                 Text(item.contentType.rawValue)

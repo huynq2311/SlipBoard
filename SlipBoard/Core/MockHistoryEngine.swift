@@ -25,7 +25,9 @@ public class MockHistoryEngine: HistoryEngineProtocol {
             result = result.filter { 
                 $0.contentString.localizedCaseInsensitiveContains(searchQuery) ||
                 $0.sourceApp.localizedCaseInsensitiveContains(searchQuery) ||
-                ($0.note?.localizedCaseInsensitiveContains(searchQuery) ?? false)
+                ($0.note?.localizedCaseInsensitiveContains(searchQuery) ?? false) ||
+                $0.tags.contains(where: { $0.localizedCaseInsensitiveContains(searchQuery) }) ||
+                ($0.folder?.localizedCaseInsensitiveContains(searchQuery) ?? false)
             }
         }
         
@@ -107,6 +109,28 @@ public class MockHistoryEngine: HistoryEngineProtocol {
     public func saveNote(for item: ClipItem, note: String) {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index].note = note.isEmpty ? nil : note
+        }
+    }
+    
+    public func addTag(to item: ClipItem, tag: String) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            let cleanedTag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanedTag.isEmpty && !items[index].tags.contains(cleanedTag) {
+                items[index].tags.append(cleanedTag)
+            }
+        }
+    }
+    
+    public func removeTag(from item: ClipItem, tag: String) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index].tags.removeAll(where: { $0 == tag })
+        }
+    }
+    
+    public func assignFolder(to item: ClipItem, folder: String?) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            let cleanedFolder = folder?.trimmingCharacters(in: .whitespacesAndNewlines)
+            items[index].folder = (cleanedFolder?.isEmpty ?? true) ? nil : cleanedFolder
         }
     }
 }

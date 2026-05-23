@@ -28,6 +28,23 @@ public enum RetentionOption: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+public enum UnlockMethod: String, CaseIterable, Identifiable, Codable {
+    case touchID = "Touch ID / Face ID"
+    case password = "System Password"
+    
+    public var id: String { self.rawValue }
+}
+
+public enum AutoLockOption: String, CaseIterable, Identifiable, Codable {
+    case never = "Never"
+    case oneMin = "1 min"
+    case fiveMin = "5 min"
+    case fifteenMin = "15 min"
+    case oneHour = "1 hour"
+    
+    public var id: String { self.rawValue }
+}
+
 public protocol SettingsStoreProtocol: ObservableObject {
     var launchAtLogin: Bool { get set }
     var showDockIcon: Bool { get set }
@@ -38,6 +55,10 @@ public protocol SettingsStoreProtocol: ObservableObject {
     var retentionPeriod: RetentionOption { get set }
     var excludedApps: [ExcludedApp] { get set }
     var pauseCapture: Bool { get set }
+    var lockSlipboard: Bool { get set }
+    var unlockMethod: UnlockMethod { get set }
+    var autoLockTime: AutoLockOption { get set }
+    var hidePreviewsInMissionControl: Bool { get set }
     
     func addExcludedApp(_ app: ExcludedApp)
     func removeExcludedApp(_ app: ExcludedApp)

@@ -13,6 +13,14 @@ public struct PopupGridContainer: View {
     @State private var showNoteEditor = false
     @State private var noteText = ""
     
+    @State private var editingTagItem: ClipItem?
+    @State private var showTagEditor = false
+    @State private var tagsText = ""
+    
+    @State private var editingFolderItem: ClipItem?
+    @State private var showFolderEditor = false
+    @State private var folderText = ""
+    
     @State private var toastMessage: String? = nil
     @State private var eventMonitor: Any? = nil
     
@@ -152,6 +160,17 @@ public struct PopupGridContainer: View {
                                             cardContextMenu(for: selected)
                                         }
                                     }
+                                    .popover(isPresented: Binding(
+                                        get: { showPasteAs && activePasteAsItem?.isPinned == true },
+                                        set: { if !$0 { showPasteAs = false } }
+                                    ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                                        if let pasteItem = activePasteAsItem {
+                                            PasteAsPopover(item: pasteItem) { transformedText in
+                                                showPasteAs = false
+                                                pasteItemText(transformedText)
+                                            }
+                                        }
+                                    }
                                 }
                                 
                                 // Recent Section
@@ -167,6 +186,17 @@ public struct PopupGridContainer: View {
                                     .contextMenu {
                                         if let selected = selectedItem {
                                             cardContextMenu(for: selected)
+                                        }
+                                    }
+                                    .popover(isPresented: Binding(
+                                        get: { showPasteAs && activePasteAsItem?.isPinned == false },
+                                        set: { if !$0 { showPasteAs = false } }
+                                    ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                                        if let pasteItem = activePasteAsItem {
+                                            PasteAsPopover(item: pasteItem) { transformedText in
+                                                showPasteAs = false
+                                                pasteItemText(transformedText)
+                                            }
                                         }
                                     }
                                 }
@@ -250,21 +280,139 @@ public struct PopupGridContainer: View {
                 .zIndex(90)
             }
             
-            // Paste As Popover Overlay
-            if showPasteAs, let pasteItem = activePasteAsItem {
-                Color.black.opacity(0.1)
+            // Tag Editor Popover View
+            if showTagEditor, let editingItem = editingTagItem {
+                Color.black.opacity(0.3)
                     .edgesIgnoringSafeArea(.all)
                     .onTapGesture {
-                        showPasteAs = false
+                        showTagEditor = false
                     }
                 
-                PasteAsPopover(item: pasteItem) { transformedText in
-                    showPasteAs = false
-                    pasteItemText(transformedText)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("ADD TAGS")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(Theme.textTertiary)
+                        Spacer()
+                        Button(action: { showTagEditor = false }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    TextField("e.g. Work, receipts, code", text: $tagsText)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(6)
+                        .background(Theme.bgSecondary)
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Theme.borderSecondary.opacity(0.6), lineWidth: 0.5)
+                        )
+                        .textFieldStyle(.plain)
+                    
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            if let index = engine.items.firstIndex(where: { $0.id == editingItem.id }) {
+                                let newTags = tagsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                                engine.items[index].tags = newTags
+                            }
+                            showTagEditor = false
+                            showToast("Tags updated successfully")
+                        }) {
+                            Text("Save Tags")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Theme.accent.cornerRadius(6))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .zIndex(95)
+                .padding(14)
+                .frame(width: 280)
+                .background(
+                    Theme.bgPrimary
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.borderPrimary, lineWidth: 1)
+                )
+                .zIndex(91)
             }
+            
+            // Folder Editor Popover View
+            if showFolderEditor, let editingItem = editingFolderItem {
+                Color.black.opacity(0.3)
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture {
+                        showFolderEditor = false
+                    }
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("ASSIGN TO FOLDER")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(Theme.textTertiary)
+                        Spacer()
+                        Button(action: { showFolderEditor = false }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    TextField("e.g. Projects, Personal", text: $folderText)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(6)
+                        .background(Theme.bgSecondary)
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Theme.borderSecondary.opacity(0.6), lineWidth: 0.5)
+                        )
+                        .textFieldStyle(.plain)
+                    
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            engine.assignFolder(to: editingItem, folder: folderText.isEmpty ? nil : folderText)
+                            showFolderEditor = false
+                            showToast(folderText.isEmpty ? "Removed folder assignment" : "Assigned folder")
+                        }) {
+                            Text("Assign Folder")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Theme.accent.cornerRadius(6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(14)
+                .frame(width: 280)
+                .background(
+                    Theme.bgPrimary
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.borderPrimary, lineWidth: 1)
+                )
+                .zIndex(92)
+            }
+            
             
             // 4. Toast Notification
             if let toastMsg = toastMessage {
@@ -298,17 +446,26 @@ public struct PopupGridContainer: View {
     @ViewBuilder
     private func cardContextMenu(for item: ClipItem) -> some View {
         Button(action: { pasteItem(item) }) {
-            Label("Paste/Copy Standard", systemImage: "doc.on.clipboard")
+            Label("Paste", systemImage: "doc.on.clipboard")
         }
         
         Button(action: {
             activePasteAsItem = item
             showPasteAs = true
         }) {
-            Label("Paste As...", systemImage: "doc.on.doc")
+            Label("Paste as...", systemImage: "doc.on.doc")
         }
         
         Divider()
+        
+        Button(action: {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(item.contentString, forType: .string)
+            showToast("Copied to clipboard")
+        }) {
+            Label("Copy to Clipboard", systemImage: "doc.on.doc.fill")
+        }
         
         Button(action: {
             engine.pinItem(item)
@@ -323,7 +480,51 @@ public struct PopupGridContainer: View {
             noteText = item.note ?? ""
             showNoteEditor = true
         }) {
-            Label("Add/Edit Note...", systemImage: "pencil.line")
+            Label(item.note != nil ? "Edit Note..." : "Add Note...", systemImage: "pencil.line")
+        }
+        
+        Button(action: {
+            editingTagItem = item
+            tagsText = item.tags.joined(separator: ", ")
+            showTagEditor = true
+        }) {
+            Label("Add Tag...", systemImage: "tag")
+        }
+        
+        Menu("Assign Folder...") {
+            Button(action: {
+                editingFolderItem = item
+                folderText = item.folder ?? ""
+                showFolderEditor = true
+            }) {
+                Label("New Folder...", systemImage: "folder.badge.plus")
+            }
+            
+            if item.folder != nil {
+                Button(action: {
+                    engine.assignFolder(to: item, folder: nil)
+                    showToast("Removed folder assignment")
+                }) {
+                    Label("Remove from Folder", systemImage: "folder.badge.minus")
+                }
+            }
+            
+            let existingFolders = Array(Set(engine.items.compactMap { $0.folder })).sorted()
+            if !existingFolders.isEmpty {
+                Divider()
+                ForEach(existingFolders, id: \.self) { folder in
+                    Button(action: {
+                        engine.assignFolder(to: item, folder: folder)
+                        showToast("Assigned to folder '\(folder)'")
+                    }) {
+                        if item.folder == folder {
+                            Label(folder, systemImage: "checkmark")
+                        } else {
+                            Text(folder)
+                        }
+                    }
+                }
+            }
         }
         
         Divider()
@@ -333,7 +534,7 @@ public struct PopupGridContainer: View {
             validateSelection()
             showToast("Deleted item from history")
         }) {
-            Label("Delete from History", systemImage: "trash")
+            Label("Delete", systemImage: "trash")
         }
     }
     
@@ -356,10 +557,12 @@ public struct PopupGridContainer: View {
     
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         // Prevent key events when popovers or sheets are open
-        if showNoteEditor || showPasteAs {
+        if showNoteEditor || showPasteAs || showTagEditor || showFolderEditor {
             if event.keyCode == 53 { // Esc to close popovers
                 showNoteEditor = false
                 showPasteAs = false
+                showTagEditor = false
+                showFolderEditor = false
                 return true
             }
             return false
@@ -539,16 +742,25 @@ public struct PopupGridContainer: View {
     private func pasteItem(_ item: ClipItem) {
         engine.selectItem(item)
         showToast("Pasted: \(item.contentString.prefix(15))...")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NSApp.keyWindow?.orderOut(nil)
+        if !NSEvent.modifierFlags.contains(.option) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApp.keyWindow?.orderOut(nil)
+            }
         }
     }
     
     private func pasteItemText(_ text: String) {
         print("Pasting transformed text: \(text)")
+        
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        
         showToast("Pasted transformed value")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NSApp.keyWindow?.orderOut(nil)
+        if !NSEvent.modifierFlags.contains(.option) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApp.keyWindow?.orderOut(nil)
+            }
         }
     }
     
