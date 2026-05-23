@@ -6,7 +6,6 @@ public struct MenuBarDropdownView<Store: SettingsStoreProtocol, Stats: HistorySt
     @ObservedObject public var stats: Stats
     
     @Environment(\.openWindow) private var openWindow
-    @State private var isPaused = false
     @State private var hoverItem: String? = nil
     
     public init(settings: Store, stats: Stats) {
@@ -43,18 +42,18 @@ public struct MenuBarDropdownView<Store: SettingsStoreProtocol, Stats: HistorySt
                 // Status Indicator
                 HStack(spacing: 5) {
                     Circle()
-                        .fill(isPaused ? Color.orange : Color.green)
+                        .fill(settings.pauseCapture ? Color.orange : Color.green)
                         .frame(width: 8, height: 8)
-                    Text(isPaused ? "Paused" : "Active")
+                    Text(settings.pauseCapture ? "Paused" : "Active")
                         .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundColor(isPaused ? Color.orange : Color.green)
+                        .foregroundColor(settings.pauseCapture ? Color.orange : Color.green)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
                     Capsule()
-                        .fill(isPaused ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
+                        .fill(settings.pauseCapture ? Color.orange.opacity(0.12) : Color.green.opacity(0.12))
                 )
             }
             .padding(.horizontal, 16)
@@ -92,19 +91,19 @@ public struct MenuBarDropdownView<Store: SettingsStoreProtocol, Stats: HistorySt
                     shortcut: "⌘⇧V",
                     isHovered: hoverItem == "open"
                 ) {
-                    // Trigger popup action
+                    PopupPanelManager.shared.toggle()
                 }
                 .onHover { isHovered in hoverItem = isHovered ? "open" : nil }
                 
                 // Command: Pause Capture
                 DropdownItemRow(
-                    title: isPaused ? "Resume Capturing" : "Pause Capturing",
-                    icon: isPaused ? "play.fill" : "pause.fill",
+                    title: settings.pauseCapture ? "Resume Capturing" : "Pause Capturing",
+                    icon: settings.pauseCapture ? "play.fill" : "pause.fill",
                     shortcut: "⌘⌃P",
                     isHovered: hoverItem == "pause"
                 ) {
                     withAnimation {
-                        isPaused.toggle()
+                        settings.pauseCapture.toggle()
                     }
                 }
                 .onHover { isHovered in hoverItem = isHovered ? "pause" : nil }

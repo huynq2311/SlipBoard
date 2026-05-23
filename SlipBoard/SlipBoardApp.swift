@@ -18,13 +18,19 @@ public class PopupPanelManager {
     
     private var popupPanel: PopupPanel?
     private let historyEngine = MockHistoryEngine()
+    private var clipboardMonitor: ClipboardMonitor?
     
     private init() {}
     
-    public func setup() {
+    public func setup(settingsStore: MockSettingsStore) {
         KeyboardShortcuts.onKeyUp(for: .togglePopup) { [weak self] in
             self?.toggle()
         }
+        
+        // Instantiate and start background clipboard monitor
+        let monitor = ClipboardMonitor(historyEngine: historyEngine, settingsStore: settingsStore)
+        monitor.start()
+        self.clipboardMonitor = monitor
     }
     
     public func toggle() {
@@ -63,11 +69,13 @@ public class PopupPanelManager {
 
 @main
 struct SlipBoardApp: App {
-    @StateObject private var settingsStore = MockSettingsStore()
+    @StateObject private var settingsStore: MockSettingsStore
     @StateObject private var statsProvider = MockHistoryStatsProvider()
 
     init() {
-        PopupPanelManager.shared.setup()
+        let store = MockSettingsStore()
+        self._settingsStore = StateObject(wrappedValue: store)
+        PopupPanelManager.shared.setup(settingsStore: store)
     }
 
     var body: some Scene {

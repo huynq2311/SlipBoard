@@ -11,6 +11,7 @@ public class MockSettingsStore: SettingsStoreProtocol {
     @Published public var maxHistoryItems: Int = 500
     @Published public var retentionPeriod: RetentionOption = .threeMonths
     @Published public var excludedApps: [ExcludedApp] = []
+    @Published public var pauseCapture: Bool = false
     
     public init() {
         // Pre-populate with typical exclusion list items from design prototypes

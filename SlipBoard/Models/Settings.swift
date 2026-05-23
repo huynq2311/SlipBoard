@@ -37,6 +37,7 @@ public protocol SettingsStoreProtocol: ObservableObject {
     var maxHistoryItems: Int { get set }
     var retentionPeriod: RetentionOption { get set }
     var excludedApps: [ExcludedApp] { get set }
+    var pauseCapture: Bool { get set }
     
     func addExcludedApp(_ app: ExcludedApp)
     func removeExcludedApp(_ app: ExcludedApp)
