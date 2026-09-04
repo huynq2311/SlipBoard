@@ -2,6 +2,10 @@ import AppKit
 import ApplicationServices
 import SwiftUI
 
+private final class SBPopupPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     private enum Layout {
@@ -11,7 +15,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         static let dockRevealInset: CGFloat = 8
         // Reserve room for the top chrome, a content-sized pinned rail, and the
         // recent rail, which stretches its card height to fill what's left.
-        static let preferredHeight: CGFloat = 380
+        static let preferredHeight: CGFloat = 420
         static let presentationDuration: TimeInterval = 0.28
     }
 
@@ -19,6 +23,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     var onDeleteRequested: (() -> Void)?
     var onPrimaryPasteRequested: (() -> Void)?
     var onMoveSelectionRequested: ((Int) -> Void)?
+    var onTypeToSearchCharacters: ((String) -> Void)?
 
     private var panel: NSPanel?
     private var hostingController: NSHostingController<AnyView>?
@@ -82,7 +87,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
 
         let hostingController = NSHostingController(rootView: rootView)
         hostingController.sizingOptions = []
-        let panel = NSPanel(
+        let panel = SBPopupPanel(
             contentRect: NSRect(x: 0, y: 0, width: 716, height: 456),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -319,7 +324,12 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
                 self.onMoveSelectionRequested?(1)
                 return nil
             default:
-                return event
+                guard self.isEditingText == false else { return event }
+                guard event.modifierFlags.intersection([.command, .control, .function]).isEmpty else { return event }
+                guard let characters = event.characters, characters.isEmpty == false else { return event }
+                guard characters.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F }) else { return event }
+                self.onTypeToSearchCharacters?(characters)
+                return nil
             }
         }
     }

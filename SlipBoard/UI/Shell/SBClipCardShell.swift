@@ -30,7 +30,7 @@ struct SBClipCardShell: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 3)
                     .frame(height: 30)
-                    .background(theme.accentBackground(for: badgeTone))
+                    .background(typeHeaderBackground)
 
                 bodyContent
                     .padding(10)
@@ -44,23 +44,23 @@ struct SBClipCardShell: View {
             }
         }
         .frame(width: 248, height: height, alignment: .topLeading)
-        .sbSurface(.card, theme: theme, emphasized: isSelected)
-        .overlay(alignment: .top) {
+        .sbSurface(.card, theme: theme)
+        .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-                    .fill(theme.palette.accentPrimary)
-                    .frame(height: 2)
-                    .padding(.horizontal, 0.5)
+                    .stroke(theme.palette.accentPrimary, lineWidth: 1.5)
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous))
-        .onTapGesture {
-            onSelect()
-        }
         .onTapGesture(count: 2) {
             onSelect()
             onPrimaryAction()
         }
+        .simultaneousGesture(
+            TapGesture(count: 1).onEnded {
+                onSelect()
+            }
+        )
         .simultaneousGesture(
             TapGesture(count: 1)
                 .modifiers(.control)
@@ -100,12 +100,12 @@ struct SBClipCardShell: View {
         HStack(alignment: .center, spacing: theme.spacing.control6) {
             HStack(spacing: 6) {
                 Text(clipKindLabel)
-                    .font(theme.typography.chip)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.palette.textPrimary)
                     .lineLimit(1)
 
                 Text(clip.createdLabel)
-                    .font(theme.typography.monoMeta)
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(theme.palette.textSecondary)
                     .lineLimit(1)
             }
@@ -113,7 +113,7 @@ struct SBClipCardShell: View {
             Spacer(minLength: theme.spacing.control4)
 
             Text(clip.sourceApp.displayName)
-                .font(theme.typography.meta)
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)
 
@@ -153,7 +153,7 @@ struct SBClipCardShell: View {
             } else {
                 switch clip.previewStyle {
                 case .text:
-                    textBody(font: theme.typography.rowPrimary, color: theme.palette.textPrimary)
+                    textBody(font: cardBodyFont, color: theme.palette.textPrimary)
                 case let .code(languageHint):
                     VStack(alignment: .leading, spacing: theme.spacing.control6) {
                         if let languageHint, languageHint.isEmpty == false {
@@ -161,7 +161,7 @@ struct SBClipCardShell: View {
                                 .font(theme.typography.uppercaseLabel)
                                 .foregroundStyle(theme.palette.textTertiary)
                         }
-                        textBody(font: theme.typography.monoMeta, color: theme.accent(for: .info))
+                        textBody(font: cardCodeFont, color: theme.palette.textPrimary)
                     }
                 case .image:
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -188,12 +188,12 @@ struct SBClipCardShell: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(clip.titleText)
-                                .font(theme.typography.meta)
+                                .font(cardBodyFont)
                                 .foregroundStyle(theme.palette.textPrimary)
                                 .lineLimit(1)
 
                             Text(fileExtension?.uppercased() ?? clip.metadataText)
-                                .font(theme.typography.uppercaseLabel)
+                                .font(cardBodyFont)
                                 .foregroundStyle(theme.palette.textTertiary)
                                 .lineLimit(1)
                         }
@@ -201,12 +201,12 @@ struct SBClipCardShell: View {
 
                     if let bodyText = clip.bodyText, bodyText.isEmpty == false {
                         Text(bodyText)
-                            .font(theme.typography.meta)
+                            .font(cardBodyFont)
                             .foregroundStyle(theme.palette.textSecondary)
                             .lineLimit(min(bodyLineLimit, 4))
                     }
                 case .url:
-                    textBody(font: theme.typography.meta, color: theme.accent(for: .primary))
+                    textBody(font: cardBodyFont, color: theme.accent(for: .primary))
                 case let .color(swatches):
                     HStack(spacing: 3) {
                         ForEach(swatches, id: \.self) { swatch in
@@ -215,9 +215,9 @@ struct SBClipCardShell: View {
                                 .frame(width: 14, height: 14)
                         }
                     }
-                    textBody(font: theme.typography.monoMeta, color: theme.palette.textSecondary)
+                    textBody(font: cardCodeFont, color: theme.palette.textSecondary)
                 case .richText:
-                    textBody(font: theme.typography.rowSecondary, color: theme.palette.textPrimary)
+                    richTextBody
                 }
             }
 
@@ -257,21 +257,33 @@ struct SBClipCardShell: View {
         return decoded
     }
 
-    private var badgeTone: SBAccentTone {
+    private var typeHeaderBackground: Color {
+        let opacity = theme.mode == .dark ? 0.14 : 0.28
+
         switch clip.kind {
-        case .text, .richText:
-            return .neutral
+        case .text:
+            return Color(red: 1, green: 0.84, blue: 0.42).opacity(opacity)
+        case .richText:
+            return Color(red: 0.75, green: 0.64, blue: 1).opacity(opacity)
         case .code:
-            return .info
+            return Color(red: 0.48, green: 0.73, blue: 1).opacity(opacity)
         case .image:
-            return .success
+            return Color(red: 1, green: 0.55, blue: 0.55).opacity(opacity)
         case .file:
-            return .warning
+            return Color(red: 1, green: 0.67, blue: 0.36).opacity(opacity)
         case .url:
-            return .primary
+            return Color(red: 0.35, green: 0.80, blue: 0.72).opacity(opacity)
         case .color:
-            return .danger
+            return Color(red: 1, green: 0.58, blue: 0.76).opacity(opacity)
         }
+    }
+
+    private var cardBodyFont: Font {
+        .system(size: 13, weight: .regular)
+    }
+
+    private var cardCodeFont: Font {
+        .system(size: 13, weight: .regular, design: .monospaced)
     }
 
     private func textBody(font: Font, color: Color) -> some View {
@@ -283,10 +295,28 @@ struct SBClipCardShell: View {
 
             if let bodyText = clip.bodyText, bodyText.isEmpty == false {
                 Text(bodyText)
-                    .font(theme.typography.meta)
+                    .font(font)
                     .foregroundStyle(theme.palette.textSecondary)
                     .lineLimit(max(2, bodyLineLimit - 2))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var richTextBody: some View {
+        if let richTextRTFData = clip.richTextRTFData {
+            if let preview = SBRichTextPreview.makeAttributedString(from: richTextRTFData, theme: theme) {
+                Text(preview)
+                    .foregroundStyle(theme.palette.textPrimary)
+                    .lineSpacing(5)
+                    .lineLimit(bodyLineLimit)
+                    .truncationMode(.tail)
+            } else {
+                SBRichTextPreviewFallback(theme: theme)
+            }
+        } else {
+            // Plain-text rich clips retain the Rich Text header but use the normal preview.
+            textBody(font: cardBodyFont, color: theme.palette.textPrimary)
         }
     }
 
@@ -423,6 +453,75 @@ struct SBClipCardShell: View {
     }
 }
 
+private enum SBRichTextPreview {
+    static func makeAttributedString(from rtfData: Data, theme: SBTheme) -> AttributedString? {
+        guard let source = try? NSAttributedString(
+            data: rtfData,
+            options: [.documentType: NSAttributedString.DocumentType.rtf],
+            documentAttributes: nil
+        ), source.length > 0, containsUnsupportedContent(source) == false else {
+            return nil
+        }
+
+        let normalized = NSMutableAttributedString(attributedString: source)
+        let range = NSRange(location: 0, length: normalized.length)
+        normalized.enumerateAttribute(.font, in: range) { value, attributeRange, _ in
+            let sourceFont = value as? NSFont
+            let traits = sourceFont?.fontDescriptor.symbolicTraits ?? []
+            let isMonospaced = traits.contains(.monoSpace) || traits.contains(.classModernSerifs)
+            let isBold = traits.contains(.bold)
+            let isItalic = traits.contains(.italic)
+            var font = isMonospaced
+                ? NSFont.monospacedSystemFont(ofSize: 13, weight: isBold ? .semibold : .regular)
+                : NSFont.systemFont(ofSize: 13, weight: isBold ? .semibold : .regular)
+
+            if isItalic {
+                font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
+            }
+
+            normalized.addAttribute(.font, value: font, range: attributeRange)
+        }
+        normalized.enumerateAttribute(.link, in: range) { value, attributeRange, _ in
+            guard value != nil else { return }
+            normalized.addAttributes([
+                .foregroundColor: NSColor(theme.accent(for: .primary)),
+                .underlineStyle: NSUnderlineStyle.single.rawValue
+            ], range: attributeRange)
+        }
+
+        return AttributedString(normalized)
+    }
+
+    private static func containsUnsupportedContent(_ value: NSAttributedString) -> Bool {
+        var hasAttachment = false
+        value.enumerateAttribute(.attachment, in: NSRange(location: 0, length: value.length)) { attachment, _, stop in
+            if attachment != nil {
+                hasAttachment = true
+                stop.pointee = true
+            }
+        }
+        return hasAttachment
+    }
+}
+
+private struct SBRichTextPreviewFallback: View {
+    let theme: SBTheme
+
+    var body: some View {
+        HStack(spacing: theme.spacing.control6) {
+            Image(systemName: "doc.richtext")
+                .foregroundStyle(theme.accent(for: .primary))
+            Text("Rich content")
+                .font(theme.typography.rowPrimary)
+                .foregroundStyle(theme.palette.textSecondary)
+        }
+        .padding(theme.spacing.control8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.accentBackground(for: .primary).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
+    }
+}
+
 struct SBHorizontalClipRail: View {
     let clips: [ClipPreviewSummary]
     let theme: SBTheme
@@ -528,10 +627,10 @@ struct SBHorizontalClipRail: View {
 
         if animated {
             withAnimation(.easeOut(duration: 0.16)) {
-                proxy.scrollTo(selectedClipID, anchor: .center)
+                proxy.scrollTo(selectedClipID, anchor: .leading)
             }
         } else {
-            proxy.scrollTo(selectedClipID, anchor: .center)
+            proxy.scrollTo(selectedClipID, anchor: .leading)
         }
     }
 }

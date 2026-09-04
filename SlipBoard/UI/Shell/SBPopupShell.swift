@@ -23,6 +23,7 @@ struct SBPopupTopBar: View {
     let filters: [PopupFilterOption]
     let state: PopupShellViewState
     var isSearchEnabled: Bool = true
+    var searchFocusRequestToken: Int = 0
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
@@ -35,6 +36,7 @@ struct SBPopupTopBar: View {
         filters: [PopupFilterOption],
         state: PopupShellViewState,
         isSearchEnabled: Bool = true,
+        searchFocusRequestToken: Int = 0,
         onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
@@ -44,6 +46,7 @@ struct SBPopupTopBar: View {
         self.filters = filters
         self.state = state
         self.isSearchEnabled = isSearchEnabled
+        self.searchFocusRequestToken = searchFocusRequestToken
         self.onToggleSearchPresented = onToggleSearchPresented
         self.onSearchQueryChange = onSearchQueryChange
         self.onSelectFilter = onSelectFilter
@@ -70,7 +73,8 @@ struct SBPopupTopBar: View {
                 text: $searchText,
                 theme: theme,
                 isPresented: state.isSearchPresented,
-                trailingHint: "ESC"
+                trailingHint: "ESC",
+                focusRequestToken: searchFocusRequestToken
             )
             .disabled(isSearchEnabled == false)
             .opacity(isSearchEnabled ? 1 : 0.55)
@@ -145,6 +149,7 @@ struct SBPopupShell: View {
     var showOverlayPreview: Bool = true
     var pasteOverlayState: PasteActionOverlayState = .hidden
     var supportedTransformActionIDs: Set<PasteActionID> = Set(PasteActionID.transformMenuOrder)
+    var searchFocusRequestToken: Int = 0
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
@@ -166,7 +171,19 @@ struct SBPopupShell: View {
     var onConfirmTransformAction: () -> Void = {}
     var onCloseActiveOverlay: () -> Void = {}
 
-    private static let recentCardHeight: CGFloat = 150
+    // nil = no manual override yet, follow whether pinned has any clips.
+    @State private var manualPinnedCollapsed: Bool? = nil
+
+    private static let recentCardHeight: CGFloat = 148
+    private static let recentCardHeightPinnedCollapsed: CGFloat = 260
+
+    private var isPinnedCollapsed: Bool {
+        manualPinnedCollapsed ?? state.pinnedClips.isEmpty
+    }
+
+    private func togglePinnedCollapsed() {
+        manualPinnedCollapsed = !isPinnedCollapsed
+    }
 
     var body: some View {
         SBPopupShellFrame(theme: theme) {
@@ -176,6 +193,7 @@ struct SBPopupShell: View {
                     filters: filters,
                     state: state,
                     isSearchEnabled: isSearchEnabled,
+                    searchFocusRequestToken: searchFocusRequestToken,
                     onToggleSearchPresented: onToggleSearchPresented,
                     onSearchQueryChange: onSearchQueryChange,
                     onSelectFilter: onSelectFilter,
@@ -200,7 +218,7 @@ struct SBPopupShell: View {
                     .padding(.vertical, theme.spacing.control12)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 6) {
                             ClipboardHistoryRailSection(
                                 kind: .pinned,
                                 clips: state.pinnedClips,
@@ -211,6 +229,8 @@ struct SBPopupShell: View {
                                 activeGroupLabel: activeGroupLabel,
                                 noteEditorState: searchNotesState.activeEditor,
                                 searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                isCollapsed: isPinnedCollapsed,
+                                onToggleCollapse: togglePinnedCollapsed,
                                 onSelectClip: onSelectClip,
                                 onToggleNoteEditor: onToggleNoteEditor,
                                 onUpdateNoteDraft: onUpdateNoteDraft,
@@ -232,7 +252,7 @@ struct SBPopupShell: View {
                                 activeGroupLabel: activeGroupLabel,
                                 noteEditorState: searchNotesState.activeEditor,
                                 searchDisabledMessage: searchNotesState.searchDisabledMessage,
-                                cardHeight: Self.recentCardHeight,
+                                cardHeight: isPinnedCollapsed ? Self.recentCardHeightPinnedCollapsed : Self.recentCardHeight,
                                 onSelectClip: onSelectClip,
                                 onToggleNoteEditor: onToggleNoteEditor,
                                 onUpdateNoteDraft: onUpdateNoteDraft,

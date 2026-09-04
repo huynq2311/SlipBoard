@@ -54,6 +54,7 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             pinnedItem.filePaths = candidate.filePaths
             pinnedItem.colorSwatches = candidate.colorSwatches
             pinnedItem.richTextAvailable = candidate.richTextAvailable
+            pinnedItem.richTextRTFData = candidate.richTextRTFData
 
             snapshot.recentItems.removeAll(where: { $0.dedupeKey == dedupeKey })
             snapshot.pinnedItems.append(pinnedItem)
@@ -70,6 +71,7 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             recentItem.filePaths = candidate.filePaths
             recentItem.colorSwatches = candidate.colorSwatches
             recentItem.richTextAvailable = candidate.richTextAvailable
+            recentItem.richTextRTFData = candidate.richTextRTFData
 
             snapshot.recentItems.insert(recentItem, at: 0)
         } else {
@@ -242,7 +244,8 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             isPinned: false,
             filePaths: sample.filePaths,
             colorSwatches: descriptor.colorSwatches,
-            richTextAvailable: sample.richTextAvailable
+            richTextAvailable: sample.richTextAvailable,
+            richTextRTFData: sample.richTextRTFData
         )
     }
 

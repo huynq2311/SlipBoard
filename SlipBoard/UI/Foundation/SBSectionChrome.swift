@@ -4,6 +4,10 @@ struct SBSectionHeader: View {
     let title: String
     let theme: SBTheme
     var symbolName: String? = nil
+    var countText: String? = nil
+    var disclosureSymbolName: String? = nil
+    var disclosureAccessibilityLabel: String? = nil
+    var onDisclosure: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: theme.spacing.control8) {
@@ -18,6 +22,20 @@ struct SBSectionHeader: View {
                     .tracking(0.8)
             }
             .foregroundStyle(theme.palette.textTertiary)
+
+            if let countText {
+                SBCountBadge(text: countText, theme: theme, tone: .neutral, compact: true)
+            }
+
+            if let disclosureSymbolName, let onDisclosure {
+                Button(action: onDisclosure) {
+                    Image(systemName: disclosureSymbolName)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(theme.palette.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(disclosureAccessibilityLabel ?? disclosureSymbolName)
+            }
 
             Rectangle()
                 .fill(theme.palette.border)

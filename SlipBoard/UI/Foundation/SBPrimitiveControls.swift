@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SBIconButton: View {
@@ -32,6 +33,9 @@ struct SBSearchFieldShell: View {
     var isPresented: Bool
     var placeholder: String = "Search clipboard..."
     var trailingHint: String? = nil
+    var focusRequestToken: Int = 0
+
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: theme.spacing.control6) {
@@ -43,9 +47,17 @@ struct SBSearchFieldShell: View {
                 .textFieldStyle(.plain)
                 .font(theme.typography.rowPrimary)
                 .foregroundStyle(theme.palette.textPrimary)
+                .focused($isFocused)
 
             if let trailingHint, isPresented {
                 SBKeyboardHint(text: trailingHint, theme: theme)
+            }
+        }
+        .onChange(of: focusRequestToken) { _, _ in
+            isFocused = true
+            DispatchQueue.main.async {
+                guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
+                editor.selectedRange = NSRange(location: editor.string.count, length: 0)
             }
         }
         .padding(.horizontal, theme.spacing.control8)

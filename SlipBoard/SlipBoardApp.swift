@@ -20,6 +20,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     @Published private(set) var snippetsHotkeysSnapshot: SnippetsHotkeysRuntimeSnapshot
     @Published private(set) var exclusionsPauseSnapshot: ExclusionsPauseSnapshot
     @Published private(set) var bridgeSnapshot: BridgeRuntimeSnapshot
+    @Published private(set) var searchFocusRequestToken: Int = 0
     @Published var organizationDraftName: String
 
     private let controller: ClipboardHistoryController
@@ -380,6 +381,12 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         recordSecurityInteraction()
         isSearchPresented = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false || isSearchPresented
         controller.updateSearchQuery(query)
+    }
+
+    func appendTypedCharactersToSearch(_ characters: String) {
+        guard securitySnapshot.lockState.revealsProtectedContent, searchNotesState.isSearchEnabled else { return }
+        updateSearchQuery(popupState.searchQuery + characters)
+        searchFocusRequestToken += 1
     }
 
     func selectFilter(id: String) {
@@ -2134,6 +2141,7 @@ struct SlipBoardApp: App {
     @StateObject private var runtime = ClipboardHistoryAppRuntime()
     @State private var popupPresentationController = SBPopupPresentationController()
     @State private var didInitializeShellLifecycle = false
+    @State private var wasPopupPresented = false
 
     var body: some Scene {
         MenuBarExtra {
@@ -2206,6 +2214,9 @@ struct SlipBoardApp: App {
         popupPresentationController.onMoveSelectionRequested = { delta in
             runtime.moveSelection(by: delta)
         }
+        popupPresentationController.onTypeToSearchCharacters = { characters in
+            runtime.appendTypedCharactersToSearch(characters)
+        }
         runtime.focusSettings(on: .general)
         runtime.startMonitoring()
         didInitializeShellLifecycle = true
@@ -2243,9 +2254,16 @@ struct SlipBoardApp: App {
 
     private func syncPopupPresentation() {
         guard runtime.isPopupPresented, runtime.shouldSuppressPopupPresentation == false else {
+            wasPopupPresented = false
             popupPresentationController.dismissIfNeeded(notifyVisibilityChange: runtime.isPopupPresented)
             return
         }
+
+        if wasPopupPresented == false {
+            let firstClipID = runtime.popupState.recentClips.first?.id
+            runtime.selectClip(id: firstClipID)
+        }
+        wasPopupPresented = true
 
         popupPresentationController.present(isLocked: runtime.securitySnapshot.lockState.revealsProtectedContent == false) {
             ClipboardHistoryPopupView(
@@ -2257,6 +2275,7 @@ struct SlipBoardApp: App {
                 securitySnapshot: runtime.securitySnapshot,
                 pasteOverlayState: runtime.pasteOverlayState,
                 supportedTransformActionIDs: runtime.supportedTransformActionIDs,
+                searchFocusRequestToken: runtime.searchFocusRequestToken,
                 onToggleSearchPresented: runtime.setSearchPresented,
                 onSearchQueryChange: runtime.updateSearchQuery,
                 onSelectFilter: runtime.selectFilter,

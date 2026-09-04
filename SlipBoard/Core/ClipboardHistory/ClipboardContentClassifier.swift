@@ -177,10 +177,12 @@ struct ClipboardContentClassifier {
             return nil
         }
 
-        guard
-            let rawString = pasteboard.string(forType: .string) ?? pasteboard.string(forType: .rtf),
-            let normalizedText = normalizedText(for: rawString)
-        else {
+        let richTextRTFData = pasteboard.data(forType: .rtf)
+        let rawString = richTextRTFData
+            .flatMap(plainText(fromRTFData:))
+            ?? pasteboard.string(forType: .string)
+
+        guard let rawString, let normalizedText = normalizedText(for: rawString) else {
             return nil
         }
 
@@ -190,6 +192,7 @@ struct ClipboardContentClassifier {
             kind: .richText,
             rawString: rawString,
             richTextAvailable: true,
+            richTextRTFData: richTextRTFData,
             normalizedText: normalizedText,
             normalizedHash: normalizedHash(for: normalizedText),
             sourceApp: sourceApp
@@ -274,6 +277,18 @@ struct ClipboardContentClassifier {
         }
 
         return types.contains(.rtf) || types.contains(.html)
+    }
+
+    private func plainText(fromRTFData data: Data) -> String? {
+        guard let attributed = try? NSAttributedString(
+            data: data,
+            options: [.documentType: NSAttributedString.DocumentType.rtf],
+            documentAttributes: nil
+        ) else {
+            return nil
+        }
+
+        return attributed.string
     }
 
     private func looksLikeHexColor(_ text: String) -> Bool {

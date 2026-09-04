@@ -53,6 +53,7 @@ struct ClipPreviewSummary: Identifiable, Hashable {
     var createdLabel: String
     var previewStyle: ClipPreviewStyle
     var secondaryBadgeText: String?
+    var richTextRTFData: Data?
 
     var hasNote: Bool {
         guard let noteText else { return false }
@@ -70,7 +71,8 @@ struct ClipPreviewSummary: Identifiable, Hashable {
         sourceApp: ClipSourceAppSummary,
         createdLabel: String,
         previewStyle: ClipPreviewStyle,
-        secondaryBadgeText: String? = nil
+        secondaryBadgeText: String? = nil,
+        richTextRTFData: Data? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -83,6 +85,7 @@ struct ClipPreviewSummary: Identifiable, Hashable {
         self.createdLabel = createdLabel
         self.previewStyle = previewStyle
         self.secondaryBadgeText = secondaryBadgeText
+        self.richTextRTFData = richTextRTFData
     }
 }
 

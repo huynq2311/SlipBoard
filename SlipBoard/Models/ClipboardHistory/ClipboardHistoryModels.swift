@@ -87,6 +87,7 @@ struct ClipboardCaptureSample: Hashable {
     var imageAvailable: Bool
     var imageData: Data?
     var richTextAvailable: Bool
+    var richTextRTFData: Data?
     var normalizedText: String?
     var normalizedHash: String?
     var sourceApp: ClipboardSourceAppSummary
@@ -101,6 +102,7 @@ struct ClipboardCaptureSample: Hashable {
         imageAvailable: Bool = false,
         imageData: Data? = nil,
         richTextAvailable: Bool = false,
+        richTextRTFData: Data? = nil,
         normalizedText: String? = nil,
         normalizedHash: String? = nil,
         sourceApp: ClipboardSourceAppSummary
@@ -114,6 +116,7 @@ struct ClipboardCaptureSample: Hashable {
         self.imageAvailable = imageAvailable
         self.imageData = imageData
         self.richTextAvailable = richTextAvailable
+        self.richTextRTFData = richTextRTFData
         self.normalizedText = normalizedText
         self.normalizedHash = normalizedHash
         self.sourceApp = sourceApp
@@ -136,6 +139,7 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
     var filePaths: [String]
     var colorSwatches: [String]
     var richTextAvailable: Bool
+    var richTextRTFData: Data?
 
     init(
         id: String,
@@ -152,7 +156,8 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
         isPinned: Bool = false,
         filePaths: [String] = [],
         colorSwatches: [String] = [],
-        richTextAvailable: Bool = false
+        richTextAvailable: Bool = false,
+        richTextRTFData: Data? = nil
     ) {
         self.id = id
         self.capturedAt = capturedAt
@@ -169,6 +174,7 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
         self.filePaths = filePaths
         self.colorSwatches = colorSwatches
         self.richTextAvailable = richTextAvailable
+        self.richTextRTFData = richTextRTFData
     }
 
     var dedupeKey: String {

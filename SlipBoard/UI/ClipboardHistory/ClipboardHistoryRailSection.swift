@@ -37,6 +37,8 @@ struct ClipboardHistoryRailSection: View {
     var noteEditorState: ClipNoteEditorState? = nil
     var searchDisabledMessage: SearchDisabledMessage? = nil
     var cardHeight: CGFloat = 128
+    var isCollapsed: Bool = false
+    var onToggleCollapse: () -> Void = {}
     var onSelectClip: (String) -> Void = { _ in }
     var onToggleNoteEditor: (String) -> Void = { _ in }
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
@@ -49,63 +51,71 @@ struct ClipboardHistoryRailSection: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SBSectionHeader(
-                title: kind.title,
-                theme: theme,
-                symbolName: kind.symbolName
-            )
+            HStack(spacing: theme.spacing.control8) {
+                SBSectionHeader(
+                    title: kind.title,
+                    theme: theme,
+                    symbolName: kind.symbolName,
+                    countText: String(clips.count),
+                    disclosureSymbolName: kind == .pinned ? (isCollapsed ? "chevron.right" : "chevron.down") : nil,
+                    disclosureAccessibilityLabel: kind == .pinned ? (isCollapsed ? "Show pinned" : "Hide pinned") : nil,
+                    onDisclosure: kind == .pinned ? onToggleCollapse : nil
+                )
+            }
             .padding(.horizontal, theme.spacing.popupPadding)
             .padding(.top, kind == .pinned ? 6 : 3)
             .padding(.bottom, 3)
 
-            if kind == .pinned && displayedClips.isEmpty {
-                HStack(spacing: theme.spacing.control6) {
-                    Image(systemName: "pin.slash")
-                        .font(.system(size: 10, weight: .medium))
-                    Text("No pinned clips")
-                        .font(theme.typography.meta)
-                }
-                .foregroundStyle(theme.palette.textTertiary)
-                .padding(.horizontal, theme.spacing.popupPadding)
-                .padding(.bottom, theme.spacing.control8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else if displayedClips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: theme.spacing.railGap) {
-                        ClipboardHistoryEmptyRailCard(
-                            kind: kind,
-                            theme: theme,
-                            searchQuery: searchQuery,
-                            activeFilterLabel: activeFilterLabel,
-                            activeGroupLabel: activeGroupLabel,
-                            searchDisabledMessage: resolvedSearchDisabledMessage
-                        )
-                        .frame(width: 220, alignment: .leading)
+            if isCollapsed == false {
+                if kind == .pinned && displayedClips.isEmpty {
+                    HStack(spacing: theme.spacing.control6) {
+                        Image(systemName: "pin.slash")
+                            .font(.system(size: 10, weight: .medium))
+                        Text("No pinned clips")
+                            .font(theme.typography.meta)
                     }
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, theme.spacing.popupPadding)
-                    .padding(.top, 6)
-                    .padding(.bottom, theme.spacing.section16)
+                    .frame(height: cardHeight + 7, alignment: .center)
+                } else if displayedClips.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: theme.spacing.railGap) {
+                            ClipboardHistoryEmptyRailCard(
+                                kind: kind,
+                                theme: theme,
+                                searchQuery: searchQuery,
+                                activeFilterLabel: activeFilterLabel,
+                                activeGroupLabel: activeGroupLabel,
+                                searchDisabledMessage: resolvedSearchDisabledMessage
+                            )
+                            .frame(width: 220, alignment: .leading)
+                        }
+                        .padding(.horizontal, theme.spacing.popupPadding)
+                        .padding(.top, 6)
+                        .padding(.bottom, theme.spacing.section16)
+                    }
+                } else {
+                    SBHorizontalClipRail(
+                        clips: displayedClips,
+                        theme: theme,
+                        emptyTitle: emptyStateTitle,
+                        emptyDetail: emptyStateDetail,
+                        cardHeight: cardHeight,
+                        selectedClipID: selectedClipID,
+                        securitySnapshot: securitySnapshot,
+                        onSelectClip: onSelectClip,
+                        noteEditorState: noteEditorState,
+                        onToggleNoteEditor: onToggleNoteEditor,
+                        onUpdateNoteDraft: onUpdateNoteDraft,
+                        onSaveNoteDraft: onSaveNoteDraft,
+                        onCancelNoteEditing: onCancelNoteEditing,
+                        onClearNote: onClearNote,
+                        onPrimaryAction: onPrimaryAction,
+                        onOpenContextMenu: onOpenContextMenu,
+                        onPerformContextAction: onPerformContextAction
+                    )
                 }
-            } else {
-                SBHorizontalClipRail(
-                    clips: displayedClips,
-                    theme: theme,
-                    emptyTitle: emptyStateTitle,
-                    emptyDetail: emptyStateDetail,
-                    cardHeight: cardHeight,
-                    selectedClipID: selectedClipID,
-                    securitySnapshot: securitySnapshot,
-                    onSelectClip: onSelectClip,
-                    noteEditorState: noteEditorState,
-                    onToggleNoteEditor: onToggleNoteEditor,
-                    onUpdateNoteDraft: onUpdateNoteDraft,
-                    onSaveNoteDraft: onSaveNoteDraft,
-                    onCancelNoteEditing: onCancelNoteEditing,
-                    onClearNote: onClearNote,
-                    onPrimaryAction: onPrimaryAction,
-                    onOpenContextMenu: onOpenContextMenu,
-                    onPerformContextAction: onPerformContextAction
-                )
             }
         }
     }
