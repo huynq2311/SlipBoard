@@ -15,7 +15,7 @@ enum MockFoundationFixtures {
         searchQuery: "",
         isSearchPresented: false,
         activeFilterID: "all",
-        themePreview: .dark,
+        themePreview: .light,
         pinnedClips: pinnedClips,
         recentClips: recentClips,
         status: PopupStatusSummary(

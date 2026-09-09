@@ -16,13 +16,13 @@ final class CloudBridgeRuntimeController: BridgeRuntimeProviding {
         transport: BridgeTransporting = CloudBridgeRecordStore(),
         evaluator: BridgeEligibilityEvaluating = CloudBridgeEligibilityEvaluator(),
         now: @escaping () -> Date = Date.init,
-        localDeviceName: @escaping () -> String = CloudBridgeRuntimeController.defaultLocalDeviceName
+        localDeviceName: (() -> String)? = nil
     ) {
         self.settingsStore = settingsStore
         self.transport = transport
         self.evaluator = evaluator
         self.now = now
-        self.localDeviceName = localDeviceName
+        self.localDeviceName = localDeviceName ?? Self.defaultLocalDeviceName
 
         let settings = settingsStore.storedSettings
         self.latestSnapshot = BridgeRuntimeSnapshot(
@@ -288,7 +288,7 @@ final class CloudBridgeRuntimeController: BridgeRuntimeProviding {
         return baseActivity
     }
 
-    private static func defaultLocalDeviceName() -> String {
+    private nonisolated static func defaultLocalDeviceName() -> String {
         Host.current().localizedName ?? "This Mac"
     }
 }

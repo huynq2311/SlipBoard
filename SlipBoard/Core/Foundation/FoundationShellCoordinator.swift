@@ -2,7 +2,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class FoundationShellCoordinator: ObservableObject, @preconcurrency PopupShellRouting {
+final class FoundationShellCoordinator: ObservableObject, PopupShellRouting {
     @Published var popupShellState: PopupShellViewState
     @Published var popupFilterOptions: [PopupFilterOption]
     @Published var settingsShellState: SettingsShellState
@@ -12,19 +12,19 @@ final class FoundationShellCoordinator: ObservableObject, @preconcurrency PopupS
     @Published var exclusionsPauseSnapshot: ExclusionsPauseSnapshot?
 
     init(
-        popupShellState: PopupShellViewState = MockFoundationFixtures.popupShellState,
-        popupFilterOptions: [PopupFilterOption] = MockFoundationFixtures.popupFilterOptions,
-        settingsShellState: SettingsShellState = MockFoundationFixtures.settingsShellState,
-        menuBarSummaryState: MenuBarSummaryState = MockFoundationFixtures.menuBarSummaryState,
-        presentationState: FoundationShellPresentationState = FoundationShellPresentationState(),
+        popupShellState: PopupShellViewState? = nil,
+        popupFilterOptions: [PopupFilterOption]? = nil,
+        settingsShellState: SettingsShellState? = nil,
+        menuBarSummaryState: MenuBarSummaryState? = nil,
+        presentationState: FoundationShellPresentationState? = nil,
         securitySnapshot: SecurityRuntimeSnapshot? = nil,
         exclusionsPauseSnapshot: ExclusionsPauseSnapshot? = nil
     ) {
-        self.popupShellState = popupShellState
-        self.popupFilterOptions = popupFilterOptions
-        self.settingsShellState = settingsShellState
-        self.baseMenuBarSummaryState = menuBarSummaryState
-        self.presentationState = presentationState
+        self.popupShellState = popupShellState ?? MockFoundationFixtures.popupShellState
+        self.popupFilterOptions = popupFilterOptions ?? MockFoundationFixtures.popupFilterOptions
+        self.settingsShellState = settingsShellState ?? MockFoundationFixtures.settingsShellState
+        self.baseMenuBarSummaryState = menuBarSummaryState ?? MockFoundationFixtures.menuBarSummaryState
+        self.presentationState = presentationState ?? FoundationShellPresentationState()
         self.securitySnapshot = securitySnapshot
         self.exclusionsPauseSnapshot = exclusionsPauseSnapshot
     }

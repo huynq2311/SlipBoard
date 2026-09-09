@@ -25,7 +25,7 @@ final class ClipboardImageAssetStore {
         }
     }
 
-    func data(for clipID: String) -> Data? {
+    nonisolated func data(for clipID: String) -> Data? {
         if let cached = memoryCache.object(forKey: clipID as NSString) {
             return cached as Data
         }

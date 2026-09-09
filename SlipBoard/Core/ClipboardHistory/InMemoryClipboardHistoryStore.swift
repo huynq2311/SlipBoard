@@ -169,6 +169,18 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
         snapshot = normalizedSnapshot(from: snapshot)
     }
 
+    func touchItem(id: String, at date: Date) {
+        if let index = snapshot.pinnedItems.firstIndex(where: { $0.id == id }) {
+            snapshot.pinnedItems[index].lastCopiedAt = date
+        } else if let index = snapshot.recentItems.firstIndex(where: { $0.id == id }) {
+            snapshot.recentItems[index].lastCopiedAt = date
+        } else {
+            return
+        }
+
+        snapshot = normalizedSnapshot(from: snapshot)
+    }
+
     var retentionManagedClips: [RetentionManagedClip] {
         snapshot.allItems.map(makeManagedClip)
     }

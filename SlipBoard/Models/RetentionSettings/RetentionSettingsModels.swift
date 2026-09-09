@@ -70,12 +70,14 @@ struct RetentionSettings: Hashable {
     var maxItemCount: Int
     var ttlPolicy: RetentionTTLPolicy
     var clearOnQuit: Bool
+    var bumpPastedItemToFront: Bool
     var lastUpdatedAt: Date
 
     init(
         maxItemCount: Int = RetentionSettingBounds.defaultItemCount,
         ttlPolicy: RetentionTTLPolicy = .oneMonth,
         clearOnQuit: Bool = false,
+        bumpPastedItemToFront: Bool = true,
         lastUpdatedAt: Date = .now
     ) {
         self.maxItemCount = RetentionSettings.clampValue(
@@ -86,6 +88,7 @@ struct RetentionSettings: Hashable {
         )
         self.ttlPolicy = ttlPolicy
         self.clearOnQuit = clearOnQuit
+        self.bumpPastedItemToFront = bumpPastedItemToFront
         self.lastUpdatedAt = lastUpdatedAt
     }
 
@@ -93,12 +96,14 @@ struct RetentionSettings: Hashable {
         maxItemCount: Int? = nil,
         ttlPolicy: RetentionTTLPolicy? = nil,
         clearOnQuit: Bool? = nil,
+        bumpPastedItemToFront: Bool? = nil,
         lastUpdatedAt: Date = .now
     ) -> RetentionSettings {
         RetentionSettings(
             maxItemCount: maxItemCount ?? self.maxItemCount,
             ttlPolicy: ttlPolicy ?? self.ttlPolicy,
             clearOnQuit: clearOnQuit ?? self.clearOnQuit,
+            bumpPastedItemToFront: bumpPastedItemToFront ?? self.bumpPastedItemToFront,
             lastUpdatedAt: lastUpdatedAt
         )
     }

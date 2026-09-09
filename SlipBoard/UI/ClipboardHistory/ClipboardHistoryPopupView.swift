@@ -2,6 +2,9 @@ import AppKit
 import SwiftUI
 
 struct ClipboardHistoryPopupView: View {
+    @SBLocalizedCopy private var copy
+    @Environment(\.sbLocalizationLanguage) private var localizationLanguage
+
     let theme: SBTheme
     let filters: [PopupFilterOption]
     let state: PopupShellViewState
@@ -17,6 +20,10 @@ struct ClipboardHistoryPopupView: View {
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
+    var onPauseCapture: () -> Void = {}
+    var onClearHistory: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+    var onQuit: () -> Void = {}
     var onSelectClipID: (String?) -> Void = { _ in }
     var onMoveSelection: (Int) -> Void = { _ in }
     var onDeleteSelectedClip: () -> Void = {}
@@ -33,6 +40,8 @@ struct ClipboardHistoryPopupView: View {
     var onHighlightTransformAction: (PasteActionID) -> Void = { _ in }
     var onSelectTransformAction: (PasteActionID) -> Void = { _ in }
     var onExecutePasteAction: (PasteActionID, PasteActionCloseBehavior) -> Void = { _, _ in }
+    var isPinnedCollapsed: Bool = false
+    var onTogglePinnedCollapsed: () -> Void = {}
 
     var body: some View {
         SBPopupShell(
@@ -50,6 +59,10 @@ struct ClipboardHistoryPopupView: View {
             onSelectFilter: onSelectFilter,
             onSelectThemePreview: onSelectThemePreview,
             onSelectOrganizationGroup: onSelectOrganizationGroup,
+            onPauseCapture: onPauseCapture,
+            onClearHistory: onClearHistory,
+            onOpenSettings: onOpenSettings,
+            onQuit: onQuit,
             onSelectClip: { clipID in
                 onSelectClipID(clipID)
             },
@@ -69,9 +82,12 @@ struct ClipboardHistoryPopupView: View {
             onHighlightTransformAction: onHighlightTransformAction,
             onSelectTransformAction: onSelectTransformAction,
             onConfirmTransformAction: confirmHighlightedTransformAction,
-            onCloseActiveOverlay: onCloseActiveOverlay
+            onCloseActiveOverlay: onCloseActiveOverlay,
+            isPinnedCollapsed: isPinnedCollapsed,
+            onTogglePinnedCollapsed: onTogglePinnedCollapsed
         )
         .focusable()
+        .focusEffectDisabled()
         .onMoveCommand(perform: handleMoveCommand)
         .onKeyPress(keys: [.delete, .deleteForward], action: handleDeleteKeyPress)
         .onExitCommand(perform: handleExitCommand)
@@ -288,10 +304,10 @@ struct ClipboardHistoryPopupView: View {
 
     private func redactedClipSummary(_ clip: ClipPreviewSummary) -> ClipPreviewSummary {
         var redacted = clip
-        redacted.titleText = "Preview hidden"
-        redacted.bodyText = "Privacy mode is redacting this clip preview."
+        redacted.titleText = copy.text(.popupPreviewHidden)
+        redacted.bodyText = copy.text(.clipRedactionPrivacy)
         redacted.noteText = nil
-        redacted.secondaryBadgeText = "PRIVATE"
+        redacted.secondaryBadgeText = localizedUppercase(copy.text(.popupPrivate))
         return redacted
     }
 
@@ -300,7 +316,7 @@ struct ClipboardHistoryPopupView: View {
 
         if exclusionsPauseSnapshot.pauseState.isPaused {
             return PopupStatusSummary(
-                statusLabel: "Capture Paused",
+                statusLabel: copy.text(.statusCapturePaused),
                 statusTone: .paused,
                 primaryHint: pausePrimaryHint(for: exclusionsPauseSnapshot),
                 secondaryHint: pauseSecondaryHint(for: exclusionsPauseSnapshot),
@@ -323,53 +339,58 @@ struct ClipboardHistoryPopupView: View {
 
     private func pausePrimaryHint(for snapshot: ExclusionsPauseSnapshot) -> String {
         if let resumeAt = snapshot.pauseState.resumeAt {
-            return "Resumes \(relativeTimestamp(for: resumeAt))"
+            return copy.text(.statusResumes, ["value": relativeTimestamp(for: resumeAt)])
         }
 
-        return snapshot.activePauseLabel ?? "Resume capturing from the menu"
+        return snapshot.activePauseLabel ?? copy.text(.statusResumeFromMenu)
     }
 
     private func pauseSecondaryHint(for snapshot: ExclusionsPauseSnapshot) -> String {
         if let activePauseLabel = snapshot.activePauseLabel {
-            return "Pause mode: \(activePauseLabel)"
+            return copy.text(.statusPauseMode, ["value": activePauseLabel])
         }
 
-        return "Resume capturing from the menu"
+        return copy.text(.statusResumeFromMenu)
     }
 
     private func excludedStatusLabel(for snapshot: ExclusionsPauseSnapshot) -> String {
         let appName = snapshot.frontmostApp?.displayName ?? snapshot.matchedExcludedApp?.appContext.displayName
         guard let appName, appName.isEmpty == false else {
-            return "Excluded App Active"
+            return copy.text(.statusExcludedAppActive)
         }
 
-        return "Excluded in \(appName)"
+        return copy.text(.statusExcludedIn, ["app": appName])
     }
 
     private func excludedPrimaryHint(for snapshot: ExclusionsPauseSnapshot) -> String {
         switch snapshot.capturePolicyDecision {
         case .ignoreBecauseExcludedApp:
-            return "Capture ignored for this app"
+            return copy.text(.statusCaptureIgnoredThisApp)
         case .ignoreBecausePaused:
             return pausePrimaryHint(for: snapshot)
         case .allow:
             return snapshot.behaviorSettings.hidePopupInsideExcludedApps
-                ? "Popup hides in excluded apps"
-                : "Popup still shows in excluded apps"
+                ? copy.text(.statusPopupHidesInExcludedApps)
+                : copy.text(.statusPopupShowsInExcludedApps)
         }
     }
 
     private func excludedSecondaryHint(for snapshot: ExclusionsPauseSnapshot) -> String {
         if snapshot.behaviorSettings.hidePopupInsideExcludedApps {
-            return "Hide popup is on"
+            return copy.text(.statusHidePopupOn)
         }
 
-        return "Hide popup is off"
+        return copy.text(.statusHidePopupOff)
     }
 
     private func relativeTimestamp(for date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
+        formatter.locale = Locale(identifier: localizationLanguage.localeIdentifier)
         return formatter.localizedString(for: date, relativeTo: .now)
+    }
+
+    private func localizedUppercase(_ value: String) -> String {
+        value.uppercased(with: Locale(identifier: localizationLanguage.localeIdentifier))
     }
 }

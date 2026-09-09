@@ -1,10 +1,17 @@
 import SwiftUI
 
+enum SBSectionHeaderStyle: Hashable {
+    case compact
+    case popup
+}
+
 struct SBSectionHeader: View {
     let title: String
     let theme: SBTheme
     var symbolName: String? = nil
     var countText: String? = nil
+    var isEmphasized: Bool = false
+    var style: SBSectionHeaderStyle = .compact
     var disclosureSymbolName: String? = nil
     var disclosureAccessibilityLabel: String? = nil
     var onDisclosure: (() -> Void)? = nil
@@ -17,14 +24,20 @@ struct SBSectionHeader: View {
                         .font(.system(size: 9, weight: .semibold))
                 }
 
-                Text(title.uppercased())
-                    .font(theme.typography.uppercaseLabel)
-                    .tracking(0.8)
+                Text(style == .popup ? title : title.uppercased())
+                    .font(style == .popup ? .system(size: 13, weight: .semibold) : theme.typography.uppercaseLabel)
+                    .tracking(style == .popup ? 0 : 0.8)
             }
-            .foregroundStyle(theme.palette.textTertiary)
+            .foregroundStyle(isEmphasized ? theme.palette.accentPrimary : theme.palette.textTertiary)
 
             if let countText {
-                SBCountBadge(text: countText, theme: theme, tone: .neutral, compact: true)
+                if style == .popup {
+                    Text("· \(countText)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(theme.palette.textSecondary)
+                } else {
+                    SBCountBadge(text: countText, theme: theme, tone: isEmphasized ? .primary : .neutral, compact: true)
+                }
             }
 
             if let disclosureSymbolName, let onDisclosure {
@@ -32,14 +45,20 @@ struct SBSectionHeader: View {
                     Image(systemName: disclosureSymbolName)
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(theme.palette.textTertiary)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(disclosureAccessibilityLabel ?? disclosureSymbolName)
             }
 
-            Rectangle()
-                .fill(theme.palette.border)
-                .frame(height: theme.border.hairline)
+            if style == .compact {
+                Rectangle()
+                    .fill(theme.palette.border)
+                    .frame(height: theme.border.hairline)
+            } else {
+                Spacer(minLength: 0)
+            }
         }
     }
 }

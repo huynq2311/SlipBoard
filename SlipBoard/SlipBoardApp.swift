@@ -5,6 +5,8 @@ import SwiftUI
 
 @MainActor
 final class ClipboardHistoryAppRuntime: ObservableObject {
+    let localization: LocalizationStore
+    @Published private(set) var appLanguage: AppLanguage
     @Published private(set) var popupState: PopupShellViewState
     @Published private(set) var filterOptions: [PopupFilterOption]
     @Published private(set) var menuBarSummary: MenuBarSummaryState
@@ -21,6 +23,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     @Published private(set) var exclusionsPauseSnapshot: ExclusionsPauseSnapshot
     @Published private(set) var bridgeSnapshot: BridgeRuntimeSnapshot
     @Published private(set) var searchFocusRequestToken: Int = 0
+    // nil = no manual override yet, follow whether pinned has any clips.
+    @Published private(set) var manualPinnedCollapsed: Bool? = nil
     @Published var organizationDraftName: String
 
     private let controller: ClipboardHistoryController
@@ -32,6 +36,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     private var themePreview: PopupThemePreview
     private var isSearchPresented: Bool
     private var runtimeStatusOverride: RuntimeStatusOverride?
+    private var localizationCancellable: AnyCancellable?
 
     init(
         controller: ClipboardHistoryController? = nil,
@@ -39,6 +44,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         bridgeRuntime: CloudBridgeRuntimeController? = nil,
         shellCoordinator: FoundationShellCoordinator? = nil
     ) {
+        let resolvedLocalization = LocalizationStore()
         let components = Self.resolveRuntimeComponents(
             controller: controller,
             securityRuntime: securityRuntime,
@@ -51,6 +57,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             securityStateProvider: components.securityRuntime
         )
 
+        self.localization = resolvedLocalization
+        self.appLanguage = resolvedLocalization.language
         self.controller = resolvedController
         self.bridgeRuntime = components.bridgeRuntime
         self.securityRuntime = components.securityRuntime
@@ -124,6 +132,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
                 self?.apply(securitySnapshot: snapshot)
             }
         }
+        localizationCancellable = resolvedLocalization.languagePublisher
+            .dropFirst()
+            .sink { [weak self] language in
+                self?.appLanguage = language
+            }
 
         components.bridgeRuntime.bootstrap()
         components.securityRuntime.bootstrap()
@@ -143,6 +156,10 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         popupTheme.mode == .dark ? .dark : .light
     }
 
+    func setAppLanguage(_ language: AppLanguage) {
+        localization.setLanguage(language)
+    }
+
     var shouldSuppressPopupPresentation: Bool {
         switch exclusionsPauseSnapshot.popupPolicyDecision {
         case .allow:
@@ -153,7 +170,115 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     }
 
     var totalCountText: String {
-        menuBarSummary.itemCount == 1 ? "1 item" : "\(menuBarSummary.itemCount) items"
+        localization.plural(.historyItemCount, count: menuBarSummary.itemCount)
+    }
+
+    var localizedFilterOptions: [PopupFilterOption] {
+        filterOptions.map { option in
+            var localized = option
+            switch option.id {
+            case "all": localized.label = localization.text(.commonAll)
+            case "text": localized.label = localization.text(.contentText)
+            case "code": localized.label = localization.text(.contentCode)
+            case "image": localized.label = localization.text(.contentImage)
+            case "file": localized.label = localization.text(.contentFile)
+            case "url": localized.label = localization.text(.contentURL)
+            case "color": localized.label = localization.text(.contentColor)
+            case "richText", "rich-text": localized.label = localization.text(.contentRichText)
+            default: break
+            }
+            return localized
+        }
+    }
+
+    var localizedPopupState: PopupShellViewState {
+        var localized = popupState
+        var status = localized.status
+        let visibleCount = searchNotesState.searchResultCount
+        let hasSearchContext = searchNotesState.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            || searchNotesState.activeGroupID != .all
+
+        if securitySnapshot.lockState.revealsProtectedContent == false {
+            status.statusLabel = localization.text(.popupSearchLockedTitle)
+            status.primaryHint = localization.text(.popupSearchLockedTitle)
+            status.secondaryHint = localization.text(.popupSearchLockedDetail)
+            status.itemCountText = localization.text(.popupVisibleCount, ["count": localization.format(number: visibleCount)])
+        } else {
+            switch status.statusTone {
+            case .success:
+                status.statusLabel = localization.text(.statusCaptureActive)
+                status.primaryHint = localization.text(.popupReturnToPaste)
+                status.secondaryHint = localization.text(.popupCommandSearch)
+            case .normal:
+                status.statusLabel = localization.text(.statusWaitingForCopy)
+                status.primaryHint = localization.text(.popupCopyToBegin)
+                status.secondaryHint = localization.text(.popupCommandSearch)
+            case .warning:
+                status.statusLabel = localization.text(.statusUnsupportedIgnored)
+                status.secondaryHint = localization.text(.popupSupportedTypes)
+            case .paused:
+                status.statusLabel = localization.text(.statusCapturePaused)
+                status.secondaryHint = localization.text(.popupResumeMonitoring)
+            case .locked:
+                status.statusLabel = localization.text(.popupSearchLockedTitle)
+                status.primaryHint = localization.text(.popupSearchLockedTitle)
+                status.secondaryHint = localization.text(.popupSearchLockedDetail)
+            }
+
+            status.itemCountText = hasSearchContext
+                ? localization.text(.popupResultCount, ["count": localization.format(number: visibleCount)])
+                : localization.plural(.historyItemCount, count: menuBarSummary.itemCount)
+        }
+
+        localized.status = status
+        return localized
+    }
+
+    var localizedMenuBarSummary: MenuBarSummaryState {
+        var localized = menuBarSummary
+        localized.itemCountLabel = localization.text(.historyItemCount)
+        localized.statusLabel = localizedPopupState.status.statusLabel
+        localized.commands = menuBarSummary.commands.map { command in
+            var command = command
+            switch command.id {
+            case "open-slipboard":
+                command.title = securitySnapshot.lockState.revealsProtectedContent
+                    ? localization.text(.menuOpenSlipBoard)
+                    : localization.text(.menuShowLockedPopup)
+                if securitySnapshot.lockState.revealsProtectedContent == false {
+                    command.subtitle = localization.text(.menuShowLockedPopupDetail)
+                }
+            case "capture-status":
+                command.title = localization.text(.menuCaptureStatus)
+                command.subtitle = localizedPopupState.status.statusLabel
+                if menuBarSummary.itemCount == 0 {
+                    command.accessoryText = localization.text(.menuCaptureStatusEmpty)
+                }
+            case "pause-capturing":
+                command.title = exclusionsPauseSnapshot.pauseState.isPaused
+                    ? localization.text(.menuResumeCapture)
+                    : localization.text(.menuPauseCapture)
+                command.subtitle = exclusionsPauseSnapshot.pauseState.isPaused
+                    ? localization.text(.menuPausedUntilResume)
+                    : localization.text(.menuPauseOptions)
+            case "open-settings":
+                command.title = localization.text(.menuSettings)
+            case "security-settings":
+                command.title = localization.text(.menuOpenSecuritySettings)
+                command.subtitle = localization.text(.menuSecuritySettingsDetail)
+            case "lock-slipboard":
+                command.title = localization.text(.securityLockSlipBoard)
+                command.subtitle = localization.text(.securityLockDetailManual)
+            case "unlock-slipboard":
+                command.title = localization.text(.securityUnlock)
+            case "quit-slipboard":
+                command.title = localization.text(.menuQuit)
+            default:
+                break
+            }
+            return command
+        }
+        return localized
     }
 
     var retentionTTLText: String {
@@ -259,6 +384,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     func handleSettingsChoice(id: String, optionID: String) {
         recordSecurityInteraction()
 
+        if id == "app-language", let language = AppLanguage(rawValue: optionID) {
+            setAppLanguage(language)
+            return
+        }
+
         switch id {
         case "ttl":
             guard let policy = RetentionTTLPolicy(rawValue: optionID) else { return }
@@ -292,6 +422,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         switch id {
         case "clear-on-quit":
             controller.updateRetentionClearOnQuit(isOn)
+        case "bump-pasted-item-to-front":
+            controller.updateBumpPastedItemToFront(isOn)
         case "enable-bridge":
             bridgeRuntime.updateBridgeEnabled(isOn)
         case "exclusions.hide-popup":
@@ -341,7 +473,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         case "exclusions.resume-capturing":
             controller.exclusionsPauseRuntime.resumeCapturing(resumedAt: .now)
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: "Capture resumed.",
+                message: localization.text(.statusCaptureResumed),
                 tone: .success
             )
             publishCurrentProjection()
@@ -357,7 +489,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
                 let excludedAppID = String(id.dropFirst("exclusions.remove.".count))
                 controller.exclusionsPauseRuntime.removeExcludedApp(id: excludedAppID, lastUpdatedAt: .now)
                 runtimeStatusOverride = RuntimeStatusOverride(
-                    message: "Excluded app removed.",
+                    message: localization.text(.statusExcludedAppRemoved),
                     tone: .success
                 )
                 publishCurrentProjection()
@@ -401,6 +533,14 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         publishCurrentProjection()
     }
 
+    var isPinnedCollapsed: Bool {
+        manualPinnedCollapsed ?? popupState.pinnedClips.isEmpty
+    }
+
+    func togglePinnedCollapsed() {
+        manualPinnedCollapsed = !isPinnedCollapsed
+    }
+
     func selectClip(id: String?) {
         recordSecurityInteraction()
         controller.selectItem(id: id)
@@ -417,7 +557,25 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         syncPasteOverlayState()
         controller.deleteItem(id: selectedClipID)
         runtimeStatusOverride = RuntimeStatusOverride(
-            message: "Deleted item from history.",
+            message: localization.text(.statusDeletedHistoryItem),
+            tone: .success
+        )
+        publishCurrentProjection()
+    }
+
+    func clearHistory() {
+        recordSecurityInteraction()
+        guard securitySnapshot.lockState.revealsProtectedContent else { return }
+
+        controller.pasteActions.closeActiveOverlay()
+        syncPasteOverlayState()
+
+        for id in popupState.allClips.map(\.id) {
+            controller.deleteItem(id: id)
+        }
+
+        runtimeStatusOverride = RuntimeStatusOverride(
+            message: localization.text(.statusClearedHistory),
             tone: .success
         )
         publishCurrentProjection()
@@ -578,7 +736,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         syncPasteOverlayState()
         if didOpen == false {
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: "Paste As is only available for text clips.",
+                message: localization.text(.popupPasteAsOnlyText),
                 tone: .warning
             )
             publishCurrentProjection()
@@ -606,7 +764,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         case "copy":
             let didCopy = controller.pasteActions.copySelectedItemAgain()
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: didCopy ? "Copied item to clipboard." : "Selected item is unavailable to copy.",
+                message: localization.text(didCopy ? .statusCopiedToClipboard : .statusSelectedUnavailableToCopy),
                 tone: didCopy ? .success : .warning
             )
             closeActiveOverlay()
@@ -615,7 +773,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             guard let item = controller.selectedHistoryItem else { return }
             controller.setPinned(item.isPinned == false, for: item.id)
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: item.isPinned ? "Unpinned item." : "Pinned item.",
+                message: localization.text(item.isPinned ? .statusUnpinnedItem : .statusPinnedItem),
                 tone: .success
             )
             closeActiveOverlay()
@@ -628,7 +786,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             deleteSelectedClip()
         default:
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: "This command is not wired in the current runtime slice.",
+                message: localization.text(.statusCommandUnavailable),
                 tone: .warning
             )
             closeActiveOverlay()
@@ -670,7 +828,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func showPastePermissionRequired() {
         runtimeStatusOverride = RuntimeStatusOverride(
-            message: "Enable Accessibility for SlipBoard to paste into another app.",
+            message: localization.text(.alertAccessibilityMessage),
             tone: .warning
         )
         publishCurrentProjection()
@@ -678,7 +836,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func showPasteTargetUnavailable() {
         runtimeStatusOverride = RuntimeStatusOverride(
-            message: "Could not return to the previous app. Focus its input, then open SlipBoard again.",
+            message: localization.text(.statusPasteTargetUnavailable),
             tone: .warning
         )
         setPopupPresented(true)
@@ -692,6 +850,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             shellCoordinator.closePopup()
             controller.pasteActions.closeActiveOverlay()
             syncPasteOverlayState()
+            setSearchPresented(false)
         }
         isPopupPresented = shellCoordinator.isPopupPresented
     }
@@ -930,7 +1089,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     private func addExcludedAppFromRuntimeContext() {
         guard let candidate = nextExcludedAppCandidate() else {
             runtimeStatusOverride = RuntimeStatusOverride(
-                message: "No eligible app was available to add.",
+                message: localization.text(.statusNoEligibleApp),
                 tone: .warning
             )
             publishCurrentProjection()
@@ -941,7 +1100,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         updatedRules.append(candidate)
         controller.exclusionsPauseRuntime.replaceExcludedApps(updatedRules, lastUpdatedAt: .now)
         runtimeStatusOverride = RuntimeStatusOverride(
-            message: "Added \(candidate.displayName) to excluded apps.",
+            message: localization.text(.statusAddedExcludedApp, ["app": candidate.displayName]),
             tone: .success
         )
         publishCurrentProjection()
@@ -1045,11 +1204,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     private func pauseStatusMessage(for option: CapturePauseDurationOption) -> String {
         switch option {
         case .fifteenMinutes:
-            return "Capture paused for 15 minutes."
+            return localization.text(.statusPausedFifteenMinutes)
         case .oneHour:
-            return "Capture paused for 1 hour."
+            return localization.text(.statusPausedOneHour)
         case .untilResume:
-            return "Capture paused until you resume it."
+            return localization.text(.statusPausedUntilResume)
         }
     }
 
@@ -1230,6 +1389,21 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
                                 range: Double(RetentionSettingBounds.minItemCount)...Double(RetentionSettingBounds.maxItemCount),
                                 step: Double(RetentionSettingBounds.itemCountStep),
                                 valueLabel: "\(formattedInteger(retentionSettings.maxItemCount)) items"
+                            )
+                        )
+                    ]
+                ),
+                SettingsPaneSection(
+                    id: "retention.paste-behavior",
+                    title: "Paste behavior",
+                    descriptionText: "Control how pasting a clip affects its position in Recent.",
+                    rows: [
+                        .toggle(
+                            SettingsToggleItem(
+                                id: "bump-pasted-item-to-front",
+                                title: "Move pasted item to top",
+                                detailText: "When enabled, pasting a clip moves it to the front of Recent.",
+                                isOn: retentionSettings.bumpPastedItemToFront
                             )
                         )
                     ]
@@ -2147,24 +2321,29 @@ struct SlipBoardApp: App {
         MenuBarExtra {
             SBMenuBarDropdownShell(
                 theme: runtime.popupTheme,
-                summary: runtime.menuBarSummary,
+                summary: runtime.localizedMenuBarSummary,
                 securitySnapshot: runtime.securitySnapshot,
                 onSelectQuickRetention: runtime.selectQuickRetention,
                 onSelectCommand: handleMenuCommand
             )
             .padding(8)
             .background(runtime.popupTheme.palette.canvas)
+            .sbLocalization(runtime.localization, language: runtime.appLanguage)
         } label: {
             SlipBoardMenuBarLifecycleLabel(
                 title: "SlipBoard",
-                badgeText: runtime.menuBarSummary.badgeText,
+                badgeText: runtime.localizedMenuBarSummary.badgeText,
                 theme: runtime.popupTheme,
                 securitySnapshot: runtime.securitySnapshot,
-                popupState: runtime.popupState,
-                filterOptions: runtime.filterOptions,
+                popupState: runtime.localizedPopupState,
+                filterOptions: runtime.localizedFilterOptions,
                 searchNotesState: runtime.searchNotesState,
                 exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
+                pasteOverlayState: runtime.pasteOverlayState,
+                supportedTransformActionIDs: runtime.supportedTransformActionIDs,
                 isPopupPresented: runtime.isPopupPresented,
+                manualPinnedCollapsed: runtime.manualPinnedCollapsed,
+                appLanguage: runtime.appLanguage,
                 onInitialAppear: initializeShellLifecycleIfNeeded,
                 onAppDidBecomeActive: handleAppDidBecomeActive,
                 onAppWillTerminate: handleAppWillTerminate,
@@ -2176,8 +2355,11 @@ struct SlipBoardApp: App {
             SlipBoardSettingsRuntimeView(
                 runtime: runtime
             )
-            .frame(minWidth: 720, minHeight: 480)
+            .frame(minWidth: 960, minHeight: 620)
+            .sbLocalization(runtime.localization, language: runtime.appLanguage)
         }
+        .defaultSize(width: 960, height: 620)
+        .windowResizability(.contentMinSize)
     }
 
     private func initializeShellLifecycleIfNeeded() {
@@ -2221,6 +2403,7 @@ struct SlipBoardApp: App {
         runtime.startMonitoring()
         didInitializeShellLifecycle = true
         presentAccessibilityPermissionAlertIfNeeded()
+        popupPresentationController.prewarm(content: popupContent)
         syncPopupPresentation()
     }
 
@@ -2229,11 +2412,11 @@ struct SlipBoardApp: App {
 
         DispatchQueue.main.async {
             let alert = NSAlert()
-            alert.messageText = "Allow SlipBoard to paste for you"
-            alert.informativeText = "SlipBoard needs Accessibility permission to return focus and paste the selected clip into the app you were using."
+            alert.messageText = runtime.localization.text(.alertAccessibilityTitle)
+            alert.informativeText = runtime.localization.text(.alertAccessibilityMessage)
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Open Accessibility Settings")
-            alert.addButton(withTitle: "Not Now")
+            alert.addButton(withTitle: runtime.localization.text(.alertOpenAccessibilitySettings))
+            alert.addButton(withTitle: runtime.localization.text(.commonNotNow))
 
             if alert.runModal() == .alertFirstButtonReturn,
                let accessibilityURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
@@ -2265,42 +2448,56 @@ struct SlipBoardApp: App {
         }
         wasPopupPresented = true
 
-        popupPresentationController.present(isLocked: runtime.securitySnapshot.lockState.revealsProtectedContent == false) {
-            ClipboardHistoryPopupView(
-                theme: runtime.popupTheme,
-                filters: runtime.filterOptions,
-                state: runtime.popupState,
-                exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
-                searchNotesState: runtime.searchNotesState,
-                securitySnapshot: runtime.securitySnapshot,
-                pasteOverlayState: runtime.pasteOverlayState,
-                supportedTransformActionIDs: runtime.supportedTransformActionIDs,
-                searchFocusRequestToken: runtime.searchFocusRequestToken,
-                onToggleSearchPresented: runtime.setSearchPresented,
-                onSearchQueryChange: runtime.updateSearchQuery,
-                onSelectFilter: runtime.selectFilter,
-                onSelectThemePreview: runtime.selectThemePreview,
-                onSelectOrganizationGroup: runtime.selectOrganizationGroup,
-                onSelectClipID: runtime.selectClip,
-                onMoveSelection: runtime.moveSelection,
-                onDeleteSelectedClip: runtime.deleteSelectedClip,
-                onToggleNoteEditor: runtime.toggleNoteEditor,
-                onUpdateNoteDraft: runtime.updateNoteDraft,
-                onSaveNoteDraft: runtime.saveNoteDraft,
-                onCancelNoteEditing: runtime.cancelNoteEditing,
-                onClearNote: runtime.clearNote,
-                onOpenContextMenu: runtime.openContextMenu,
-                onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
-                onCloseActiveOverlay: runtime.closeActiveOverlay,
-                onHighlightContextAction: runtime.highlightContextAction,
-                onPerformContextAction: handleContextAction,
-                onHighlightTransformAction: runtime.highlightTransformAction,
-                onSelectTransformAction: runtime.selectTransformAction,
-                onExecutePasteAction: handlePasteAction
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(runtime.popupTheme.palette.canvas)
-        }
+        popupPresentationController.present(
+            isLocked: runtime.securitySnapshot.lockState.revealsProtectedContent == false,
+            reservesOverlayHeadroom: runtime.pasteOverlayState.isPresented
+                && runtime.pasteOverlayState.kind == .pasteTransformMenu,
+            isPinnedCollapsed: runtime.isPinnedCollapsed,
+            content: popupContent
+        )
+    }
+
+    private func popupContent() -> some View {
+        ClipboardHistoryPopupView(
+            theme: runtime.popupTheme,
+            filters: runtime.localizedFilterOptions,
+            state: runtime.localizedPopupState,
+            exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
+            searchNotesState: runtime.searchNotesState,
+            securitySnapshot: runtime.securitySnapshot,
+            pasteOverlayState: runtime.pasteOverlayState,
+            supportedTransformActionIDs: runtime.supportedTransformActionIDs,
+            searchFocusRequestToken: runtime.searchFocusRequestToken,
+            onToggleSearchPresented: runtime.setSearchPresented,
+            onSearchQueryChange: runtime.updateSearchQuery,
+            onSelectFilter: runtime.selectFilter,
+            onSelectThemePreview: runtime.selectThemePreview,
+            onSelectOrganizationGroup: runtime.selectOrganizationGroup,
+            onPauseCapture: { handleMenuCommand("pause-capturing") },
+            onClearHistory: handleClearHistoryCommand,
+            onOpenSettings: { handleMenuCommand("open-settings") },
+            onQuit: { NSApplication.shared.terminate(nil) },
+            onSelectClipID: runtime.selectClip,
+            onMoveSelection: runtime.moveSelection,
+            onDeleteSelectedClip: runtime.deleteSelectedClip,
+            onToggleNoteEditor: runtime.toggleNoteEditor,
+            onUpdateNoteDraft: runtime.updateNoteDraft,
+            onSaveNoteDraft: runtime.saveNoteDraft,
+            onCancelNoteEditing: runtime.cancelNoteEditing,
+            onClearNote: runtime.clearNote,
+            onOpenContextMenu: runtime.openContextMenu,
+            onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
+            onCloseActiveOverlay: runtime.closeActiveOverlay,
+            onHighlightContextAction: runtime.highlightContextAction,
+            onPerformContextAction: handleContextAction,
+            onHighlightTransformAction: runtime.highlightTransformAction,
+            onSelectTransformAction: runtime.selectTransformAction,
+            onExecutePasteAction: handlePasteAction,
+            isPinnedCollapsed: runtime.isPinnedCollapsed,
+            onTogglePinnedCollapsed: runtime.togglePinnedCollapsed
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .sbLocalization(runtime.localization, language: runtime.appLanguage)
     }
 
     private func handleMenuCommand(_ commandID: String) {
@@ -2326,10 +2523,25 @@ struct SlipBoardApp: App {
         }
     }
 
+    private func handleClearHistoryCommand() {
+        let alert = NSAlert()
+        alert.messageText = runtime.localization.text(.alertClearClipboardHistoryTitle)
+        alert.informativeText = runtime.localization.text(.alertClearClipboardHistoryMessage)
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: runtime.localization.text(.menuClearHistory))
+        alert.addButton(withTitle: runtime.localization.text(.cancel))
+        alert.buttons.first?.hasDestructiveAction = true
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        runtime.clearHistory()
+    }
+
     private func showSettingsWindow(selecting section: SettingsSectionID = .general) {
         runtime.showSettingsPresentation(selecting: section)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        }
     }
 
     private func handlePasteAction(_ actionID: PasteActionID, _ closeBehavior: PasteActionCloseBehavior) {
@@ -2372,7 +2584,11 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
     let filterOptions: [PopupFilterOption]
     let searchNotesState: SearchNotesProjectionState
     let exclusionsPauseSnapshot: ExclusionsPauseSnapshot
+    let pasteOverlayState: PasteActionOverlayState
+    let supportedTransformActionIDs: Set<PasteActionID>
     let isPopupPresented: Bool
+    let manualPinnedCollapsed: Bool?
+    let appLanguage: AppLanguage
     let onInitialAppear: () -> Void
     let onAppDidBecomeActive: () -> Void
     let onAppWillTerminate: () -> Void
@@ -2395,6 +2611,12 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
         .onChange(of: isPopupPresented) { _, _ in
             onSyncPopupPresentation()
         }
+        .onChange(of: manualPinnedCollapsed) { _, _ in
+            onSyncPopupPresentation()
+        }
+        .onChange(of: appLanguage) { _, _ in
+            onSyncPopupPresentation()
+        }
         .onChange(of: popupState) { _, _ in
             onSyncPopupPresentation()
         }
@@ -2410,6 +2632,12 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
         .onChange(of: exclusionsPauseSnapshot) { _, _ in
             onSyncPopupPresentation()
         }
+        .onChange(of: pasteOverlayState) { _, _ in
+            onSyncPopupPresentation()
+        }
+        .onChange(of: supportedTransformActionIDs) { _, _ in
+            onSyncPopupPresentation()
+        }
     }
 }
 
@@ -2422,6 +2650,8 @@ private struct SlipBoardSettingsRuntimeView: View {
             theme: runtime.settingsTheme,
             state: runtime.settingsState,
             securitySnapshot: runtime.securitySnapshot,
+            bridgeSnapshot: runtime.bridgeSnapshot,
+            exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
             snippetsHotkeysSnapshot: runtime.snippetsHotkeysSnapshot,
             onSelectSection: runtime.focusSettings,
             onSelectChoice: runtime.handleSettingsChoice,

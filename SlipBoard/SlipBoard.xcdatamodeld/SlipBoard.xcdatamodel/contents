@@ -40,6 +40,7 @@
         <attribute name="hotkeyModifiersBlob" optional="YES" attributeType="Binary"/>
     </entity>
     <entity name="RetentionSettingsRecord" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="bumpPastedItemToFront" optional="NO" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="clearOnQuit" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="maxItemCount" optional="NO" attributeType="Integer 64" defaultValueString="2000" usesScalarValueType="YES"/>
         <attribute name="ttlPolicyRawValue" optional="NO" attributeType="String" defaultValueString="1mo"/>

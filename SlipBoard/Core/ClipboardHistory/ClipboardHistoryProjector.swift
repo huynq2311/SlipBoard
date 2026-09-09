@@ -58,7 +58,7 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             searchQuery: searchQuery,
             isSearchPresented: searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
             activeFilterID: snapshot.activeFilter.id,
-            themePreview: .dark,
+            themePreview: .light,
             pinnedClips: snapshot.pinnedItems
                 .filter { visibleItemIDs.contains($0.id) }
                 .map {
@@ -87,14 +87,16 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
 
     private func projectFilterOptions(_ snapshot: ClipboardHistorySnapshot) -> [PopupFilterOption] {
         let counts = Dictionary(grouping: snapshot.allItems, by: \.kind).mapValues(\.count)
-        let baseFilters: [ClipboardHistoryFilter] = [.all, .text, .code, .image, .file, .url]
-        var filters = baseFilters
+        var filters: [ClipboardHistoryFilter] = [.all, .text, .image]
+
+        if (counts[.richText] ?? 0) > 0 {
+            filters.append(.richText)
+        }
+
+        filters.append(contentsOf: [.code, .file, .url])
 
         if (counts[.color] ?? 0) > 0 {
             filters.append(.color)
-        }
-        if (counts[.richText] ?? 0) > 0 {
-            filters.append(.richText)
         }
 
         return filters.map { filter in
@@ -457,7 +459,39 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             return "Pinned"
         }
 
-        return relativeFormatter.localizedString(for: item.lastCopiedAt, relativeTo: Date())
+        return Self.compactRelativeLabel(for: item.lastCopiedAt, relativeTo: Date())
+    }
+
+    // Compact, "ago"-free timestamp for card headers (15s / 4m / 2h / Yesterday).
+    private static func compactRelativeLabel(for date: Date, relativeTo now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+
+        if seconds < 60 {
+            return "\(seconds)s"
+        }
+
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)h"
+        }
+
+        if Calendar.current.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+
+        let days = hours / 24
+        if days < 7 {
+            return "\(days)d"
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 
     private func clipKind(for kind: ClipboardHistoryKind) -> ClipKind {

@@ -44,6 +44,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             object.setValue(Int64(settings.maxItemCount), forKey: "maxItemCount")
             object.setValue(settings.ttlPolicy.rawValue, forKey: "ttlPolicyRawValue")
             object.setValue(settings.clearOnQuit, forKey: "clearOnQuit")
+            object.setValue(settings.bumpPastedItemToFront, forKey: "bumpPastedItemToFront")
             object.setValue(settings.lastUpdatedAt, forKey: "updatedAt")
         }
     }
@@ -152,6 +153,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                 rawValue: object.value(forKey: "ttlPolicyRawValue") as? String ?? RetentionTTLPolicy.oneMonth.rawValue
             ) ?? .oneMonth,
             clearOnQuit: object.value(forKey: "clearOnQuit") as? Bool ?? false,
+            bumpPastedItemToFront: object.value(forKey: "bumpPastedItemToFront") as? Bool ?? true,
             lastUpdatedAt: object.value(forKey: "updatedAt") as? Date ?? .now
         )
     }
@@ -383,6 +385,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             makeAttribute(name: "maxItemCount", type: .integer64AttributeType, optional: false, defaultValue: Int64(RetentionSettingBounds.defaultItemCount)),
             makeAttribute(name: "ttlPolicyRawValue", type: .stringAttributeType, optional: false, defaultValue: RetentionTTLPolicy.oneMonth.rawValue),
             makeAttribute(name: "clearOnQuit", type: .booleanAttributeType, optional: false, defaultValue: false),
+            makeAttribute(name: "bumpPastedItemToFront", type: .booleanAttributeType, optional: false, defaultValue: true),
             makeAttribute(name: "updatedAt", type: .dateAttributeType)
         ]
         return entity

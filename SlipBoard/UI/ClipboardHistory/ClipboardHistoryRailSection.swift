@@ -6,19 +6,19 @@ enum ClipboardHistoryRailKind: String, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var titleKey: LocalizationKey {
         switch self {
         case .pinned:
-            return "Pinned"
+            return .popupPinned
         case .recent:
-            return "Recent"
+            return .popupRecent
         }
     }
 
     var symbolName: String {
         switch self {
         case .pinned:
-            return "pin.fill"
+            return "star.fill"
         case .recent:
             return "clock"
         }
@@ -26,6 +26,8 @@ enum ClipboardHistoryRailKind: String, Identifiable, Hashable {
 }
 
 struct ClipboardHistoryRailSection: View {
+    @SBLocalizedCopy private var copy
+
     let kind: ClipboardHistoryRailKind
     let clips: [ClipPreviewSummary]
     let theme: SBTheme
@@ -36,7 +38,9 @@ struct ClipboardHistoryRailSection: View {
     var activeGroupLabel: String? = nil
     var noteEditorState: ClipNoteEditorState? = nil
     var searchDisabledMessage: SearchDisabledMessage? = nil
+    var cardWidth: CGFloat = 216
     var cardHeight: CGFloat = 128
+    var isEmphasized: Bool = false
     var isCollapsed: Bool = false
     var onToggleCollapse: () -> Void = {}
     var onSelectClip: (String) -> Void = { _ in }
@@ -53,25 +57,29 @@ struct ClipboardHistoryRailSection: View {
         VStack(spacing: 0) {
             HStack(spacing: theme.spacing.control8) {
                 SBSectionHeader(
-                    title: kind.title,
+                    title: copy.text(kind.titleKey),
                     theme: theme,
                     symbolName: kind.symbolName,
                     countText: String(clips.count),
+                    isEmphasized: isEmphasized,
+                    style: .popup,
                     disclosureSymbolName: kind == .pinned ? (isCollapsed ? "chevron.right" : "chevron.down") : nil,
-                    disclosureAccessibilityLabel: kind == .pinned ? (isCollapsed ? "Show pinned" : "Hide pinned") : nil,
+                    disclosureAccessibilityLabel: kind == .pinned
+                        ? copy.text(isCollapsed ? .popupShowPinned : .popupHidePinned)
+                        : nil,
                     onDisclosure: kind == .pinned ? onToggleCollapse : nil
                 )
             }
             .padding(.horizontal, theme.spacing.popupPadding)
-            .padding(.top, kind == .pinned ? 6 : 3)
-            .padding(.bottom, 3)
+            .padding(.top, kind == .pinned ? 6 : 4)
+            .padding(.bottom, 2)
 
             if isCollapsed == false {
                 if kind == .pinned && displayedClips.isEmpty {
                     HStack(spacing: theme.spacing.control6) {
                         Image(systemName: "pin.slash")
                             .font(.system(size: 10, weight: .medium))
-                        Text("No pinned clips")
+                        Text(copy.text(.popupNoPinnedClips))
                             .font(theme.typography.meta)
                     }
                     .foregroundStyle(theme.palette.textTertiary)
@@ -101,6 +109,7 @@ struct ClipboardHistoryRailSection: View {
                         theme: theme,
                         emptyTitle: emptyStateTitle,
                         emptyDetail: emptyStateDetail,
+                        cardWidth: cardWidth,
                         cardHeight: cardHeight,
                         selectedClipID: selectedClipID,
                         securitySnapshot: securitySnapshot,
@@ -122,32 +131,32 @@ struct ClipboardHistoryRailSection: View {
 
     private var emptyStateTitle: String {
         if let searchDisabledMessage = resolvedSearchDisabledMessage {
-            return searchDisabledMessage.title
+            return localizedSearchDisabledTitle(searchDisabledMessage)
         }
 
         switch kind {
         case .pinned:
-            return "No pinned clips"
+            return copy.text(.popupNoPinnedClips)
         case .recent:
-            return trimmedSearchQuery.isEmpty ? "Clipboard history is empty" : "No matching clips"
+            return copy.text(trimmedSearchQuery.isEmpty ? .popupHistoryEmpty : .popupNoMatchingClips)
         }
     }
 
     private var emptyStateDetail: String {
         if let searchDisabledMessage = resolvedSearchDisabledMessage {
-            return searchDisabledMessage.detailText
+            return localizedSearchDisabledDetail(searchDisabledMessage)
         }
 
         switch kind {
         case .pinned:
             return filteredStateDetail(
-                defaultText: "Pinned items stay visible here so primary references always remain first."
+                defaultText: copy.text(.popupPinnedEmptyDetail)
             )
         case .recent:
             return trimmedSearchQuery.isEmpty
-                ? "Recent captures will appear here once the runtime begins projecting clipboard activity."
+                ? copy.text(.popupRecentEmptyDetail)
                 : filteredStateDetail(
-                    defaultText: "Try a broader query or switch the active filter to reveal more results."
+                    defaultText: copy.text(.popupNoMatchDetail)
                 )
         }
     }
@@ -177,22 +186,43 @@ struct ClipboardHistoryRailSection: View {
     }
 
     private func filteredStateDetail(defaultText: String) -> String {
-        let filterText = activeFilterLabel.flatMap { label in
-            label.isEmpty ? nil : " filter \(label.lowercased())"
-        } ?? ""
-        let groupText = activeGroupLabel.flatMap { label in
-            label.isEmpty ? nil : " group \(label)"
-        } ?? ""
+        let filter = activeFilterLabel.flatMap { $0.isEmpty ? nil : $0 }
+        let group = activeGroupLabel.flatMap { $0.isEmpty ? nil : $0 }
 
-        guard filterText.isEmpty == false || groupText.isEmpty == false else {
-            return defaultText
+        let context: String?
+        switch (filter, group) {
+        case let (.some(filter), .some(group)):
+            context = copy.text(.popupCurrentFilterAndGroup, ["filter": filter, "group": group])
+        case let (.some(filter), .none):
+            context = copy.text(.popupCurrentFilter, ["filter": filter])
+        case let (.none, .some(group)):
+            context = copy.text(.popupCurrentGroup, ["group": group])
+        case (.none, .none):
+            context = nil
         }
 
-        return "\(defaultText) Current\(filterText)\(groupText)."
+        return context.map { "\(defaultText) \($0)" } ?? defaultText
+    }
+
+    private func localizedSearchDisabledTitle(_ message: SearchDisabledMessage) -> String {
+        switch message.reason {
+        case .locked:
+            return copy.text(.popupSearchLockedTitle)
+        }
+    }
+
+    private func localizedSearchDisabledDetail(_ message: SearchDisabledMessage) -> String {
+        switch message.reason {
+        case .locked:
+            return copy.text(.popupSearchLockedDetail)
+        }
     }
 }
 
 struct ClipboardHistoryEmptyRailCard: View {
+    @SBLocalizedCopy private var copy
+    @Environment(\.sbLocalizationLanguage) private var localizationLanguage
+
     let kind: ClipboardHistoryRailKind
     let theme: SBTheme
     var searchQuery: String = ""
@@ -211,44 +241,44 @@ struct ClipboardHistoryEmptyRailCard: View {
 
     private var title: String {
         if let searchDisabledMessage {
-            return searchDisabledMessage.title
+            return localizedSearchDisabledTitle(searchDisabledMessage)
         }
 
         switch kind {
         case .pinned:
-            return "Pinned rail ready"
+            return copy.text(.popupPinnedRailReady)
         case .recent:
-            return hasSearchQuery ? "No results in recent" : "Recent rail waiting"
+            return copy.text(hasSearchQuery ? .popupNoResultsInRecent : .popupRecentRailWaiting)
         }
     }
 
     private var detailText: String {
         if let searchDisabledMessage {
-            return searchDisabledMessage.detailText
+            return localizedSearchDisabledDetail(searchDisabledMessage)
         }
 
         switch kind {
         case .pinned:
-            return "Pinned items stay separated from recent history and keep their position when duplicate copies arrive."
+            return copy.text(.popupPinnedRailDetail)
         case .recent:
             if hasSearchQuery {
-                return "Search is active\(filterSuffix)\(groupSuffix). Clear the query or change filters to restore visible results."
+                return copy.text(.popupRecentSearchDetail, ["context": searchContext])
             }
 
-            return "Recent captures remain in a dedicated horizontal rail, even when the live slice has nothing visible yet."
+            return copy.text(.popupRecentRailDetail)
         }
     }
 
     private var badgeText: String? {
         if searchDisabledMessage != nil {
-            return "LOCKED"
+            return localizedUppercase(copy.text(.popupLocked))
         }
 
         switch kind {
         case .pinned:
-            return "PINNED"
+            return localizedUppercase(copy.text(.popupPinned))
         case .recent:
-            return hasSearchQuery ? "FILTERED" : "RECENT"
+            return localizedUppercase(copy.text(hasSearchQuery ? .popupFiltered : .popupRecent))
         }
     }
 
@@ -256,19 +286,40 @@ struct ClipboardHistoryEmptyRailCard: View {
         searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
-    private var filterSuffix: String {
-        guard let activeFilterLabel, activeFilterLabel.isEmpty == false else {
+    private var searchContext: String {
+        let filter = activeFilterLabel.flatMap { $0.isEmpty ? nil : $0 }
+        let group = activeGroupLabel.flatMap { $0.isEmpty ? nil : $0 }
+
+        switch (filter, group) {
+        case let (.some(filter), .some(group)):
+            return "; " + copy.text(.popupCurrentFilterAndGroup, ["filter": filter, "group": group])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        case let (.some(filter), .none):
+            return "; " + copy.text(.popupCurrentFilter, ["filter": filter])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        case let (.none, .some(group)):
+            return "; " + copy.text(.popupCurrentGroup, ["group": group])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        case (.none, .none):
             return ""
         }
-
-        return " for \(activeFilterLabel.lowercased())"
     }
 
-    private var groupSuffix: String {
-        guard let activeGroupLabel, activeGroupLabel.isEmpty == false else {
-            return ""
+    private func localizedSearchDisabledTitle(_ message: SearchDisabledMessage) -> String {
+        switch message.reason {
+        case .locked:
+            return copy.text(.popupSearchLockedTitle)
         }
+    }
 
-        return " in \(activeGroupLabel)"
+    private func localizedSearchDisabledDetail(_ message: SearchDisabledMessage) -> String {
+        switch message.reason {
+        case .locked:
+            return copy.text(.popupSearchLockedDetail)
+        }
+    }
+
+    private func localizedUppercase(_ value: String) -> String {
+        value.uppercased(with: Locale(identifier: localizationLanguage.localeIdentifier))
     }
 }

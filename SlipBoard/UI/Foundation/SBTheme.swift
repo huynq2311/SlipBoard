@@ -67,7 +67,7 @@ struct SBTheme {
         let control8: CGFloat = 8
         let control10: CGFloat = 10
         let control12: CGFloat = 12
-        let popupPadding: CGFloat = 14
+        let popupPadding: CGFloat = 20
         let dropdownPadding: CGFloat = 14
         let settingsPaneHorizontal: CGFloat = 26
         let settingsPaneVertical: CGFloat = 22
@@ -79,7 +79,7 @@ struct SBTheme {
     }
 
     struct Radius {
-        let shell: CGFloat = 14
+        let shell: CGFloat = 20
         let window: CGFloat = 12
         let panel: CGFloat = 10
         let control: CGFloat = 7
@@ -122,8 +122,8 @@ struct SBTheme {
             textPrimary: Color(hex: 0xF0F0F2),
             textSecondary: Color(hex: 0x8E8E9F),
             textTertiary: Color(hex: 0x50505F),
-            accentPrimary: Color(hex: 0x7C6EF8),
-            accentPrimaryMuted: Color(red: 124 / 255, green: 110 / 255, blue: 248 / 255, opacity: 0.12),
+            accentPrimary: Color(hex: 0x2F7CF6),
+            accentPrimaryMuted: Color(red: 47 / 255, green: 124 / 255, blue: 246 / 255, opacity: 0.12),
             accentSuccess: Color(hex: 0x3ECF8E),
             accentWarning: Color(hex: 0xF59E0B),
             accentInfo: Color(hex: 0x38BDF8),
@@ -148,17 +148,17 @@ struct SBTheme {
     static let light = SBTheme(
         mode: .light,
         palette: Palette(
-            canvas: Color(hex: 0xE4E4E8),
-            panel: Color(hex: 0xFFFFFF),
-            subpanel: Color(hex: 0xF0F0F3),
-            raised: Color(hex: 0xE4E4EA),
-            border: Color(hex: 0xDDDDE5),
-            borderStrong: Color(hex: 0xC5C5D0),
-            textPrimary: Color(hex: 0x111114),
-            textSecondary: Color(hex: 0x5A5A6B),
-            textTertiary: Color(hex: 0x9898A8),
-            accentPrimary: Color(hex: 0x6558F5),
-            accentPrimaryMuted: Color(red: 101 / 255, green: 88 / 255, blue: 245 / 255, opacity: 0.08),
+            canvas: Color(red: 245 / 255, green: 250 / 255, blue: 1, opacity: 1),
+            panel: Color.white.opacity(1),
+            subpanel: Color.white.opacity(0.48),
+            raised: Color.white.opacity(0.72),
+            border: Color(red: 140 / 255, green: 170 / 255, blue: 210 / 255, opacity: 0.18),
+            borderStrong: Color(red: 140 / 255, green: 170 / 255, blue: 210 / 255, opacity: 0.20),
+            textPrimary: Color(hex: 0x243042),
+            textSecondary: Color(hex: 0x6C7A90),
+            textTertiary: Color(hex: 0x7B8799),
+            accentPrimary: Color(hex: 0x2F7CF6),
+            accentPrimaryMuted: Color(red: 47 / 255, green: 124 / 255, blue: 246 / 255, opacity: 0.08),
             accentSuccess: Color(hex: 0x3ECF8E),
             accentWarning: Color(hex: 0xF59E0B),
             accentInfo: Color(hex: 0x38BDF8),

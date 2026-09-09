@@ -143,21 +143,35 @@ struct SBOverlayMenuShell<Header: View>: View {
 }
 
 struct SBContextMenuShell: View {
+    private static let pasteAsSupportedKinds: Set<ClipKind> = [.text, .richText, .code, .url]
+
     let theme: SBTheme
+    @SBLocalizedCopy private var copy
     var highlightedActionID: String? = "paste"
     var isPinned: Bool = false
+    var clipKind: ClipKind? = nil
     var onSelectAction: (String) -> Void = { _ in }
     var onHoverAction: (String?) -> Void = { _ in }
 
     private var actions: [SBOverlayMenuAction] {
-        [
-            SBOverlayMenuAction(id: "paste", title: "Paste", symbolName: "doc.on.clipboard", shortcut: "↩"),
-            SBOverlayMenuAction(id: "paste-as", title: "Paste As…", subtitle: "Open transform preview", symbolName: "arrowshape.turn.up.right", shortcut: "⌘↩"),
-            SBOverlayMenuAction(id: "copy", title: "Copy Again", symbolName: "square.on.square", shortcut: "⌘C"),
-            SBOverlayMenuAction(id: "pin", title: isPinned ? "Unpin Item" : "Pin Item", symbolName: isPinned ? "pin.slash" : "pin", shortcut: "⌘P"),
-            SBOverlayMenuAction(id: "add-note", title: "Add Note…", symbolName: "note.text"),
-            SBOverlayMenuAction(id: "delete", title: "Delete", symbolName: "trash", shortcut: "⌫", tone: .danger)
+        var actions = [
+            SBOverlayMenuAction(id: "paste", title: copy.text(.actionPaste), symbolName: "doc.on.clipboard", shortcut: "↩")
         ]
+
+        if let clipKind, Self.pasteAsSupportedKinds.contains(clipKind) {
+            actions.append(
+                SBOverlayMenuAction(id: "paste-as", title: copy.text(.actionPasteAs), subtitle: copy.text(.overlayOpenTransformPreview), symbolName: "arrowshape.turn.up.right", shortcut: "⌘↩")
+            )
+        }
+
+        actions.append(contentsOf: [
+            SBOverlayMenuAction(id: "copy", title: copy.text(.actionCopy), symbolName: "square.on.square", shortcut: "⌘C"),
+            SBOverlayMenuAction(id: "pin", title: isPinned ? copy.text(.actionUnpin) : copy.text(.actionPin), symbolName: isPinned ? "pin.slash" : "pin", shortcut: "⌘P"),
+            SBOverlayMenuAction(id: "add-note", title: copy.text(.popupAddNote), symbolName: "note.text"),
+            SBOverlayMenuAction(id: "delete", title: copy.text(.actionDelete), symbolName: "trash", shortcut: "⌫", tone: .danger)
+        ])
+
+        return actions
     }
 
     var body: some View {
@@ -175,7 +189,10 @@ struct SBContextMenuShell: View {
 }
 
 struct SBPasteTransformMenuShell: View {
+    private static let previewCharacterLimit = 600
+
     let theme: SBTheme
+    @SBLocalizedCopy private var copy
     var highlightedActionID: String? = PasteActionID.plainText.id
     var previewState: PasteActionPreviewState = .empty
     var supportedActionIDs: Set<PasteActionID> = Set(PasteActionID.transformMenuOrder)
@@ -216,7 +233,7 @@ struct SBPasteTransformMenuShell: View {
                 }
             ) {
                 VStack(alignment: .leading, spacing: theme.spacing.control8) {
-                    Text("Paste As…")
+                    Text(copy.text(.actionPasteAs))
                         .font(theme.typography.uppercaseLabel)
                         .foregroundStyle(theme.palette.textTertiary)
 
@@ -239,7 +256,7 @@ struct SBPasteTransformMenuShell: View {
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(theme.palette.textTertiary)
 
-                        Text("ESC cancel")
+                        Text(copy.text(.overlayEscapeCancel))
                             .font(theme.typography.meta)
                             .foregroundStyle(theme.palette.textTertiary)
                     }
@@ -256,7 +273,7 @@ struct SBPasteTransformMenuShell: View {
                                 .tint(.white)
                         }
 
-                        Text(isExecuting ? "Pasting…" : "Paste")
+                        Text(isExecuting ? copy.text(.popupExecutingPaste) : copy.text(.actionPaste))
                             .font(theme.typography.chip)
                             .foregroundStyle(Color.white)
                     }
@@ -296,6 +313,8 @@ struct SBPasteTransformMenuShell: View {
             Text(previewText)
                 .font(usesMono ? theme.typography.monoMeta : theme.typography.meta)
                 .foregroundStyle(previewColor)
+                .lineLimit(4)
+                .truncationMode(.tail)
                 .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
                 .padding(theme.spacing.control8)
                 .background(theme.palette.subpanel)
@@ -322,15 +341,20 @@ struct SBPasteTransformMenuShell: View {
     }
 
     private var resolvedPreviewText: String {
+        let previewText: String
         if previewState.previewText.isEmpty == false {
-            return previewState.previewText
+            previewText = previewState.previewText
+        } else if let placeholderText = previewState.placeholderText, placeholderText.isEmpty == false {
+            previewText = placeholderText
+        } else {
+            previewText = copy.text(.popupTransformUnavailable)
         }
 
-        if let placeholderText = previewState.placeholderText, placeholderText.isEmpty == false {
-            return placeholderText
+        guard previewText.count > Self.previewCharacterLimit else {
+            return previewText
         }
 
-        return "Transform preview is unavailable for this item."
+        return String(previewText.prefix(Self.previewCharacterLimit)) + "…"
     }
 
     private var previewColor: Color {
@@ -347,15 +371,15 @@ struct SBPasteTransformMenuShell: View {
     private func title(for actionID: PasteActionID) -> String {
         switch actionID {
         case .plainText:
-            return "Plain Text"
+            return copy.text(.overlayPlainText)
         case .markdown:
-            return "Convert to Markdown"
+            return copy.text(.overlayMarkdownDescription)
         case .stripUnicodeAccent:
-            return "Strip Unicode / Accent"
+            return copy.text(.overlayStripUnicodeDescription)
         case .uppercase:
-            return "UPPERCASE"
+            return copy.text(.overlayUppercaseDescription)
         case .lowercase:
-            return "lowercase"
+            return copy.text(.overlayLowercaseDescription)
         case .original, .pasteAndClose, .pasteAndKeepOpen:
             return actionID.rawValue
         }
@@ -364,15 +388,15 @@ struct SBPasteTransformMenuShell: View {
     private func subtitle(for actionID: PasteActionID) -> String {
         switch actionID {
         case .plainText:
-            return "Remove rich formatting"
+            return copy.text(.overlayRemoveRichFormatting)
         case .markdown:
-            return "Map clipboard text into markdown-friendly output"
+            return copy.text(.overlayConvertMarkdown)
         case .stripUnicodeAccent:
-            return "Normalize special characters for plain transport"
+            return copy.text(.overlayStripUnicode)
         case .uppercase:
-            return "Convert output to upper case"
+            return copy.text(.overlayUppercase)
         case .lowercase:
-            return "Convert output to lower case"
+            return copy.text(.overlayLowercase)
         case .original, .pasteAndClose, .pasteAndKeepOpen:
             return ""
         }

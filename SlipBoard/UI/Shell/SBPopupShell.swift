@@ -1,11 +1,37 @@
 import SwiftUI
 
+// Native SwiftUI `Menu` popups don't reliably show inside the app's
+// borderless `.nonactivatingPanel` popup window, so the header's dropdown
+// controls use this hand-rolled overlay state instead (same reasoning as
+// the existing custom SBContextMenuShell/SBPasteTransformMenuShell overlays).
+enum SBHeaderMenuKind: Equatable {
+    case overflow
+    case source
+    case sort
+    case collection
+}
+
+enum SBPopupLayoutMetrics {
+    static let expandedContentHeight: CGFloat = 460
+    static let pinnedCollapsedHeightReduction: CGFloat = 93
+
+    static func contentHeight(isPinnedCollapsed: Bool) -> CGFloat {
+        expandedContentHeight - (isPinnedCollapsed ? pinnedCollapsedHeightReduction : 0)
+    }
+}
+
 struct SBPopupShellFrame<Content: View>: View {
     let theme: SBTheme
+    let contentHeight: CGFloat
     @ViewBuilder var content: Content
 
-    init(theme: SBTheme, @ViewBuilder content: () -> Content) {
+    init(
+        theme: SBTheme,
+        contentHeight: CGFloat = SBPopupLayoutMetrics.expandedContentHeight,
+        @ViewBuilder content: () -> Content
+    ) {
         self.theme = theme
+        self.contentHeight = contentHeight
         self.content = content()
     }
 
@@ -13,7 +39,12 @@ struct SBPopupShellFrame<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // The hosting panel may reserve transparent space above this surface
+        // while an action menu is open. Keep the visible shell at its normal
+        // height so that spare area becomes real overlay headroom instead of
+        // stretching the rails.
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: contentHeight, alignment: .topLeading)
         .sbSurface(.popup, theme: theme)
     }
 }
@@ -22,12 +53,21 @@ struct SBPopupTopBar: View {
     let theme: SBTheme
     let filters: [PopupFilterOption]
     let state: PopupShellViewState
+    @SBLocalizedCopy private var copy
     var isSearchEnabled: Bool = true
     var searchFocusRequestToken: Int = 0
+    var groupChips: [OrganizationChipSummary] = []
+    var activeGroupID: OrganizationGroupID? = nil
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
+    var onPauseCapture: () -> Void = {}
+    var onClearHistory: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+    var onQuit: () -> Void = {}
+    @Binding var activeMenu: SBHeaderMenuKind?
 
     @State private var searchText: String
 
@@ -37,92 +77,151 @@ struct SBPopupTopBar: View {
         state: PopupShellViewState,
         isSearchEnabled: Bool = true,
         searchFocusRequestToken: Int = 0,
+        groupChips: [OrganizationChipSummary] = [],
+        activeGroupID: OrganizationGroupID? = nil,
+        activeMenu: Binding<SBHeaderMenuKind?>,
         onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
-        onSelectThemePreview: @escaping (PopupThemePreview) -> Void = { _ in }
+        onSelectThemePreview: @escaping (PopupThemePreview) -> Void = { _ in },
+        onSelectOrganizationGroup: @escaping (OrganizationGroupID) -> Void = { _ in },
+        onPauseCapture: @escaping () -> Void = {},
+        onClearHistory: @escaping () -> Void = {},
+        onOpenSettings: @escaping () -> Void = {},
+        onQuit: @escaping () -> Void = {}
     ) {
         self.theme = theme
         self.filters = filters
         self.state = state
         self.isSearchEnabled = isSearchEnabled
         self.searchFocusRequestToken = searchFocusRequestToken
+        self.groupChips = groupChips
+        self.activeGroupID = activeGroupID
+        _activeMenu = activeMenu
         self.onToggleSearchPresented = onToggleSearchPresented
         self.onSearchQueryChange = onSearchQueryChange
         self.onSelectFilter = onSelectFilter
         self.onSelectThemePreview = onSelectThemePreview
+        self.onSelectOrganizationGroup = onSelectOrganizationGroup
+        self.onPauseCapture = onPauseCapture
+        self.onClearHistory = onClearHistory
+        self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
         _searchText = State(initialValue: state.searchQuery)
     }
 
     var body: some View {
-        HStack(spacing: theme.spacing.control8) {
-            SBIconButton(
-                symbolName: "magnifyingglass",
-                theme: theme,
-                isActive: state.isSearchPresented,
-                accessibilityLabel: "Search",
-                action: {
-                    guard isSearchEnabled else { return }
-                    onToggleSearchPresented(state.isSearchPresented == false)
+        VStack(spacing: 10) {
+            HStack(spacing: theme.spacing.control8) {
+                SBIconButton(
+                    symbolName: "magnifyingglass",
+                    theme: theme,
+                    isActive: state.isSearchPresented,
+                    accessibilityLabel: copy.text(.search),
+                    action: {
+                        guard isSearchEnabled else { return }
+                        onToggleSearchPresented(state.isSearchPresented == false)
+                    }
+                )
+                .disabled(isSearchEnabled == false)
+                .opacity(isSearchEnabled ? 1 : 0.55)
+
+                SBSearchFieldShell(
+                    text: $searchText,
+                    theme: theme,
+                    isPresented: state.isSearchPresented,
+                    trailingHint: "ESC",
+                    focusRequestToken: searchFocusRequestToken
+                )
+                .disabled(isSearchEnabled == false)
+                .opacity(isSearchEnabled ? 1 : 0.55)
+
+                Spacer(minLength: theme.spacing.control8)
+
+                SBKeyboardHint(text: "⌘K", theme: theme)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "menubar.rectangle")
+                        .font(.system(size: 11, weight: .medium))
+
+                    Text(copy.text(.appName))
+                        .font(theme.typography.chip)
                 }
-            )
-            .disabled(isSearchEnabled == false)
-            .opacity(isSearchEnabled ? 1 : 0.55)
+                .foregroundStyle(theme.palette.textSecondary)
 
-            SBSearchFieldShell(
-                text: $searchText,
-                theme: theme,
-                isPresented: state.isSearchPresented,
-                trailingHint: "ESC",
-                focusRequestToken: searchFocusRequestToken
-            )
-            .disabled(isSearchEnabled == false)
-            .opacity(isSearchEnabled ? 1 : 0.55)
+                overflowMenu
+            }
+            // Wins hit-testing against the filter/dropdown row below, which
+            // this menu's popout visually overlaps when open (see zIndex
+            // note on SBPopupTopBar's own call site).
+            .zIndex(1)
 
-            Rectangle()
-                .fill(theme.palette.borderStrong)
-                .frame(width: theme.border.hairline, height: 18)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
-                    ForEach(filters) { filter in
-                        SBFilterChip(
-                            title: filter.label,
-                            systemImage: filter.iconName,
-                            countText: filter.count.map(String.init),
-                            theme: theme,
-                            isSelected: filter.id == state.activeFilterID,
-                            action: {
-                                onSelectFilter(filter.id)
-                            }
-                        )
-                        .disabled(isSearchEnabled == false)
-                        .opacity(isSearchEnabled ? 1 : 0.55)
+            HStack(spacing: theme.spacing.control8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: theme.spacing.control6) {
+                        ForEach(filters) { filter in
+                            SBFilterChip(
+                                title: filter.label,
+                                systemImage: filter.iconName,
+                                countText: filter.count.map(String.init),
+                                theme: theme,
+                                isSelected: filter.id == state.activeFilterID,
+                                tintColor: SBClipTypeColor.base(forFilterID: filter.id),
+                                action: {
+                                    onSelectFilter(filter.id)
+                                }
+                            )
+                            .disabled(isSearchEnabled == false)
+                            .opacity(isSearchEnabled ? 1 : 0.55)
+                        }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
+                .layoutPriority(1)
 
-            SBSegmentedControl(
-                options: PopupThemePreview.allCases,
-                selection: state.themePreview.id,
-                theme: theme,
-                label: { _ in "" },
-                icon: { $0.segmentIcon },
-                action: { previewID in
-                    guard let preview = PopupThemePreview(rawValue: previewID) else { return }
-                    onSelectThemePreview(preview)
-                }
-            )
-            .frame(width: 96)
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Theme")
+                Spacer(minLength: theme.spacing.control8)
+
+                SBUtilityDropdown(
+                    label: copy.text(.commonSource),
+                    selectionText: copy.text(.commonAll),
+                    options: [SBUtilityDropdownOption(id: "all", label: copy.text(.commonAll))],
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .source,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.source) },
+                    action: { _ in activeMenu = nil }
+                )
+
+                SBUtilityDropdown(
+                    label: copy.text(.popupSort),
+                    selectionText: copy.text(.popupSortNewestFirst),
+                    options: [SBUtilityDropdownOption(id: "newest", label: copy.text(.popupSortNewestFirst))],
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .sort,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.sort) },
+                    action: { _ in activeMenu = nil }
+                )
+
+                SBUtilityDropdown(
+                    label: copy.text(.popupCollections),
+                    selectionText: collectionSelectionText,
+                    options: groupChips,
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .collection,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.collection) },
+                    action: { chip in
+                        onSelectOrganizationGroup(chip.groupID)
+                        activeMenu = nil
+                    }
+                )
+            }
         }
         .padding(.horizontal, theme.spacing.popupPadding)
-        .padding(.vertical, 5)
-        .frame(minHeight: 34)
+        .padding(.vertical, theme.spacing.control8)
         .background(theme.palette.canvas)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -136,6 +235,114 @@ struct SBPopupTopBar: View {
             if searchText != newValue {
                 searchText = newValue
             }
+        }
+    }
+
+    private var collectionSelectionText: String {
+        groupChips.first(where: { $0.isSelected })?.label ?? copy.text(.commonAll)
+    }
+
+    private func toggleMenu(_ kind: SBHeaderMenuKind) {
+        activeMenu = activeMenu == kind ? nil : kind
+    }
+
+    private var overflowMenu: some View {
+        Button {
+            toggleMenu(.overflow)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.palette.textSecondary)
+                .frame(width: 32, height: 32)
+                .background(theme.palette.subpanel)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(theme.palette.borderStrong, lineWidth: theme.border.hairline)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(copy.text(.accessibilityMoreActions))
+        .overlay(alignment: .topTrailing) {
+            if activeMenu == .overflow {
+                overflowMenuContent
+                    .offset(y: 34)
+            }
+        }
+    }
+
+    private var overflowMenuContent: some View {
+        SBOverlayMenuShell(
+            theme: theme,
+            width: 220,
+            actions: overflowActions,
+            onSelectAction: handleOverflowAction
+        ) {
+            VStack(spacing: 0) {
+                ForEach(PopupThemePreview.allCases) { preview in
+                    Button {
+                        onSelectThemePreview(preview)
+                        activeMenu = nil
+                    } label: {
+                        HStack(spacing: theme.spacing.control8) {
+                            Image(systemName: preview == state.themePreview ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(preview == state.themePreview ? theme.palette.accentPrimary : theme.palette.textTertiary)
+
+                            Text(themePreviewLabel(for: preview))
+                                .font(theme.typography.rowPrimary)
+                                .foregroundStyle(theme.palette.textPrimary)
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, theme.spacing.control12)
+                        .padding(.vertical, theme.spacing.control6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Rectangle()
+                    .fill(theme.palette.border)
+                    .frame(height: theme.border.hairline)
+                    .padding(.top, 3)
+            }
+            .padding(.top, theme.spacing.control6)
+        }
+    }
+
+    private var overflowActions: [SBOverlayMenuAction] {
+        [
+            SBOverlayMenuAction(id: "pause", title: copy.text(.menuPauseCapture), symbolName: "pause.circle"),
+            SBOverlayMenuAction(id: "clear-history", title: copy.text(.menuClearHistory), symbolName: "trash", tone: .danger),
+            SBOverlayMenuAction(id: "settings", title: copy.text(.menuSettings), symbolName: "gearshape"),
+            SBOverlayMenuAction(id: "quit", title: copy.text(.menuQuit), symbolName: "power")
+        ]
+    }
+
+    private func handleOverflowAction(_ actionID: String) {
+        activeMenu = nil
+        switch actionID {
+        case "pause":
+            onPauseCapture()
+        case "clear-history":
+            onClearHistory()
+        case "settings":
+            onOpenSettings()
+        case "quit":
+            onQuit()
+        default:
+            break
+        }
+    }
+
+    private func themePreviewLabel(for preview: PopupThemePreview) -> String {
+        switch preview {
+        case .system:
+            return copy.text(.menuAppearanceAuto)
+        case .dark:
+            return copy.text(.menuAppearanceDark)
+        case .light:
+            return copy.text(.menuAppearanceLight)
         }
     }
 }
@@ -155,6 +362,10 @@ struct SBPopupShell: View {
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
+    var onPauseCapture: () -> Void = {}
+    var onClearHistory: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+    var onQuit: () -> Void = {}
     var onSelectClip: (String) -> Void = { _ in }
     var onToggleNoteEditor: (String) -> Void = { _ in }
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
@@ -170,23 +381,27 @@ struct SBPopupShell: View {
     var onSelectTransformAction: (PasteActionID) -> Void = { _ in }
     var onConfirmTransformAction: () -> Void = {}
     var onCloseActiveOverlay: () -> Void = {}
+    var isPinnedCollapsed: Bool = false
+    var onTogglePinnedCollapsed: () -> Void = {}
 
-    // nil = no manual override yet, follow whether pinned has any clips.
-    @State private var manualPinnedCollapsed: Bool? = nil
+    @State private var activeHeaderMenu: SBHeaderMenuKind? = nil
 
+    private static let recentCardWidth: CGFloat = 216
+    private static let recentCardWidthPinnedCollapsed: CGFloat = 264
     private static let recentCardHeight: CGFloat = 148
-    private static let recentCardHeightPinnedCollapsed: CGFloat = 260
-
-    private var isPinnedCollapsed: Bool {
-        manualPinnedCollapsed ?? state.pinnedClips.isEmpty
-    }
+    private static let recentCardHeightPinnedCollapsed: CGFloat = 190
 
     private func togglePinnedCollapsed() {
-        manualPinnedCollapsed = !isPinnedCollapsed
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+            onTogglePinnedCollapsed()
+        }
     }
 
     var body: some View {
-        SBPopupShellFrame(theme: theme) {
+        SBPopupShellFrame(
+            theme: theme,
+            contentHeight: SBPopupLayoutMetrics.contentHeight(isPinnedCollapsed: isPinnedCollapsed)
+        ) {
             VStack(spacing: 0) {
                 SBPopupTopBar(
                     theme: theme,
@@ -194,20 +409,25 @@ struct SBPopupShell: View {
                     state: state,
                     isSearchEnabled: isSearchEnabled,
                     searchFocusRequestToken: searchFocusRequestToken,
+                    groupChips: searchNotesState.groupChips,
+                    activeGroupID: searchNotesState.activeGroupID,
+                    activeMenu: $activeHeaderMenu,
                     onToggleSearchPresented: onToggleSearchPresented,
                     onSearchQueryChange: onSearchQueryChange,
                     onSelectFilter: onSelectFilter,
-                    onSelectThemePreview: onSelectThemePreview
+                    onSelectThemePreview: onSelectThemePreview,
+                    onSelectOrganizationGroup: onSelectOrganizationGroup,
+                    onPauseCapture: onPauseCapture,
+                    onClearHistory: onClearHistory,
+                    onOpenSettings: onOpenSettings,
+                    onQuit: onQuit
                 )
-
-                if searchNotesState.groupChips.isEmpty == false {
-                    SearchNotesOrganizationStrip(
-                        chips: searchNotesState.groupChips,
-                        theme: theme,
-                        isEnabled: isSearchEnabled,
-                        onSelectGroup: onSelectOrganizationGroup
-                    )
-                }
+                // The header's dropdown popouts render as overlays that
+                // visually extend down into this ScrollView's territory;
+                // without a higher zIndex, this later sibling would paint
+                // (and hit-test) on top of them, per SwiftUI's normal
+                // declaration-order stacking.
+                .zIndex(1)
 
                 if let securitySnapshot, securitySnapshot.lockState.revealsProtectedContent == false {
                     SBLockedPopupStateCard(
@@ -218,7 +438,7 @@ struct SBPopupShell: View {
                     .padding(.vertical, theme.spacing.control12)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 6) {
+                        VStack(spacing: theme.spacing.control8) {
                             ClipboardHistoryRailSection(
                                 kind: .pinned,
                                 clips: state.pinnedClips,
@@ -229,6 +449,7 @@ struct SBPopupShell: View {
                                 activeGroupLabel: activeGroupLabel,
                                 noteEditorState: searchNotesState.activeEditor,
                                 searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                isEmphasized: true,
                                 isCollapsed: isPinnedCollapsed,
                                 onToggleCollapse: togglePinnedCollapsed,
                                 onSelectClip: onSelectClip,
@@ -252,6 +473,7 @@ struct SBPopupShell: View {
                                 activeGroupLabel: activeGroupLabel,
                                 noteEditorState: searchNotesState.activeEditor,
                                 searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                cardWidth: isPinnedCollapsed ? Self.recentCardWidthPinnedCollapsed : Self.recentCardWidth,
                                 cardHeight: isPinnedCollapsed ? Self.recentCardHeightPinnedCollapsed : Self.recentCardHeight,
                                 onSelectClip: onSelectClip,
                                 onToggleNoteEditor: onToggleNoteEditor,
@@ -270,42 +492,48 @@ struct SBPopupShell: View {
                 }
             }
         }
-        .overlay {
-            if pasteOverlayState.isPresented {
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onCloseActiveOverlay)
+        .overlayPreferenceValue(SBClipCardAnchorPreferenceKey.self) { anchors in
+            GeometryReader { proxy in
+                ZStack(alignment: .topLeading) {
+                if pasteOverlayState.isPresented {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: onCloseActiveOverlay)
+                        .zIndex(0)
+                }
+
+                if showContextOverlay {
+                    SBContextMenuShell(
+                        theme: theme,
+                        highlightedActionID: contextHighlightedActionID,
+                        isPinned: selectedClip?.isPinned == true,
+                        clipKind: selectedClip?.kind,
+                        onSelectAction: onPerformContextAction,
+                        onHoverAction: { actionID in
+                            guard let actionID else { return }
+                            onHighlightContextAction(actionID)
+                        }
+                    )
+                    .offset(contextMenuOffset(in: proxy, anchors: anchors))
+                    .zIndex(1)
+                }
+
+                if showPasteOverlay {
+                    SBPasteTransformMenuShell(
+                        theme: theme,
+                        highlightedActionID: transformHighlightedActionID,
+                        previewState: pasteOverlayState.preview,
+                        supportedActionIDs: supportedTransformActionIDs,
+                        isExecuting: pasteOverlayState.isExecuting,
+                        onHighlightAction: onHighlightTransformAction,
+                        onSelectAction: onSelectTransformAction,
+                        onConfirm: onConfirmTransformAction,
+                        onCancel: onCloseActiveOverlay
+                    )
+                    .offset(pasteTransformMenuOffset(in: proxy, anchors: anchors))
+                    .zIndex(1)
+                }
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            if showContextOverlay {
-                SBContextMenuShell(
-                    theme: theme,
-                    highlightedActionID: contextHighlightedActionID,
-                    isPinned: selectedClip?.isPinned == true,
-                    onSelectAction: onPerformContextAction,
-                    onHoverAction: { actionID in
-                        guard let actionID else { return }
-                        onHighlightContextAction(actionID)
-                    }
-                )
-                    .offset(x: 18, y: 118)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if showPasteOverlay {
-                SBPasteTransformMenuShell(
-                    theme: theme,
-                    highlightedActionID: transformHighlightedActionID,
-                    previewState: pasteOverlayState.preview,
-                    supportedActionIDs: supportedTransformActionIDs,
-                    isExecuting: pasteOverlayState.isExecuting,
-                    onHighlightAction: onHighlightTransformAction,
-                    onSelectAction: onSelectTransformAction,
-                    onConfirm: onConfirmTransformAction,
-                    onCancel: onCloseActiveOverlay
-                )
-                    .offset(x: -24, y: -22)
             }
         }
     }
@@ -378,108 +606,57 @@ struct SBPopupShell: View {
     private var isSearchEnabled: Bool {
         searchNotesState.isSearchEnabled && isLocked == false
     }
-}
 
-private struct SearchNotesOrganizationStrip: View {
-    let chips: [OrganizationChipSummary]
-    let theme: SBTheme
-    var isEnabled: Bool = true
-    let onSelectGroup: (OrganizationGroupID) -> Void
+    private func contextMenuOffset(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGSize {
+        let menuWidth: CGFloat = 220
+        let menuHeight: CGFloat = 238
+        let gap: CGFloat = 8
+        let rect = anchoredClipRect(in: proxy, anchors: anchors)
+        let x = rect.maxX + menuWidth + gap <= proxy.size.width
+            ? rect.maxX + gap
+            : max(gap, rect.minX - menuWidth - gap)
+        let y = min(max(gap, rect.minY), max(gap, proxy.size.height - menuHeight - gap))
+        return CGSize(width: x, height: y)
+    }
 
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 5) {
-                ForEach(chips) { chip in
-                    OrganizationChipButton(
-                        chip: chip,
-                        theme: theme,
-                        isEnabled: isEnabled,
-                        action: {
-                            onSelectGroup(chip.groupID)
-                        }
-                    )
-                }
-            }
-            .padding(.horizontal, theme.spacing.popupPadding)
-            .padding(.vertical, 8)
+    private func pasteTransformMenuOffset(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGSize {
+        let menuWidth: CGFloat = 260
+        let menuHeight: CGFloat = 412
+        let gap: CGFloat = 10
+        let rect = anchoredClipRect(in: proxy, anchors: anchors)
+        let x = rect.maxX + menuWidth + gap <= proxy.size.width
+            ? rect.maxX + gap
+            : max(gap, rect.minX - menuWidth - gap)
+        // The expanded panel gives this negative offset room to render above
+        // the normal popup surface rather than clipping at its top edge.
+        let y = max(-menuHeight + gap, rect.maxY - menuHeight)
+        return CGSize(width: x, height: y)
+    }
+
+    private func anchoredClipRect(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGRect {
+        guard let anchorClipID = pasteOverlayState.anchorClipID,
+              let anchor = anchors[anchorClipID] else {
+            return CGRect(x: theme.spacing.popupPadding, y: 42, width: 216, height: 148)
         }
-        .background(theme.palette.panel)
-        .opacity(isEnabled ? 1 : 0.55)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(theme.palette.border)
-                .frame(height: theme.border.hairline)
-        }
+
+        return proxy[anchor]
     }
 }
 
-private struct OrganizationChipButton: View {
-    let chip: OrganizationChipSummary
-    let theme: SBTheme
-    let isEnabled: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: theme.spacing.control4) {
-                if let accentToken = chip.accentToken, chip.isSystem == false {
-                    Circle()
-                        .fill(theme.accent(for: accentToken))
-                        .frame(width: 6, height: 6)
-                }
-
-                Text(chip.label)
-                    .font(theme.typography.chip)
-                    .lineLimit(1)
-
-                SBCountBadge(
-                    text: String(chip.count),
-                    theme: theme,
-                    tone: chip.isSelected ? resolvedTone : .neutral,
-                    compact: true
-                )
-            }
-            .foregroundStyle(chip.isSelected ? theme.accent(for: resolvedTone) : theme.palette.textSecondary)
-            .padding(.horizontal, theme.spacing.control10)
-            .padding(.vertical, theme.spacing.control4)
-            .background(chip.isSelected ? theme.accentBackground(for: resolvedTone) : theme.palette.subpanel)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(
-                        chip.isSelected ? theme.accent(for: resolvedTone) : theme.palette.border,
-                        lineWidth: theme.border.hairline
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(chip.isDisabled || isEnabled == false)
-        .opacity(chip.isDisabled || isEnabled == false ? 0.45 : 1)
-    }
-
-    private var resolvedTone: SBAccentTone {
-        if chip.isSystem {
-            return .primary
-        }
-
-        switch chip.accentToken {
-        case "accent.success":
-            return .success
-        case "accent.warning":
-            return .warning
-        case "accent.info":
-            return .info
-        case "accent.danger":
-            return .danger
-        default:
-            return .primary
-        }
-    }
-}
 
 private struct SBLockedPopupStateCard: View {
     let theme: SBTheme
     let snapshot: SecurityRuntimeSnapshot
+    @SBLocalizedCopy private var copy
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.control10) {
@@ -516,7 +693,7 @@ private struct SBLockedPopupStateCard: View {
             if let failureText {
                 SBSecurityStatusCallout(
                     theme: theme,
-                    title: "Protected content unavailable",
+                    title: copy.text(.securityProtectedStorageUnavailable),
                     detailText: failureText,
                     symbolName: "exclamationmark.lock.fill",
                     tone: .danger
@@ -547,13 +724,13 @@ private struct SBLockedPopupStateCard: View {
     private var titleText: String {
         switch snapshot.lockState {
         case .locked:
-            return "SlipBoard is locked"
+            return copy.text(.popupLockTitleLocked)
         case .unlocking:
-            return "Unlocking SlipBoard"
+            return copy.text(.popupLockTitleUnlocking)
         case .unlockFailed:
-            return "SlipBoard stayed locked"
+            return copy.text(.popupLockTitleFailed)
         case .unlocked:
-            return "SlipBoard is unlocked"
+            return copy.text(.popupLockTitleUnlocked)
         }
     }
 
@@ -564,39 +741,39 @@ private struct SBLockedPopupStateCard: View {
 
         switch snapshot.lockState {
         case .locked:
-            return "Previews and search stay hidden inside this popup until you unlock from the menu or Security settings."
+            return copy.text(.popupLockDetailLocked)
         case .unlocking:
-            return "SlipBoard is waiting for the current system authentication step to complete before showing protected content."
+            return copy.text(.popupLockDetailUnlocking)
         case .unlockFailed:
-            return "Protected previews remain hidden after the last unlock attempt. Retry from the menu bar or open Security settings."
+            return copy.text(.popupLockDetailFailed)
         case .unlocked:
-            return "Protected content is visible."
+            return copy.text(.popupLockDetailUnlocked)
         }
     }
 
     private var hintText: String {
         switch snapshot.lockState {
         case .locked:
-            return "Unlock from menu or settings"
+            return copy.text(.popupLockHintLocked)
         case .unlocking:
-            return "Waiting for system auth"
+            return copy.text(.popupLockHintUnlocking)
         case .unlockFailed:
-            return "Retry unlock from menu"
+            return copy.text(.popupLockHintFailed)
         case .unlocked:
-            return "Protected content visible"
+            return copy.text(.popupLockHintUnlocked)
         }
     }
 
     private var footerStatusText: String {
         switch snapshot.lockState {
         case .locked:
-            return "Locked"
+            return copy.text(.locked)
         case .unlocking:
-            return "Unlocking"
+            return copy.text(.securityUnlocking)
         case .unlockFailed:
-            return "Unlock failed"
+            return copy.text(.securityUnlockFailed)
         case .unlocked:
-            return "Unlocked"
+            return copy.text(.unlocked)
         }
     }
 
@@ -648,17 +825,6 @@ private extension PopupThemePreview {
             return "Dark"
         case .light:
             return "Light"
-        }
-    }
-
-    var segmentIcon: String {
-        switch self {
-        case .system:
-            return "circle.lefthalf.filled"
-        case .dark:
-            return "moon.fill"
-        case .light:
-            return "sun.max.fill"
         }
     }
 }

@@ -40,6 +40,7 @@ struct SBMenuBarLabel: View {
 struct SBMenuBarDropdownShell: View {
     let theme: SBTheme
     let summary: MenuBarSummaryState
+    @SBLocalizedCopy private var copy
     var securitySnapshot: Any? = nil
     var onSelectQuickRetention: (String) -> Void = { _ in }
     var onSelectCommand: (String) -> Void = { _ in }
@@ -87,7 +88,7 @@ struct SBMenuBarDropdownShell: View {
             Spacer(minLength: theme.spacing.control12)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("Status")
+                Text(copy.text(.menuStatus))
                     .font(theme.typography.chip)
                     .foregroundStyle(theme.palette.textTertiary)
 
@@ -111,7 +112,7 @@ struct SBMenuBarDropdownShell: View {
 
     private var retentionSection: some View {
         VStack(alignment: .leading, spacing: theme.spacing.control6) {
-            Text("Retention")
+            Text(copy.text(.menuRetention))
                 .font(theme.typography.chip)
                 .foregroundStyle(theme.palette.textTertiary)
 
@@ -258,8 +259,7 @@ struct SBMenuBarDropdownShell: View {
 
     private var pauseCommandRow: MenuBarCommandRow? {
         summary.commands.first { row in
-            row.id.localizedCaseInsensitiveContains("pause")
-                || row.title.localizedCaseInsensitiveContains("pause")
+            row.id == "pause-capturing"
                 || row.symbolName == "pause.circle"
                 || row.symbolName == "play.circle"
         }
@@ -276,7 +276,7 @@ struct SBMenuBarDropdownShell: View {
         let lockState = securityVisualState(from: snapshot)
 
         return VStack(alignment: .leading, spacing: theme.spacing.control8) {
-            Text("Security")
+            Text(copy.text(.menuSecurity))
                 .font(theme.typography.chip)
                 .foregroundStyle(theme.palette.textTertiary)
 
@@ -367,15 +367,15 @@ struct SBMenuBarDropdownShell: View {
 
         switch lockState {
         case .locked:
-            return "Locked"
+            return copy.text(.locked)
         case .unlocking:
-            return "Unlocking"
+            return copy.text(.securityUnlocking)
         case .unlockFailed:
-            return "Unlock failed"
+            return copy.text(.securityUnlockFailed)
         case .unlocked:
             return summary.statusLabel
         case .unknown:
-            return "Locked"
+            return copy.text(.locked)
         }
     }
 
@@ -387,21 +387,28 @@ struct SBMenuBarDropdownShell: View {
     private func lockTitle(for state: SBMenuBarSecurityState) -> String {
         switch state {
         case .locked:
-            return "SlipBoard is locked"
+            return copy.text(.securityStateLocked)
         case .unlocking:
-            return "Unlock in progress"
+            return copy.text(.securityUnlockInProgress)
         case .unlockFailed:
-            return "Unlock unavailable"
+            return copy.text(.securityUnlockUnavailable)
         case .unlocked:
-            return "SlipBoard is unlocked"
+            return copy.text(.securityStateUnlocked)
         case .unknown:
-            return "SlipBoard status unavailable"
+            return copy.text(.securityStateUnavailable)
         }
     }
 
     private func lockDetailText(for snapshot: Any) -> String {
-        if let failureDetailText = securityFailureDetailText(from: snapshot) {
-            return failureDetailText
+        if let failure = (snapshot as? SecurityRuntimeSnapshot)?.lastFailure {
+            switch failure.kind {
+            case .authenticationFailed:
+                return copy.text(.securityLockDetailFailed)
+            case .migrationFailed:
+                return copy.text(.securityLockDetailMigration)
+            case .keyProvisioningFailed, .keyWrapFailed, .keyUnwrapFailed, .itemDecryptFailed:
+                return copy.text(.securityLockDetailKeyUnavailable)
+            }
         }
 
         switch securityVisualState(from: snapshot) {
@@ -409,29 +416,29 @@ struct SBMenuBarDropdownShell: View {
             if let reason = securityLockedReason(from: snapshot) {
                 switch reason {
                 case .manual:
-                    return "Protected previews stay hidden until SlipBoard is unlocked again."
+                    return copy.text(.securityLockDetailManual)
                 case .autoLockTimeout:
-                    return "Auto-lock hid your previews and disabled search until you unlock."
+                    return copy.text(.securityLockDetailAutoLock)
                 case .backgroundTransition:
-                    return "Previews are hidden after leaving the active session."
+                    return copy.text(.securityLockDetailBackground)
                 case .authenticationRequired:
-                    return "Use the approved system method from Settings to reveal protected content."
+                    return copy.text(.securityLockDetailAuthentication)
                 case .keyUnavailable:
-                    return "Protected storage is unavailable until the payload key can be unwrapped."
+                    return copy.text(.securityLockDetailKeyUnavailable)
                 case .migrationRequired:
-                    return "Finish the current migration before protected content can be shown."
+                    return copy.text(.securityLockDetailMigration)
                 }
             }
 
-            return "Protected previews stay hidden until SlipBoard is unlocked again."
+            return copy.text(.securityLockDetailManual)
         case .unlocking:
-            return "SlipBoard is waiting for the current system authentication flow to finish."
+            return copy.text(.securityLockDetailUnlocking)
         case .unlockFailed:
-            return "Use Unlock Slipboard or open Security settings to retry."
+            return copy.text(.securityLockDetailFailed)
         case .unlocked:
-            return "Protected content is available."
+            return copy.text(.securityLockDetailUnlocked)
         case .unknown:
-            return "Protected previews remain hidden until security state is available."
+            return copy.text(.securityLockDetailUnknown)
         }
     }
 
@@ -473,10 +480,10 @@ struct SBMenuBarDropdownShell: View {
 
     private func pauseDetailTitle(for row: MenuBarCommandRow) -> String? {
         if let accessoryText = row.accessoryText, accessoryText.isEmpty == false {
-            if row.title.localizedCaseInsensitiveContains("resume") {
-                return "Paused until resume"
+            if row.symbolName == "play.circle" {
+                return copy.text(.menuPausedUntilResume)
             }
-            return "Pause for \(accessoryText)"
+            return copy.text(.menuPauseFor, ["duration": accessoryText])
         }
 
         if let subtitle = row.subtitle, subtitle.isEmpty == false {
@@ -507,7 +514,7 @@ struct SBMenuBarDropdownShell: View {
     }
 
     private func pauseDetailSymbolName(for row: MenuBarCommandRow) -> String {
-        if row.title.localizedCaseInsensitiveContains("resume") {
+        if row.symbolName == "play.circle" {
             return "play.circle"
         }
 
@@ -522,6 +529,7 @@ struct SBMenuBarDropdownShell: View {
 private struct SBMenuBarLockBadge: View {
     let theme: SBTheme
     let lockState: SBMenuBarSecurityState
+    @SBLocalizedCopy private var copy
 
     var body: some View {
         Image(systemName: symbolName)
@@ -581,15 +589,15 @@ private struct SBMenuBarLockBadge: View {
     private var accessibilityText: String {
         switch lockState {
         case .locked:
-            return "SlipBoard locked"
+            return copy.text(.securityMenuLocked)
         case .unlocking:
-            return "SlipBoard unlocking"
+            return copy.text(.securityUnlocking)
         case .unlockFailed:
-            return "SlipBoard unlock failed"
+            return copy.text(.securityUnlockFailed)
         case .unlocked:
-            return "SlipBoard unlocked"
+            return copy.text(.securityMenuUnlocked)
         case .unknown:
-            return "SlipBoard security status unavailable"
+            return copy.text(.securityMenuUnavailable)
         }
     }
 }
@@ -655,14 +663,6 @@ private enum SBMenuBarLockedReason: String {
 private func securityVisualState(from snapshot: Any) -> SBMenuBarSecurityState {
     let rawValue = String(describing: mirroredChild(named: "lockState", in: snapshot) ?? "")
     return SBMenuBarSecurityState(rawValue: rawValue) ?? .unknown
-}
-
-private func securityFailureDetailText(from snapshot: Any) -> String? {
-    guard let failure = mirroredChild(named: "lastFailure", in: snapshot) else {
-        return nil
-    }
-
-    return mirroredChild(named: "detailText", in: failure) as? String
 }
 
 private func securityLockedReason(from snapshot: Any) -> SBMenuBarLockedReason? {

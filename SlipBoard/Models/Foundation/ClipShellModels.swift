@@ -187,7 +187,7 @@ struct PopupShellViewState: Hashable {
         searchQuery: String = "",
         isSearchPresented: Bool = false,
         activeFilterID: String = "all",
-        themePreview: PopupThemePreview = .dark,
+        themePreview: PopupThemePreview = .light,
         pinnedClips: [ClipPreviewSummary] = [],
         recentClips: [ClipPreviewSummary] = [],
         status: PopupStatusSummary,

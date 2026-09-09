@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SlipBoard UI</title>
+  <style>
+    :root {
+      --bg-blue: rgba(245, 250, 255, 0.72);
+      --panel-bg: rgba(255, 255, 255, 0.58);
+      --panel-border: rgba(255, 255, 255, 0.5);
+      --shadow: 0 10px 30px rgba(22, 60, 110, 0.12);
+
+      --accent: #2f7cf6;
+      --text: #243042;
+      --muted: #6c7a90;
+      --line: rgba(110, 140, 180, 0.12);
+
+      --text-type: #d19a00;
+      --text-type-bg: rgba(209, 154, 0, 0.06);
+      --text-type-head: rgba(209, 154, 0, 0.12);
+      --text-type-border: rgba(209, 154, 0, 0.22);
+
+      --image-type: #ef5350;
+      --image-type-bg: rgba(239, 83, 80, 0.05);
+      --image-type-head: rgba(239, 83, 80, 0.10);
+      --image-type-border: rgba(239, 83, 80, 0.18);
+
+      --rich-type: #8b5cf6;
+      --rich-type-bg: rgba(139, 92, 246, 0.05);
+      --rich-type-head: rgba(139, 92, 246, 0.10);
+      --rich-type-border: rgba(139, 92, 246, 0.18);
+
+      --code-type: #2f7cf6;
+      --code-type-bg: rgba(47, 124, 246, 0.05);
+      --code-type-head: rgba(47, 124, 246, 0.10);
+      --code-type-border: rgba(47, 124, 246, 0.18);
+
+      --file-type: #f08a24;
+      --file-type-bg: rgba(240, 138, 36, 0.05);
+      --file-type-head: rgba(240, 138, 36, 0.10);
+      --file-type-border: rgba(240, 138, 36, 0.18);
+
+      --url-type: #0f9aa8;
+      --url-type-bg: rgba(15, 154, 168, 0.05);
+      --url-type-head: rgba(15, 154, 168, 0.10);
+      --url-type-border: rgba(15, 154, 168, 0.18);
+
+      --color-type: #ec5fb7;
+      --color-type-bg: rgba(236, 95, 183, 0.05);
+      --color-type-head: rgba(236, 95, 183, 0.10);
+      --color-type-border: rgba(236, 95, 183, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,.20), transparent 18%),
+        radial-gradient(circle at 70% 30%, rgba(255,255,255,.12), transparent 20%),
+        linear-gradient(180deg, #5ab8ff 0%, #7fd2ff 35%, #6cc7ff 100%);
+      overflow: hidden;
+    }
+
+    /* fake wallpaper vibe */
+    .wallpaper-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background:
+        radial-gradient(circle at 20% 18%, #ffffff 0 6px, transparent 7px),
+        radial-gradient(circle at 23% 20%, #ffffff 0 10px, transparent 11px),
+        radial-gradient(circle at 27% 15%, #ffffff 0 8px, transparent 9px);
+      filter: blur(1px);
+    }
+
+    .app-shell {
+      position: fixed;
+      left: 15px;
+      right: 15px;
+      bottom: 15px;
+      height: 410px;
+      border-radius: 20px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px) saturate(1.2);
+      -webkit-backdrop-filter: blur(22px) saturate(1.2);
+      overflow: hidden;
+    }
+
+    .app-inner {
+      padding: 12px 20px 14px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,.22),
+        rgba(255,255,255,.10)
+      );
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 36px;
+    }
+
+    .search {
+      flex: 1;
+      height: 34px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(140, 170, 210, 0.18);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      color: var(--muted);
+    }
+
+    .search input {
+      flex: 1;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .kbd {
+      font-size: 12px;
+      color: #7b8799;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid rgba(0,0,0,0.05);
+      white-space: nowrap;
+    }
+
+    .menu-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(140, 170, 210, 0.20);
+      background: rgba(255,255,255,0.55);
+      color: #6b7a90;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .chips {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .chip, .select {
+      height: 34px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 14px;
+      line-height: 1;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      background: rgba(255,255,255,0.42);
+    }
+
+    .chip svg,
+    .select svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    .chip-all {
+      color: var(--accent);
+      border-color: rgba(47, 124, 246, 0.18);
+      background: rgba(47, 124, 246, 0.06);
+      font-weight: 600;
+    }
+
+    .chip-text {
+      color: var(--text-type);
+      border-color: var(--text-type-border);
+      background: var(--text-type-head);
+    }
+
+    .chip-image {
+      color: var(--image-type);
+      border-color: var(--image-type-border);
+      background: var(--image-type-head);
+    }
+
+    .chip-rich {
+      color: var(--rich-type);
+      border-color: var(--rich-type-border);
+      background: var(--rich-type-head);
+    }
+
+    .chip-code {
+      color: var(--code-type);
+      border-color: var(--code-type-border);
+      background: var(--code-type-head);
+    }
+
+    .chip-file {
+      color: var(--file-type);
+      border-color: var(--file-type-border);
+      background: var(--file-type-head);
+    }
+
+    .chip-url {
+      color: var(--url-type);
+      border-color: var(--url-type-border);
+      background: var(--url-type-head);
+    }
+
+    .chip-color {
+      color: var(--color-type);
+      border-color: var(--color-type-border);
+      background: var(--color-type-head);
+    }
+
+    .selects {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .select {
+      min-width: 190px;
+      justify-content: space-between;
+      color: #56657c;
+      border: 1px solid rgba(120, 150, 190, 0.16);
+      background: rgba(255,255,255,0.48);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: -2px 0 0;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section.pinned {
+      background: rgba(47, 124, 246, 0.03);
+      border-radius: 14px;
+      padding: 10px 10px 12px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #2a3d57;
+      padding-left: 2px;
+    }
+
+    .section-title .muted-count {
+      color: #7b8799;
+      font-weight: 600;
+    }
+
+    .star {
+      color: var(--accent);
+      font-size: 15px;
+    }
+
+    .clock {
+      color: #75839b;
+      font-size: 15px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+    }
+
+    .card {
+      position: relative;
+      min-height: 108px;
+      border-radius: 14px;
+      border: 1px solid;
+      overflow: hidden;
+      background: rgba(255,255,255,.5);
+    }
+
+    .card-header {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .card-type {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-type svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .time {
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.72;
+    }
+
+    .card-body {
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #2d3440;
+    }
+
+    .card-body p {
+      margin: 0;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .thumbs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .thumb {
+      width: 58px;
+      height: 30px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #f3f4f8, #e7ecf7);
+      border: 1px solid rgba(150,160,180,.18);
+    }
+
+    .thumb:nth-child(2) {
+      background: linear-gradient(135deg, #faf3ff, #efe6ff);
+    }
+
+    .thumb:nth-child(3) {
+      background: linear-gradient(135deg, #fff8e6, #ffefb8);
+    }
+
+    .ellipsis {
+      position: absolute;
+      right: 10px;
+      bottom: 8px;
+      font-size: 18px;
+      color: #8a94a8;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+      cursor: pointer;
+    }
+
+    .card:hover .ellipsis {
+      opacity: 1;
+    }
+
+    .type-text {
+      background: var(--text-type-bg);
+      border-color: var(--text-type-border);
+    }
+    .type-text .card-header {
+      background: var(--text-type-head);
+      color: var(--text-type);
+    }
+
+    .type-image {
+      background: var(--image-type-bg);
+      border-color: var(--image-type-border);
+    }
+    .type-image .card-header {
+      background: var(--image-type-head);
+      color: var(--image-type);
+    }
+
+    .type-rich {
+      background: var(--rich-type-bg);
+      border-color: var(--rich-type-border);
+    }
+    .type-rich .card-header {
+      background: var(--rich-type-head);
+      color: var(--rich-type);
+    }
+
+    .type-code {
+      background: var(--code-type-bg);
+      border-color: var(--code-type-border);
+    }
+    .type-code .card-header {
+      background: var(--code-type-head);
+      color: var(--code-type);
+    }
+
+    .type-file {
+      background: var(--file-type-bg);
+      border-color: var(--file-type-border);
+    }
+    .type-file .card-header {
+      background: var(--file-type-head);
+      color: var(--file-type);
+    }
+
+    .type-url {
+      background: var(--url-type-bg);
+      border-color: var(--url-type-border);
+    }
+    .type-url .card-header {
+      background: var(--url-type-head);
+      color: var(--url-type);
+    }
+
+    .type-color {
+      background: var(--color-type-bg);
+      border-color: var(--color-type-border);
+    }
+    .type-color .card-header {
+      background: var(--color-type-head);
+      color: var(--color-type);
+    }
+
+    .color-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+    }
+
+    @media (max-width: 1280px) {
+      .app-shell {
+        height: 430px;
+      }
+      .select {
+        min-width: 160px;
+      }
+      .card-grid {
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+      .app-shell {
+        position: relative;
+        inset: auto;
+        margin: 15px;
+        height: auto;
+      }
+      .app-inner {
+        padding-bottom: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wallpaper-overlay"></div>
+
+  <div class="app-shell">
+    <div class="app-inner">
+      <div class="topbar">
+        <div class="search">
+          <span>🔍</span>
+          <input type="text" placeholder="Search clipboard..." />
+          <span class="kbd">⌘K</span>
+        </div>
+        <button class="menu-btn">···</button>
+      </div>
+
+      <div class="controls-row">
+        <div class="chips">
+          <div class="chip chip-all">⊕ All</div>
+          <div class="chip chip-text">▣ Text</div>
+          <div class="chip chip-image">🖼 Image</div>
+          <div class="chip chip-rich">▤ Rich Text</div>
+          <div class="chip chip-code">⌘ Code</div>
+          <div class="chip chip-file">📎 File</div>
+          <div class="chip chip-url">🔗 URL</div>
+          <div class="chip chip-color">◈ Color</div>
+        </div>
+
+        <div class="selects">
+          <div class="select">
+            <span>Source: All Apps</span>
+            <span>⌄</span>
+          </div>
+          <div class="select">
+            <span>Sort: Newest First</span>
+            <span>⌄</span>
+          </div>
+          <div class="select">
+            <span>Collection: All</span>
+            <span>⌄</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section pinned">
+        <div class="section-title">
+          <span class="star">★</span>
+          <span>Pinned</span>
+          <span class="muted-count">· 7</span>
+        </div>
+
+        <div class="card-grid">
+          <div class="card type-text">
+            <div class="card-header">
+              <div class="card-type"><span>▣</span><span>Text</span></div>
+              <div class="time">11m</div>
+            </div>
+            <div class="card-body">
+              <p>https://</p>
+              <p>notion-widget-14kr.png</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-text">
+            <div class="card-header">
+              <div class="card-type"><span>▣</span><span>Text</span></div>
+              <div class="time">13m</div>
+            </div>
+            <div class="card-body">
+              <p>Hey</p>
+              <p>SlipBoard</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-url">
+            <div class="card-header">
+              <div class="card-type"><span>🔗</span><span>URL</span></div>
+              <div class="time">11m</div>
+            </div>
+            <div class="card-body">
+              <p>https://</p>
+              <p>slipbd.com/clipboard?redirect=...</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-image">
+            <div class="card-header">
+              <div class="card-type"><span>🖼</span><span>Image</span></div>
+              <div class="time">16m</div>
+            </div>
+            <div class="card-body">
+              <p>dr-ersin_devx__play.webp</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-rich">
+            <div class="card-header">
+              <div class="card-type"><span>▤</span><span>Rich Text</span></div>
+              <div class="time">13m</div>
+            </div>
+            <div class="card-body">
+              <div class="thumbs">
+                <div class="thumb"></div>
+                <div class="thumb"></div>
+                <div class="thumb"></div>
+              </div>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-code">
+            <div class="card-header">
+              <div class="card-type"><span>⌘</span><span>Code</span></div>
+              <div class="time">15m</div>
+            </div>
+            <div class="card-body">
+              <p>4sCC1</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-url">
+            <div class="card-header">
+              <div class="card-type"><span>🔗</span><span>URL</span></div>
+              <div class="time">15m</div>
+            </div>
+            <div class="card-body">
+              <p>Chạy việc định cho dev từ</p>
+              <p>https://docs.slipboard.web2...</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <span class="clock">◔</span>
+          <span>Recent</span>
+          <span class="muted-count">· 287</span>
+        </div>
+
+        <div class="card-grid">
+          <div class="card type-text">
+            <div class="card-header">
+              <div class="card-type"><span>▣</span><span>Text</span></div>
+              <div class="time">11m</div>
+            </div>
+            <div class="card-body">
+              <p>Hey</p>
+              <p>#SlipBoardTeam</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-url">
+            <div class="card-header">
+              <div class="card-type"><span>🔗</span><span>URL</span></div>
+              <div class="time">11m</div>
+            </div>
+            <div class="card-body">
+              <p>https://docs.aws.amazon...</p>
+              <p>source=unity?version=2.5es</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-image">
+            <div class="card-header">
+              <div class="card-type"><span>🖼</span><span>Image</span></div>
+              <div class="time">16m</div>
+            </div>
+            <div class="card-body">
+              <p>xrbtn_device_play.webp</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-rich">
+            <div class="card-header">
+              <div class="card-type"><span>▤</span><span>Rich Text</span></div>
+              <div class="time">13m</div>
+            </div>
+            <div class="card-body">
+              <div class="thumbs">
+                <div class="thumb"></div>
+                <div class="thumb"></div>
+                <div class="thumb"></div>
+              </div>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-code">
+            <div class="card-header">
+              <div class="card-type"><span>⌘</span><span>Code</span></div>
+              <div class="time">15m</div>
+            </div>
+            <div class="card-body">
+              <p>45CC1</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-color">
+            <div class="card-header">
+              <div class="card-type"><span>◈</span><span>Color</span></div>
+              <div class="time">17m</div>
+            </div>
+            <div class="card-body">
+              <div class="color-preview">
+                <span class="dot"></span>
+                <span>#22C55E</span>
+              </div>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-url">
+            <div class="card-header">
+              <div class="card-type"><span>🔗</span><span>URL</span></div>
+              <div class="time">17m</div>
+            </div>
+            <div class="card-body">
+              <p>Chạy việc định cho dev từ</p>
+              <p>https://docs.slipboard.web2...</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-file">
+            <div class="card-header">
+              <div class="card-type"><span>📎</span><span>File</span></div>
+              <div class="time">17m</div>
+            </div>
+            <div class="card-body">
+              <p>Visual Studio Code July 2025</p>
+              <p>https://code.visualstudio.com/</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+
+          <div class="card type-image">
+            <div class="card-header">
+              <div class="card-type"><span>🖼</span><span>Image</span></div>
+              <div class="time">17m</div>
+            </div>
+            <div class="card-body">
+              <p>Screenshot</p>
+              <p>2025-06-04 at 16.12.38.png</p>
+            </div>
+            <div class="ellipsis">…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

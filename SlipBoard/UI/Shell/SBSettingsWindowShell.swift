@@ -3,7 +3,11 @@ import SwiftUI
 struct SBSettingsWindowShell: View {
     let theme: SBTheme
     let state: SettingsShellState
+    @SBLocalizedCopy private var copy
+    @Environment(\.sbLocalizationLanguage) private var localizationLanguage
     var securitySnapshot: Any? = nil
+    var bridgeSnapshot: BridgeRuntimeSnapshot? = nil
+    var exclusionsPauseSnapshot: ExclusionsPauseSnapshot? = nil
     var snippetsHotkeysSnapshot: SnippetsHotkeysRuntimeSnapshot? = nil
     var onSelectSection: (SettingsSectionID) -> Void = { _ in }
     var onSelectChoice: (String, String) -> Void = { _, _ in }
@@ -14,44 +18,13 @@ struct SBSettingsWindowShell: View {
     var onClearHotkeyBinding: (HotkeyBindingTarget) -> Void = { _ in }
 
     var body: some View {
-        VStack(spacing: 0) {
-            titlebar
-
-            HStack(spacing: 0) {
-                sidebar
-                contentPane
-            }
-            // The Settings scene keeps the native title bar above this custom shell.
-            .padding(.top, 22)
-            .frame(minHeight: 560)
+        HStack(spacing: 0) {
+            sidebar
+            contentPane
         }
+        .frame(minHeight: 560)
         .frame(minWidth: 960, minHeight: 620, alignment: .topLeading)
         .sbSurface(.window, theme: theme)
-    }
-
-    private var titlebar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                circle(Color(red: 226 / 255, green: 75 / 255, blue: 74 / 255))
-                circle(Color(red: 239 / 255, green: 159 / 255, blue: 39 / 255))
-                circle(Color(red: 99 / 255, green: 153 / 255, blue: 34 / 255))
-            }
-
-            Text("Settings")
-                .font(theme.typography.rowPrimary)
-                .foregroundStyle(theme.palette.textSecondary)
-                .padding(.leading, 4)
-
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(theme.palette.panel)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(theme.palette.border)
-                .frame(height: theme.border.hairline)
-        }
     }
 
     private var sidebar: some View {
@@ -74,7 +47,7 @@ struct SBSettingsWindowShell: View {
     }
 
     private var contentPane: some View {
-        let pane = state.pane(for: state.selectedSection)
+        let pane = localizedPane(state.pane(for: state.selectedSection))
 
         return ScrollView {
             VStack(alignment: .leading, spacing: theme.spacing.section24) {
@@ -172,12 +145,7 @@ struct SBSettingsWindowShell: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    private func circle(_ color: Color) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 11, height: 11)
+        .focusEffectDisabled()
     }
 
     @ViewBuilder
@@ -224,7 +192,7 @@ struct SBSettingsWindowShell: View {
         }
 
         if let pinnedPlaceholder = pane.sections.compactMap(\.placeholder).first {
-            SBPaneSection(title: "Pinned items", theme: theme) {
+            SBPaneSection(title: copy.text(.popupPinned), theme: theme) {
                 SBSettingsSectionPlaceholder(placeholder: pinnedPlaceholder, theme: theme)
             }
         }
@@ -296,7 +264,7 @@ struct SBSettingsWindowShell: View {
 
         return SettingsChoiceItem(
             id: item.id,
-            title: item.title == "Retention period" ? "Clear history after" : item.title,
+            title: copy.text(.settingsClearHistoryAfter),
             detailText: item.detailText,
             selectedOptionID: normalizedRetentionID(item.selectedOptionID),
             options: normalizedOptions,
@@ -339,14 +307,22 @@ struct SBSettingsWindowShell: View {
         case "1w", "2w", "1mo", "3mo":
             return id
         case "never":
-            return "Never"
+            return copy.text(.retentionNever)
         default:
             return fallback
         }
     }
 
     private func sidebarTitle(for pane: SettingsPaneModel) -> String {
-        pane.id == .bridge ? "Bridge" : pane.title
+        switch pane.id {
+        case .general: copy.text(.sidebarOrganization)
+        case .bridge: copy.text(.sidebarBridge)
+        case .retention: copy.text(.sidebarRetention)
+        case .exclusions: copy.text(.sidebarExclusions)
+        case .hotkeys: copy.text(.sidebarHotkeys)
+        case .snippets: copy.text(.sidebarSnippets)
+        case .security: copy.text(.sidebarSecurity)
+        }
     }
 
     private func sidebarSymbolName(for pane: SettingsPaneModel) -> String {
@@ -358,7 +334,435 @@ struct SBSettingsWindowShell: View {
     }
 
     private func isOrganizationPane(_ pane: SettingsPaneModel) -> Bool {
-        pane.title.compare("Organization", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        pane.id == .general
+    }
+
+    private func localizedPane(_ pane: SettingsPaneModel) -> SettingsPaneModel {
+        var localized = pane
+
+        switch pane.id {
+        case .general:
+            localized.title = copy.text(.settingsOrganization)
+            localized.subtitle = copy.text(.settingsOrganizationDescription)
+        case .bridge:
+            localized.title = copy.text(.settingsBridge)
+            localized.subtitle = copy.text(.bridgeDescription)
+        case .retention:
+            localized.title = copy.text(.settingsRetention)
+            localized.subtitle = copy.text(.settingsRetentionDescription)
+        case .exclusions:
+            localized.title = copy.text(.settingsExclusions)
+            localized.subtitle = copy.text(.settingsExclusionsDescription)
+        case .hotkeys:
+            localized.title = copy.text(.settingsHotkeys)
+            localized.subtitle = copy.text(.settingsHotkeysDescription)
+        case .snippets:
+            localized.title = copy.text(.settingsSnippets)
+            localized.subtitle = copy.text(.settingsSnippetsDescription)
+        case .security:
+            localized.title = copy.text(.settingsSecurity)
+            localized.subtitle = copy.text(.settingsSecurityDescription)
+        }
+
+        localized.sections = pane.sections.map(localizedSection)
+        return localized
+    }
+
+    private func localizedSection(_ section: SettingsPaneSection) -> SettingsPaneSection {
+        var localized = section
+
+        switch section.id {
+        case "organization.search":
+            localized.title = copy.text(.settingsSearchHeading)
+            localized.descriptionText = copy.text(.settingsSearchDescription)
+        case "organization.collections":
+            localized.title = copy.text(.settingsCollectionsHeading)
+            localized.descriptionText = copy.text(.settingsCollectionsDescription)
+        case "organization.locked":
+            localized.title = copy.text(.settingsLockedStateHeading)
+        case "retention.history-limit":
+            localized.title = copy.text(.settingsHistoryLimit)
+            localized.descriptionText = copy.text(.settingsHistoryLimitDescription)
+        case "retention.paste-behavior":
+            localized.title = copy.text(.settingsPasteBehavior)
+            localized.descriptionText = copy.text(.settingsPasteBehaviorDescription)
+        case "retention.ttl":
+            localized.title = copy.text(.settingsAutoClear)
+            localized.descriptionText = copy.text(.settingsAutoClearDescription)
+        case "retention.pinned-callout":
+            localized.title = copy.text(.settingsPinnedItems)
+        case "retention.asset-cache":
+            localized.title = copy.text(.settingsAssetCache)
+            localized.descriptionText = copy.text(.settingsAssetCacheDescription)
+        case "exclusions.apps":
+            localized.title = copy.text(.settingsExcludedApps)
+            localized.descriptionText = copy.text(.settingsExcludedAppsDescription)
+        case "exclusions.behavior":
+            localized.title = copy.text(.settingsCaptureBehavior)
+            localized.descriptionText = copy.text(.settingsCaptureBehaviorDescription)
+        case "exclusions.pause":
+            localized.title = copy.text(.settingsPauseCapture)
+            localized.descriptionText = copy.text(.settingsPauseDescription)
+        case "hotkeys.global":
+            localized.title = copy.text(.settingsGlobalShortcuts)
+            localized.descriptionText = copy.text(.settingsGlobalHotkeysDescription)
+        case "hotkeys.snippets":
+            localized.title = copy.text(.settingsSnippetHotkeys)
+            localized.descriptionText = copy.text(.settingsSnippetHotkeysDescription)
+        case "hotkeys.status":
+            localized.title = copy.text(.settingsRuntimeStatus)
+        case "snippets.library":
+            localized.title = copy.text(.settingsSnippetLibrary)
+            localized.descriptionText = copy.text(.settingsSnippetLibraryDescription)
+        case "snippets.editor":
+            localized.title = copy.text(.settingsEditorState)
+        case "security.app-lock":
+            localized.title = copy.text(.settingsSecurity)
+            localized.descriptionText = copy.text(.securityAppLockDescription)
+        case "security.unlock-method":
+            localized.title = copy.text(.securityUnlockMethod)
+            localized.descriptionText = copy.text(.securityUnlockMethodDescription)
+        case "security.auto-lock":
+            localized.title = copy.text(.securityAutoLock)
+            localized.descriptionText = copy.text(.securityAutoLockDescription)
+        case "security.privacy":
+            localized.title = copy.text(.securityPrivacy)
+            localized.descriptionText = copy.text(.securityPrivacyDescription)
+        case "security.data-protection":
+            localized.title = copy.text(.securityDataProtection)
+            localized.descriptionText = copy.text(.securityDataProtectionDescription)
+        case "bridge.behavior":
+            localized.title = copy.text(.bridgeBehavior)
+            localized.descriptionText = copy.text(.bridgeBehaviorDescription)
+        case "bridge.devices":
+            localized.title = copy.text(.bridgeDevices)
+            localized.descriptionText = copy.text(
+                bridgeSnapshot?.devices.isEmpty == false
+                    ? .bridgeObservedDevicesDescription
+                    : .bridgeDevicesDescription
+            )
+        case "bridge.activity":
+            localized.title = copy.text(.bridgeLastActivity)
+            localized.descriptionText = copy.text(.bridgeActivityDescription)
+        case "bridge.note":
+            localized.title = copy.text(.bridgeLocalOnlyPolicy)
+        case "bridge.stop":
+            localized.title = copy.text(.bridgeStop)
+            localized.descriptionText = copy.text(.bridgeStopDescription)
+        default:
+            break
+        }
+
+        localized.rows = section.rows.map(localizedRow)
+        if var placeholder = localized.placeholder {
+            if placeholder.id == "organization.collections.empty" {
+                placeholder.title = copy.text(.settingsCreateFirstGroup)
+                placeholder.detailText = copy.text(.settingsCollectionsEmptyDetail)
+            } else if placeholder.id == "organization.locked.callout" {
+                let isLocked = (securitySnapshot as? SecurityRuntimeSnapshot)?.lockState.revealsProtectedContent == false
+                placeholder.title = copy.text(isLocked ? .settingsSearchDisabledTitle : .settingsAppLockLiveTitle)
+                placeholder.detailText = copy.text(isLocked ? .settingsSearchLockedDetail : .settingsSearchUnlockedLockDetail)
+                placeholder.badgeText = localizedUppercase(copy.text(isLocked ? .locked : .unlocked))
+            } else if placeholder.id == "retention.pinned-callout.note" {
+                placeholder.title = copy.text(.settingsPinnedPreserved)
+                placeholder.detailText = copy.text(.settingsPinnedPreservedDetail)
+            } else if placeholder.id == "hotkeys.snippets.empty" {
+                placeholder.title = copy.text(.settingsNoSnippetShortcuts)
+                placeholder.detailText = copy.text(.settingsNoSnippetShortcutsDetail)
+            } else if placeholder.id == "hotkeys.status.callout" {
+                placeholder.title = localizedRuntimeAvailabilityTitle
+                placeholder.detailText = copy.text(.settingsHotkeyConflictTiming)
+                placeholder.badgeText = localizedCountBadge(
+                    snippetsHotkeysSnapshot?.registeredBindings.count ?? 0,
+                    suffix: .settingsActiveBadge
+                )
+            } else if placeholder.id == "snippets.library.empty" {
+                placeholder.title = copy.text(.settingsNoSnippets)
+                placeholder.detailText = copy.text(.settingsNoSnippetsDetail)
+            } else if placeholder.id == "exclusions.apps.empty" {
+                placeholder.title = copy.text(.settingsNoExcludedApps)
+                placeholder.detailText = copy.text(.settingsNoExcludedAppsDetail)
+            } else if placeholder.id == "exclusions.behavior.active-app" {
+                placeholder.title = copy.text(.settingsExcludedAppActive)
+                let hidePopup = exclusionsPauseSnapshot?.behaviorSettings.hidePopupInsideExcludedApps ?? false
+                placeholder.badgeText = localizedUppercase(copy.text(hidePopup ? .settingsHidePopupBadge : .settingsCaptureOnlyBadge))
+            } else if placeholder.id == "snippets.editor.status" {
+                placeholder.title = localizedRuntimeAvailabilityTitle
+                placeholder.detailText = copy.text(.settingsSnippetEditingDetail)
+                placeholder.badgeText = localizedCountBadge(
+                    snippetsHotkeysSnapshot?.assignedSnippetCount ?? 0,
+                    suffix: .settingsAssignedBadge
+                )
+            } else if placeholder.id == "bridge.note.local-only" {
+                placeholder.title = copy.text(
+                    bridgeSnapshot?.accountStatus == .unavailable
+                        ? .bridgeUnavailable
+                        : .bridgeLocalHistoryTitle
+                )
+                placeholder.detailText = copy.text(.bridgeLocalOnlyPolicy)
+            }
+            localized.placeholder = placeholder
+        }
+        return localized
+    }
+
+    private func localizedRow(_ row: SettingsRowModel) -> SettingsRowModel {
+        switch row {
+        case .toggle(var item):
+            switch item.id {
+            case "clear-on-quit": item.title = copy.text(.settingsClearOnQuit)
+                item.detailText = copy.text(.settingsClearOnQuitDetail)
+            case "bump-pasted-item-to-front":
+                item.title = copy.text(.settingsMovePastedToTop)
+                item.detailText = copy.text(.settingsMovePastedToTopDetail)
+            case "exclusions.hide-popup": item.title = copy.text(.settingsHidePopupInExcludedApps)
+                item.detailText = copy.text(.settingsHidePopupDetail)
+            case "security.app-lock-toggle":
+                item.title = copy.text(.securityLockToggleTitle)
+                item.detailText = copy.text(.securityLockToggleDetail)
+            case "security.hide-previews":
+                item.title = copy.text(.securityHidePreviews)
+                item.detailText = copy.text(.securityHidePreviewsDetail)
+            case "enable-bridge":
+                item.title = copy.text(.bridgeEnable)
+                item.detailText = copy.text(.bridgeEnableDetail)
+            case "bridge.publish-on-paste":
+                item.title = copy.text(.bridgePublishOnPaste)
+                item.detailText = copy.text(.bridgePublishDetail)
+            case "bridge.receive":
+                item.title = copy.text(.bridgeReceive)
+                item.detailText = copy.text(.bridgeReceiveDetail)
+            default: break
+            }
+            return .toggle(item)
+        case .slider(var item):
+            switch item.id {
+            case "max-items":
+                item.title = copy.text(.settingsMaxItems)
+                item.detailText = copy.text(.settingsRetentionPinnedNote)
+                if localizationLanguage == .vietnamese {
+                    item.valueLabel = item.valueLabel?.replacingOccurrences(of: " items", with: " mục")
+                }
+            case "cache-size":
+                item.title = copy.text(.settingsMaxCacheSize)
+                item.detailText = copy.text(.settingsCacheRefreshDetail)
+            default: break
+            }
+            return .slider(item)
+        case .action(var item):
+            switch item.id {
+            case "clear-cache": item.title = copy.text(.settingsClearNow)
+            case "exclusions.add-app": item.title = copy.text(.settingsAddApp)
+                item.detailText = copy.text(.settingsAddAppDetail)
+            case "exclusions.resume-capturing":
+                item.title = copy.text(.settingsResumeCapturing)
+                item.detailText = copy.text(.settingsResumeCapturingDetail)
+            case "bridge.stop": item.title = copy.text(.bridgeStop)
+            default: break
+            }
+            return .action(item)
+        case .listEntry(var item):
+            switch item.id {
+            case "organization.search-status":
+                item.title = copy.text(.settingsSearchVisibility)
+                let isUnlocked = (securitySnapshot as? SecurityRuntimeSnapshot)?.lockState.revealsProtectedContent ?? true
+                if isUnlocked {
+                    item.detailText = copy.text(.settingsSearchUnlockedDetail)
+                } else {
+                    item.detailText = copy.text(.popupSearchLockedDetail)
+                }
+                item.accessoryText = copy.text(isUnlocked ? .unlocked : .locked)
+            case "organization.note-source":
+                item.title = copy.text(.settingsNoteSource)
+                item.detailText = copy.text(.settingsNoteSourceDetail)
+            case let id where id.hasPrefix("organization.group."):
+                let isSelected = item.accessoryText != nil
+                item.detailText = copy.text(isSelected ? .settingsGroupActiveDetail : .settingsGroupAvailableDetail)
+                item.accessoryText = isSelected ? copy.text(.settingsSelected) : nil
+            case let id where id.hasPrefix("exclusions.remove."):
+                item.accessoryText = copy.text(.settingsRemoveApp)
+            case "global:openSlipboard":
+                item.title = copy.text(.menuOpenSlipBoard)
+                localizeHotkeyState(&item)
+            case "global:pasteAs":
+                item.title = copy.text(.actionPasteAs)
+                localizeHotkeyState(&item)
+            case "global:pauseCapturing":
+                item.title = copy.text(.menuPauseCapture)
+                localizeHotkeyState(&item)
+            case let id where id.hasPrefix("future:") || id.hasPrefix("snippet:"):
+                localizeHotkeyState(&item)
+            case "security.current-state":
+                item.title = copy.text(.securityCurrentState)
+                let isUnlocked = (securitySnapshot as? SecurityRuntimeSnapshot)?.lockState.revealsProtectedContent ?? true
+                item.accessoryText = copy.text(isUnlocked ? .securityLockSlipBoard : .securityUnlock)
+            case "security.encryption-status":
+                item.title = copy.text(.securityEncryptionStatus)
+                item.detailText = copy.text(.securityEncryptionDetail)
+                let isEnabled = (securitySnapshot as? SecurityRuntimeSnapshot)?.settings.isAppLockEnabled ?? false
+                item.accessoryText = copy.text(isEnabled ? .enabled : .disabled)
+            case "security.key-storage":
+                item.title = copy.text(.securityKeyStorage)
+                item.detailText = copy.text(.securityKeyStorageDetail)
+            case "security.decrypted-cache":
+                item.title = copy.text(.securityDecryptedCache)
+                item.detailText = copy.text(.securityDecryptedCacheDetail)
+                let isInMemory = (securitySnapshot as? SecurityRuntimeSnapshot)?.hasUnwrappedPayloadKey ?? false
+                item.accessoryText = copy.text(isInMemory ? .securityInMemory : .securityCleared)
+            case "bridge.activity.last-sent":
+                item.title = copy.text(.bridgeLastSent)
+                if bridgeSnapshot?.activity.lastPublishedAt == nil {
+                    item.detailText = copy.text(.bridgeNoMacPastes)
+                    item.accessoryText = copy.text(.retentionNever)
+                } else if let date = bridgeSnapshot?.activity.lastPublishedAt {
+                    item.detailText = copy.text(.bridgeSentSupportedDetail)
+                    item.accessoryText = localizedRelativeTimestamp(for: date)
+                    item.badgeText = Date().timeIntervalSince(date) < 60 ? copy.text(.commonNow) : nil
+                }
+            case "bridge.activity.last-received":
+                item.title = copy.text(.bridgeLastReceived)
+                if bridgeSnapshot?.activity.lastImportedAt == nil {
+                    item.detailText = copy.text(.bridgeNoCompanionImports)
+                    item.accessoryText = copy.text(.retentionNever)
+                } else if let date = bridgeSnapshot?.activity.lastImportedAt {
+                    item.detailText = copy.text(.bridgeReceivedLocalDetail)
+                    item.accessoryText = localizedRelativeTimestamp(for: date)
+                    item.badgeText = Date().timeIntervalSince(date) < 60 ? copy.text(.commonNow) : nil
+                }
+            case "bridge.activity.pending-imports":
+                item.title = copy.text(.bridgePendingImports)
+                let pendingCount = bridgeSnapshot?.activity.pendingImportCount ?? 0
+                item.detailText = copy.text(pendingCount > 0 ? .bridgeEligiblePendingDetail : .bridgePendingImportsDetail)
+                item.badgeText = pendingCount > 0 ? copy.text(.commonPending) : nil
+            case "bridge.activity.last-error":
+                item.title = copy.text(.bridgeLastError)
+                item.accessoryText = copy.text(.commonError)
+                item.badgeText = copy.text(.commonError)
+            case let id where id.hasPrefix("snippet.library."):
+                let entryID = String(id.dropFirst("snippet.library.".count))
+                let entry = snippetsHotkeysSnapshot?.snippetsSettingsState.libraryEntries.first { $0.id == entryID }
+                if entry?.subtitle == nil {
+                    item.detailText = copy.text(.settingsSavedLocallyDetail)
+                }
+                item.badgeText = entry?.isPinned == true
+                    ? copy.text(.settingsPinnedBadge)
+                    : (entry?.isSelected == true ? copy.text(.settingsOpenBadge) : nil)
+            case "snippets.editor.selection":
+                let editorState = snippetsHotkeysSnapshot?.snippetsSettingsState.editorState
+                if editorState?.savedRecord == nil {
+                    item.title = copy.text(.settingsNoSnippetSelected)
+                }
+                if let editorState {
+                    switch editorState.validationState {
+                    case .valid:
+                        item.detailText = copy.text(
+                            editorState.savedRecord == nil
+                                ? .settingsCreateOrSelectSnippetDetail
+                                : .settingsCurrentSnippetDraftDetail
+                        )
+                    case .missingTitle:
+                        item.detailText = copy.text(.settingsSnippetMissingTitle)
+                    case .missingContent:
+                        item.detailText = copy.text(.settingsSnippetMissingContent)
+                    case .hotkeyConflict:
+                        break
+                    }
+                }
+                item.badgeText = editorState?.isDirty == true
+                    ? copy.text(.settingsDirtyBadge)
+                    : (editorState?.canSave == true ? copy.text(.settingsReadyBadge) : nil)
+            default:
+                break
+            }
+            return .listEntry(item)
+        case .choice(var item):
+            switch item.id {
+            case "ttl":
+                item.title = copy.text(.settingsClearHistoryAfter)
+                item.detailText = copy.text(.settingsRetentionPeriodDetail)
+            case "exclusions.pause": item.title = copy.text(.settingsPausePreset)
+                item.detailText = copy.text(.settingsPausePresetDetail)
+                item.options = item.options.map { option in
+                    var option = option
+                    if option.id == CapturePauseDurationOption.untilResume.rawValue {
+                        option.label = copy.text(.menuPausedUntilResume)
+                    }
+                    return option
+                }
+            case "security.unlock-method":
+                item.title = copy.text(.securityPreferredMethod)
+                item.options = item.options.map { option in
+                    var option = option
+                    option.label = option.id.localizedCaseInsensitiveContains("biometric")
+                        ? "Touch ID / Face ID"
+                        : copy.text(.securitySystemPassword)
+                    return option
+                }
+            case "security.auto-lock": item.title = copy.text(.securityTimeout)
+            default: break
+            }
+            return .choice(item)
+        }
+    }
+
+    private func localizedUppercase(_ value: String) -> String {
+        value.uppercased(with: Locale(identifier: localizationLanguage.localeIdentifier))
+    }
+
+    private func localizedRelativeTimestamp(for date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        formatter.locale = Locale(identifier: localizationLanguage.localeIdentifier)
+        return formatter.localizedString(for: date, relativeTo: .now)
+    }
+
+    private var localizedRuntimeAvailabilityTitle: String {
+        let stateText: String
+        switch snippetsHotkeysSnapshot?.runtimeAvailability ?? .enabled {
+        case .enabled:
+            stateText = copy.text(.commonActive)
+        case .lockedDisabled:
+            stateText = copy.text(.locked)
+        case .futureCommandUnavailable:
+            stateText = copy.text(.commonFuture)
+        case .registrationUnavailable:
+            stateText = copy.text(.commonUnavailable)
+        }
+        return "\(copy.text(.settingsHotkeys)): \(stateText)"
+    }
+
+    private func localizedCountBadge(_ count: Int, suffix: LocalizationKey) -> String {
+        "\(count) \(localizedUppercase(copy.text(suffix)))"
+    }
+
+    private func localizeHotkeyState(_ item: inout SettingsListEntry) {
+        guard let snapshot = snippetsHotkeysSnapshot else { return }
+        let bindings = snapshot.hotkeysSettingsState.globalBindings + snapshot.hotkeysSettingsState.snippetBindings
+        guard let binding = bindings.first(where: { $0.id == item.id }) else { return }
+
+        if binding.hotkey == nil {
+            switch binding.availability {
+            case .enabled:
+                item.accessoryText = copy.text(.commonNotSet)
+            case .lockedDisabled:
+                item.accessoryText = copy.text(.locked)
+            case .futureCommandUnavailable:
+                item.accessoryText = copy.text(.commonFuture)
+            case .registrationUnavailable:
+                item.accessoryText = copy.text(.commonUnavailable)
+            }
+        }
+
+        switch binding.availability {
+        case .enabled:
+            item.badgeText = localizedUppercase(copy.text(.commonActive))
+        case .lockedDisabled:
+            item.badgeText = localizedUppercase(copy.text(.locked))
+        case .futureCommandUnavailable:
+            item.badgeText = localizedUppercase(copy.text(.commonFuture))
+        case .registrationUnavailable:
+            item.badgeText = localizedUppercase(copy.text(.commonUnavailable))
+        }
     }
 
     @ViewBuilder
@@ -370,7 +774,7 @@ struct SBSettingsWindowShell: View {
         let stopSection = bridgeSection(in: pane, matching: ["bridge.stop", "danger", "stop"])
 
         SBPaneSection(
-            title: behaviorSection?.title ?? "Bridge behavior",
+            title: behaviorSection?.title ?? copy.text(.bridgeBehavior),
             descriptionText: behaviorSection?.descriptionText,
             theme: theme
         ) {
@@ -383,15 +787,15 @@ struct SBSettingsWindowShell: View {
             }
 
             SBBridgeActivitySummaryRow(
-                title: "Scope",
+                title: copy.text(.bridgeScopeLabel),
                 valueText: "Text / URL / Code",
-                detailText: "Only successful local pastes of supported kinds are bridged in v1.",
+                detailText: copy.text(.bridgeSupportedPastesV1Detail),
                 theme: theme,
                 tone: .info
             )
         }
 
-        SBPaneSection(title: "Paste flow", theme: theme) {
+        SBPaneSection(title: copy.text(.bridgePasteFlow), theme: theme) {
             ForEach(bridgeFlowRows(isEnabled: isBridgeEnabled(for: pane))) { step in
                 SBBridgeFlowStepRow(
                     title: step.title,
@@ -405,15 +809,15 @@ struct SBSettingsWindowShell: View {
         }
 
         SBPaneSection(
-            title: devicesSection?.title ?? "Devices",
+            title: devicesSection?.title ?? copy.text(.bridgeDevices),
             descriptionText: devicesSection?.descriptionText,
             theme: theme
         ) {
             let deviceRows = bridgeDeviceRows(in: devicesSection)
             if deviceRows.isEmpty {
                 SBEmptyStateCard(
-                    title: "No companion devices yet",
-                    detailText: "Bridge can stay enabled on Mac before an iPhone companion signs into the same iCloud account.",
+                    title: copy.text(.bridgeNoDevices),
+                    detailText: copy.text(.bridgeNoDevicesDetail),
                     theme: theme
                 )
             } else {
@@ -421,7 +825,7 @@ struct SBSettingsWindowShell: View {
                     SBBridgeDeviceRow(
                         title: item.title,
                         detailText: bridgeDeviceDetail(for: item),
-                        statusText: item.badgeText,
+                        statusText: bridgeDeviceStatusText(),
                         symbolName: bridgeDeviceSymbolName(for: item),
                         theme: theme,
                         tone: bridgeDeviceTone(for: item)
@@ -431,7 +835,7 @@ struct SBSettingsWindowShell: View {
         }
 
         SBPaneSection(
-            title: activitySection?.title ?? "Last activity",
+            title: activitySection?.title ?? copy.text(.bridgeLastActivity),
             descriptionText: activitySection?.descriptionText,
             theme: theme
         ) {
@@ -447,14 +851,14 @@ struct SBSettingsWindowShell: View {
         }
 
         SBPolicyNoteRow(
-            title: noteSection?.placeholder?.title == "Bridge preview" ? nil : noteSection?.placeholder?.title,
+            title: noteSection?.placeholder?.id == "bridge.placeholder" ? nil : noteSection?.placeholder?.title,
             detailText: bridgePolicyNoteText(from: noteSection),
             theme: theme,
             symbolName: "shield"
         )
 
         SBPaneSection(
-            title: stopSection?.title ?? "Stop Bridge",
+            title: stopSection?.title ?? copy.text(.bridgeStop),
             descriptionText: stopSection?.descriptionText,
             theme: theme
         ) {
@@ -469,13 +873,33 @@ struct SBSettingsWindowShell: View {
 
     @ViewBuilder
     private func organizationPaneSections(for pane: SettingsPaneModel) -> some View {
-        let searchSection = pane.sections.first { section in
-            section.title.compare("Search", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-        }
-        let collectionsSection = pane.sections.first { section in
-            section.title.compare("Collections", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-        }
+        let searchSection = pane.sections.first { $0.id == "organization.search" }
+        let collectionsSection = pane.sections.first { $0.id == "organization.collections" }
         let calloutPlaceholder = pane.sections.compactMap(\.placeholder).first
+
+        SBPaneSection(
+            title: copy.text(.settingsLanguageTitle),
+            descriptionText: copy.text(.settingsLanguageDescription),
+            theme: theme
+        ) {
+            InteractiveChoiceRow(
+                item: SettingsChoiceItem(
+                    id: "app-language",
+                    title: copy.text(.language),
+                    selectedOptionID: localizationLanguage.rawValue,
+                    options: AppLanguage.allCases.map { language in
+                        SettingsChoiceOption(
+                            id: language.rawValue,
+                            label: copy.text(language == .english ? .languageEnglish : .languageVietnamese),
+                            isSelected: language == localizationLanguage
+                        )
+                    },
+                    style: .segmented
+                ),
+                theme: theme,
+                onSelect: { onSelectChoice("app-language", $0) }
+            )
+        }
 
         if let searchSection {
             SBPaneSection(
@@ -510,7 +934,7 @@ struct SBSettingsWindowShell: View {
         }
 
         if let calloutPlaceholder {
-            SBPaneSection(title: "Locked state", theme: theme) {
+            SBPaneSection(title: copy.text(.settingsLockedStateHeading), theme: theme) {
                 SBSettingsSectionPlaceholder(placeholder: calloutPlaceholder, theme: theme)
             }
         }
@@ -632,12 +1056,14 @@ struct SBSettingsWindowShell: View {
     ) -> some View {
         let hotkeysState = snapshot.hotkeysSettingsState
 
-        if let inlineMessage = hotkeysState.inlineMessage, inlineMessage.isEmpty == false {
+        if hotkeysState.inlineMessage?.isEmpty == false {
             SBSettingsConflictCallout(
                 title: snapshot.runtimeAvailability == .lockedDisabled
-                    ? "Shortcut access is locked"
-                    : "Shortcut info",
-                detailText: inlineMessage,
+                    ? copy.text(.hotkeyAccessLocked)
+                    : copy.text(.hotkeyInfo),
+                detailText: snapshot.runtimeAvailability == .lockedDisabled
+                    ? copy.text(.hotkeyAccessLockedDetail)
+                    : copy.text(.hotkeyInfoDetail),
                 theme: theme,
                 tone: snapshot.runtimeAvailability == .lockedDisabled ? .warning : .info
             )
@@ -676,7 +1102,7 @@ struct SBSettingsWindowShell: View {
         if let statusPlaceholder = pane.sections
             .first(where: { $0.id == "hotkeys.status" })?
             .placeholder {
-            SBPaneSection(title: "Runtime status", theme: theme) {
+            SBPaneSection(title: copy.text(.menuStatus), theme: theme) {
                 SBSettingsSectionPlaceholder(placeholder: statusPlaceholder, theme: theme)
             }
         }
@@ -687,8 +1113,8 @@ struct SBSettingsWindowShell: View {
         recorderSession: HotkeyRecorderSessionState
     ) -> some View {
         SBShortcutAssignmentRow(
-            title: binding.title,
-            detailText: binding.detailText,
+            title: shortcutTitle(for: binding),
+            detailText: shortcutDetailText(for: binding),
             shortcutLabel: shortcutLabel(for: binding, recorderSession: recorderSession),
             theme: theme,
             state: shortcutVisualState(
@@ -747,17 +1173,60 @@ struct SBSettingsWindowShell: View {
         if recorderSession.target == binding.target {
             switch recorderSession.phase {
             case .recording:
-                return "Press the shortcut you want to assign. Press Escape to cancel."
+                return copy.text(.hotkeyRecorderInstruction)
             case .conflict:
-                return recorderSession.conflictResult?.message ?? binding.detailText
+                return copy.text(.hotkeyConflictDetail)
             case .disabled:
-                return binding.detailText ?? "Unlock SlipBoard to edit this shortcut."
+                return copy.text(.hotkeyUnlockToEdit)
             case .idle, .saved:
                 break
             }
         }
 
-        return binding.latestConflict?.message ?? binding.detailText
+        if binding.latestConflict != nil {
+            return copy.text(.hotkeyConflictDetail)
+        }
+
+        return shortcutDetailText(for: binding)
+    }
+
+    private func shortcutTitle(for binding: HotkeyBindingSummary) -> String {
+        switch binding.target {
+        case let .globalCommand(commandID):
+            switch commandID {
+            case .openSlipboard: return copy.text(.menuOpenSlipBoard)
+            case .pasteAs: return copy.text(.actionPasteAs)
+            case .pauseCapturing: return copy.text(.menuPauseCapture)
+            }
+        case .snippet, .reservedFutureCommand:
+            return binding.title
+        }
+    }
+
+    private func shortcutDetailText(for binding: HotkeyBindingSummary) -> String {
+        switch binding.availability {
+        case .lockedDisabled:
+            return copy.text(.hotkeyUnlockToEdit)
+        case .registrationUnavailable:
+            return copy.text(.commonUnavailable)
+        case .futureCommandUnavailable:
+            return copy.text(.hotkeyFutureCommandDetail)
+        case .enabled:
+            break
+        }
+
+        switch binding.target {
+        case let .globalCommand(commandID):
+            switch commandID {
+            case .openSlipboard: return copy.text(.hotkeyOpenSlipBoardDetail)
+            case .pasteAs: return copy.text(.hotkeyPasteAsDetail)
+            case .pauseCapturing: return copy.text(.hotkeyPauseCaptureDetail)
+            }
+        case .snippet:
+            return copy.text(.hotkeySnippetDetail)
+        case .reservedFutureCommand:
+            return copy.text(.hotkeyFutureCommandDetail)
+        }
     }
 
     private func paneHeaderAction(for pane: SettingsPaneModel) -> SettingsActionRow? {
@@ -796,7 +1265,7 @@ struct SBSettingsWindowShell: View {
     }
 
     private func paneHeaderActionTone(for action: SettingsActionRow) -> SBAccentTone {
-        if action.role == .standard, action.title.localizedCaseInsensitiveContains("add") {
+        if action.role == .standard, action.id == "exclusions.add-app" {
             return .primary
         }
 
@@ -804,55 +1273,32 @@ struct SBSettingsWindowShell: View {
     }
 
     private func bridgeSubtitle(for pane: SettingsPaneModel) -> String {
-        if pane.subtitle.localizedCaseInsensitiveContains("placeholder") ||
-            pane.subtitle.localizedCaseInsensitiveContains("no sync wiring") {
-            return "Paste on Mac, then paste on iPhone. Mac history stays local."
-        }
-
         return pane.subtitle
     }
 
     private func bridgeHeaderStatus(for pane: SettingsPaneModel) -> (title: String, tone: SBAccentTone, symbolName: String?) {
-        let aggregateText = pane.sections
-            .flatMap(\.rows)
-            .compactMap { row -> String? in
-                switch row {
-                case let .toggle(item):
-                    return [item.title, item.detailText].compactMap { $0 }.joined(separator: " ")
-                case let .slider(item):
-                    return [item.title, item.detailText, item.valueLabel].compactMap { $0 }.joined(separator: " ")
-                case let .action(item):
-                    return [item.title, item.detailText, item.accessoryText].compactMap { $0 }.joined(separator: " ")
-                case let .listEntry(item):
-                    return [item.title, item.detailText, item.accessoryText, item.badgeText].compactMap { $0 }.joined(separator: " ")
-                case let .choice(item):
-                    return [item.title, item.detailText].compactMap { $0 }.joined(separator: " ")
-                }
+        if let bridgeSnapshot {
+            switch bridgeSnapshot.accountStatus {
+            case .error:
+                return (copy.text(.commonError), .danger, "exclamationmark.circle")
+            case .restricted:
+                return (copy.text(.commonRestricted), .warning, "lock")
+            case .unavailable:
+                return (copy.text(.commonUnavailable), .warning, "icloud.slash")
+            case .syncing:
+                return (copy.text(.bridgeSyncing), .info, "arrow.triangle.2.circlepath")
+            case .ready:
+                return (copy.text(.bridgeReady), .success, "checkmark.circle")
+            case .disabled:
+                return (copy.text(.commonOff), .neutral, "pause.circle")
             }
-            .joined(separator: " ")
-            .lowercased()
-
-        if aggregateText.contains("error") {
-            return ("Error", .danger, "exclamationmark.circle")
-        }
-
-        if aggregateText.contains("restricted") {
-            return ("Restricted", .warning, "lock")
-        }
-
-        if aggregateText.contains("unavailable") || aggregateText.contains("signed out") {
-            return ("Unavailable", .warning, "icloud.slash")
-        }
-
-        if aggregateText.contains("syncing") || aggregateText.contains("pending") {
-            return ("Syncing", .info, "arrow.triangle.2.circlepath")
         }
 
         if isBridgeEnabled(for: pane) {
-            return ("Ready", .success, "checkmark.circle")
+            return (copy.text(.bridgeReady), .success, "checkmark.circle")
         }
 
-        return ("Off", .neutral, "pause.circle")
+        return (copy.text(.commonOff), .neutral, "pause.circle")
     }
 
     private func bridgeSection(
@@ -860,10 +1306,9 @@ struct SBSettingsWindowShell: View {
         matching tokens: [String]
     ) -> SettingsPaneSection? {
         pane.sections.first { section in
-            let haystacks = [section.id, section.title, section.descriptionText ?? ""]
-                .joined(separator: " ")
-                .lowercased()
-            return tokens.contains { haystacks.contains($0.lowercased()) }
+            tokens.contains { token in
+                section.id == token || section.id.hasSuffix(".\(token)")
+            }
         }
     }
 
@@ -880,21 +1325,21 @@ struct SBSettingsWindowShell: View {
         return [
             SettingsToggleItem(
                 id: "enable-bridge",
-                title: "Enable iCloud Bridge",
-                detailText: "Bridge through CloudKit private database without uploading full SlipBoard history.",
+                title: copy.text(.bridgeEnable),
+                detailText: copy.text(.bridgeEnableDetail),
                 isOn: false
             ),
             SettingsToggleItem(
                 id: "bridge.publish-on-paste",
-                title: "Publish pasted item to devices",
-                detailText: "Double-click or Enter on Mac pastes locally and publishes that same item to devices on the same iCloud account.",
+                title: copy.text(.bridgePublishOnPaste),
+                detailText: copy.text(.bridgePublishDetail),
                 isOn: false,
                 isEnabled: false
             ),
             SettingsToggleItem(
                 id: "bridge.receive",
-                title: "Receive from iPhone",
-                detailText: "Companion imports from iPhone appear in SlipBoard on Mac.",
+                title: copy.text(.bridgeReceive),
+                detailText: copy.text(.bridgeReceiveDetail),
                 isOn: false,
                 isEnabled: false
             )
@@ -904,29 +1349,29 @@ struct SBSettingsWindowShell: View {
     private func bridgeFlowRows(isEnabled: Bool) -> [BridgeFlowStepPresentation] {
         [
             BridgeFlowStepPresentation(
-                title: "Pick on Mac",
-                detailText: "Double-click or press Enter from the popup grid.",
+                title: copy.text(.bridgePickOnMac),
+                detailText: copy.text(.bridgePickOnMacDetail),
                 symbolName: "cursorarrow.click",
                 trailingAccessory: .keyboardHint("↵")
             ),
             BridgeFlowStepPresentation(
-                title: "Paste on Mac",
-                detailText: "SlipBoard still pastes into the current app as usual.",
+                title: copy.text(.bridgePasteOnMac),
+                detailText: copy.text(.bridgePasteOnMacDetail),
                 symbolName: "laptopcomputer",
-                trailingAccessory: .badge("Local", tone: .success),
+                trailingAccessory: .badge(copy.text(.commonLocal), tone: .success),
                 isEmphasized: isEnabled
             ),
             BridgeFlowStepPresentation(
-                title: "Publish one-shot bridge record",
-                detailText: "Only the item just pasted is sent with a short TTL and cleanup after use.",
+                title: copy.text(.bridgePublishOneShot),
+                detailText: copy.text(.bridgePublishOneShotDetail),
                 symbolName: "icloud.and.arrow.up",
-                trailingAccessory: .badge("10 min", tone: .info)
+                trailingAccessory: .badge(copy.text(.bridgeOneShotTTL, ["minutes": "10"]), tone: .info)
             ),
             BridgeFlowStepPresentation(
-                title: "Receive on iPhone",
-                detailText: "The iPhone companion receives the item so the user can paste again there.",
+                title: copy.text(.bridgeReceiveOnIPhone),
+                detailText: copy.text(.bridgeReceiveOnIPhoneDetail),
                 symbolName: "iphone",
-                trailingAccessory: .badge(isEnabled ? "Ready" : "Off", tone: isEnabled ? .success : .neutral)
+                trailingAccessory: .badge(isEnabled ? copy.text(.bridgeReady) : copy.text(.commonOff), tone: isEnabled ? .success : .neutral)
             )
         ]
     }
@@ -939,51 +1384,52 @@ struct SBSettingsWindowShell: View {
     }
 
     private func bridgeDeviceSymbolName(for item: SettingsListEntry) -> String {
-        if let symbolName = item.symbolName, symbolName.isEmpty == false {
-            return symbolName
+        switch bridgeDevice(for: item)?.platform {
+        case .mac: return "laptopcomputer"
+        case .ipad: return "ipad"
+        case .iphone: return "iphone"
+        case .unknown, .none:
+            return item.symbolName ?? "iphone"
         }
-
-        let haystack = [item.title, item.detailText ?? "", item.accessoryText ?? ""].joined(separator: " ").lowercased()
-        if haystack.contains("ipad") {
-            return "ipad"
-        }
-        if haystack.contains("mac") {
-            return "laptopcomputer"
-        }
-        if haystack.contains("iphone") || haystack.contains("phone") {
-            return "iphone"
-        }
-        return "iphone"
     }
 
     private func bridgeDeviceDetail(for item: SettingsListEntry) -> String {
-        if let detailText = item.detailText, detailText.isEmpty == false {
-            return detailText
+        if let lastSeenAt = bridgeDevice(for: item)?.lastSeenAt {
+            return copy.text(
+                .bridgeDeviceLastSeenDetail,
+                ["time": localizedRelativeTimestamp(for: lastSeenAt)]
+            )
         }
 
-        if let accessoryText = item.accessoryText, accessoryText.isEmpty == false {
-            return accessoryText
-        }
-
-        return "Same iCloud account"
+        return copy.text(.bridgeSameICloudAccount)
     }
 
     private func bridgeDeviceTone(for item: SettingsListEntry) -> SBAccentTone {
-        let status = [item.badgeText, item.accessoryText, item.detailText]
-            .compactMap { $0 }
-            .joined(separator: " ")
-            .lowercased()
+        switch bridgeSnapshot?.accountStatus {
+        case .ready: return .success
+        case .syncing: return .info
+        case .restricted, .unavailable: return .warning
+        case .error: return .danger
+        case .disabled, .none: return .neutral
+        }
+    }
 
-        if status.contains("active") || status.contains("live") || status.contains("ready") {
-            return .success
+    private func bridgeDeviceStatusText() -> String {
+        switch bridgeSnapshot?.accountStatus {
+        case .ready: return copy.text(.bridgeReady)
+        case .syncing: return copy.text(.bridgeSyncing)
+        case .restricted: return copy.text(.commonRestricted)
+        case .unavailable: return copy.text(.commonUnavailable)
+        case .error: return copy.text(.commonError)
+        case .disabled, .none: return copy.text(.commonOff)
         }
-        if status.contains("optional") {
-            return .info
-        }
-        if status.contains("idle") {
-            return .warning
-        }
-        return .neutral
+    }
+
+    private func bridgeDevice(for item: SettingsListEntry) -> BridgeDeviceSummary? {
+        let prefix = "bridge.device."
+        guard item.id.hasPrefix(prefix) else { return nil }
+        let deviceID = String(item.id.dropFirst(prefix.count))
+        return bridgeSnapshot?.devices.first { $0.id == deviceID }
     }
 
     private func bridgeActivityRows(in section: SettingsPaneSection?) -> [BridgeActivityRowPresentation] {
@@ -992,14 +1438,14 @@ struct SBSettingsWindowShell: View {
             case let .listEntry(item):
                 return BridgeActivityRowPresentation(
                     title: item.title,
-                    valueText: item.badgeText ?? item.accessoryText ?? "Never",
+                    valueText: item.badgeText ?? item.accessoryText ?? copy.text(.retentionNever),
                     detailText: item.detailText,
                     tone: bridgeActivityTone(for: item)
                 )
             case let .action(item):
                 return BridgeActivityRowPresentation(
                     title: item.title,
-                    valueText: item.accessoryText ?? "Review",
+                    valueText: item.accessoryText ?? copy.text(.bridgeReview),
                     detailText: item.detailText,
                     tone: item.role == .danger ? .danger : .neutral
                 )
@@ -1013,36 +1459,24 @@ struct SBSettingsWindowShell: View {
         }
 
         return [
-            BridgeActivityRowPresentation(title: "Last sent", valueText: "Never", detailText: "No intentional Mac paste has been bridged yet.", tone: .neutral),
-            BridgeActivityRowPresentation(title: "Last received", valueText: "Never", detailText: "No companion import has been added to local Mac history yet.", tone: .neutral),
-            BridgeActivityRowPresentation(title: "Pending imports", valueText: "0", detailText: "Incoming bridge records waiting for Mac import.", tone: .info)
+            BridgeActivityRowPresentation(title: copy.text(.bridgeLastSent), valueText: copy.text(.retentionNever), detailText: copy.text(.bridgeNoMacPastes), tone: .neutral),
+            BridgeActivityRowPresentation(title: copy.text(.bridgeLastReceived), valueText: copy.text(.retentionNever), detailText: copy.text(.bridgeNoCompanionImports), tone: .neutral),
+            BridgeActivityRowPresentation(title: copy.text(.bridgePendingImports), valueText: "0", detailText: copy.text(.bridgePendingImportsDetail), tone: .info)
         ]
     }
 
     private func bridgeActivityTone(for item: SettingsListEntry) -> SBAccentTone {
-        let value = [item.badgeText, item.accessoryText, item.detailText]
-            .compactMap { $0 }
-            .joined(separator: " ")
-            .lowercased()
-
-        if value.contains("error") {
+        if item.id == "bridge.activity.last-error" {
             return .danger
         }
-        if value.contains("pending") || value.contains("now") || value.contains("just") {
+        if item.id == "bridge.activity.pending-imports" {
             return .info
         }
-        if value.contains("never") {
-            return .neutral
-        }
-        return .success
+        return item.badgeText == nil && item.accessoryText == nil ? .neutral : .success
     }
 
     private func bridgePolicyNoteText(from section: SettingsPaneSection?) -> String {
-        if let detailText = section?.placeholder?.detailText, detailText.isEmpty == false {
-            return detailText
-        }
-
-        return "Mac history stays local. SlipBoard only bridges items you actually paste with double-click or Enter, never the full history."
+        return copy.text(.bridgeLocalOnlyPolicy)
     }
 
     private func bridgeStopAction(in section: SettingsPaneSection?) -> SettingsActionRow {
@@ -1055,8 +1489,8 @@ struct SBSettingsWindowShell: View {
 
         return SettingsActionRow(
             id: "bridge.stop",
-            title: "Stop Bridge",
-            detailText: "Disable new publish and receive activity while keeping imported local history intact.",
+            title: copy.text(.bridgeStop),
+            detailText: copy.text(.bridgeStopDescription),
             symbolName: "stop.circle",
             role: .danger
         )
@@ -1069,7 +1503,7 @@ struct SBSettingsWindowShell: View {
                 guard case let .toggle(item) = row else { return nil }
                 return item
             }
-            .first { $0.id == "enable-bridge" || $0.title.localizedCaseInsensitiveContains("enable icloud bridge") }?
+            .first { $0.id == "enable-bridge" }?
             .isOn ?? false
     }
 }

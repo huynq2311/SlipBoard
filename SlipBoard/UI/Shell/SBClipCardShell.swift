@@ -1,14 +1,26 @@
 import AppKit
 import SwiftUI
 
-private enum SBClipThumbnailCache {
+private nonisolated enum SBClipThumbnailCache {
     static let shared = NSCache<NSString, NSImage>()
     static let assetStore = ClipboardImageAssetStore()
+}
+
+/// Carries each visible card's bounds up to the popup shell so its action
+/// menus can be positioned next to the item that opened them.
+struct SBClipCardAnchorPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
+    }
 }
 
 struct SBClipCardShell: View {
     let clip: ClipPreviewSummary
     let theme: SBTheme
+    @SBLocalizedCopy private var copy
+    var width: CGFloat = 216
     var height: CGFloat = 128
     var isSelected: Bool = false
     var securitySnapshot: SecurityRuntimeSnapshot? = nil
@@ -23,35 +35,47 @@ struct SBClipCardShell: View {
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
 
+    @State private var isHovering = false
+    @State private var loadedThumbnail: NSImage?
+
     var body: some View {
         GeometryReader { proxy in
             VStack(alignment: .leading, spacing: 0) {
                 header
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 3)
-                    .frame(height: 30)
+                    .frame(height: 34)
                     .background(typeHeaderBackground)
+                    .onHover { hovering in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isHovering = hovering
+                        }
+                    }
 
                 bodyContent
-                    .padding(10)
+                    .padding(12)
                     .frame(
                         maxWidth: .infinity,
                         minHeight: 0,
-                        maxHeight: max(0, proxy.size.height - 30),
+                        maxHeight: max(0, proxy.size.height - 34),
                         alignment: .topLeading
                     )
                     .clipped()
             }
         }
-        .frame(width: 248, height: height, alignment: .topLeading)
-        .sbSurface(.card, theme: theme)
-        .overlay {
-            if isSelected {
-                RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
-                    .stroke(theme.palette.accentPrimary, lineWidth: 1.5)
+        .frame(width: width, height: height, alignment: .topLeading)
+        .background {
+            ZStack {
+                theme.palette.subpanel
+                cardBodyTint
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isSelected ? theme.palette.accentPrimary : cardBorderTint, lineWidth: isSelected ? 1.5 : theme.border.hairline)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture(count: 2) {
             onSelect()
             onPrimaryAction()
@@ -66,56 +90,43 @@ struct SBClipCardShell: View {
                 .modifiers(.control)
                 .onEnded(onOpenContextMenu)
         )
-        .contextMenu {
-            Button("Paste") {
-                onSelect()
-                onPerformContextAction("paste")
-            }
-            Button("Paste As…") {
-                onSelect()
-                onPerformContextAction("paste-as")
-            }
-            Divider()
-            Button("Copy Again") {
-                onSelect()
-                onPerformContextAction("copy")
-            }
-            Button(clip.isPinned ? "Unpin Item" : "Pin Item") {
-                onSelect()
-                onPerformContextAction("pin")
-            }
-            Button("Add Note…") {
-                onSelect()
-                onPerformContextAction("add-note")
-            }
-            Divider()
-            Button("Delete", role: .destructive) {
-                onSelect()
-                onPerformContextAction("delete")
-            }
+        // Right-click now opens the same custom action surface as the card's
+        // ellipsis button, instead of a separate native NSMenu with a second
+        // action path.
+        .background(SBRightClickGesture(action: onOpenContextMenu))
+        .anchorPreference(key: SBClipCardAnchorPreferenceKey.self, value: .bounds) {
+            [clip.id: $0]
         }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: theme.spacing.control6) {
             HStack(spacing: 6) {
-                Text(clipKindLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .lineLimit(1)
+                Image(systemName: clipKindSymbolName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(typeColor)
 
-                Text(clip.createdLabel)
-                    .font(.system(size: 12, weight: .regular, design: .monospaced))
-                    .foregroundStyle(theme.palette.textSecondary)
+                Text(clipKindLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(typeColor)
                     .lineLimit(1)
             }
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: theme.spacing.control4)
 
             Text(clip.sourceApp.displayName)
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+
+            Text(clip.createdLabel)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(theme.palette.textSecondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             Button(action: handleHeaderTap) {
                 SBIconAvatar(
@@ -135,14 +146,29 @@ struct SBClipCardShell: View {
             }
             .buttonStyle(.plain)
             .disabled(isSelected == false || noteInteractionsEnabled == false)
-            .accessibilityLabel("Clip from \(clip.sourceApp.displayName)")
+            .accessibilityLabel(copy.text(.accessibilityClipFrom, ["app": clip.sourceApp.displayName]))
+            .help(clip.sourceApp.displayName)
 
-            if clip.isPinned {
+            if isHovering {
+                Button(action: onOpenContextMenu) {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .frame(width: 18, height: 18)
+                        .background(theme.palette.raised)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(copy.text(.accessibilityMoreActions))
+                .transition(.opacity)
+            } else if clip.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(theme.accent(for: .danger))
+                    .transition(.opacity)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -180,6 +206,9 @@ struct SBClipCardShell: View {
                             }
                         }
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .task(id: clip.id) {
+                            await loadThumbnailIfNeeded()
+                        }
                 case let .file(fileExtension):
                     HStack(spacing: theme.spacing.control8) {
                         Image(systemName: "doc.fill")
@@ -243,39 +272,45 @@ struct SBClipCardShell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var thumbnailImage: NSImage? {
+    private var cachedThumbnailImage: NSImage? {
         guard clip.kind == .image else { return nil }
+        return SBClipThumbnailCache.shared.object(forKey: clip.id as NSString)
+    }
 
-        let cacheKey = clip.id as NSString
-        if let cached = SBClipThumbnailCache.shared.object(forKey: cacheKey) {
-            return cached
+    private var thumbnailImage: NSImage? {
+        cachedThumbnailImage ?? loadedThumbnail
+    }
+
+    private func loadThumbnailIfNeeded() async {
+        guard clip.kind == .image, cachedThumbnailImage == nil else { return }
+
+        let clipID = clip.id
+        let decoded = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            guard let data = SBClipThumbnailCache.assetStore.data(for: clipID) else { return nil }
+            return NSImage(data: data)
+        }.value
+
+        guard let decoded else { return }
+        SBClipThumbnailCache.shared.setObject(decoded, forKey: clipID as NSString)
+        if clip.id == clipID {
+            loadedThumbnail = decoded
         }
+    }
 
-        guard let data = SBClipThumbnailCache.assetStore.data(for: clip.id),
-              let decoded = NSImage(data: data) else { return nil }
-        SBClipThumbnailCache.shared.setObject(decoded, forKey: cacheKey)
-        return decoded
+    private var typeColor: Color {
+        SBClipTypeColor.base(for: clip.kind)
     }
 
     private var typeHeaderBackground: Color {
-        let opacity = theme.mode == .dark ? 0.14 : 0.28
+        typeColor.opacity(theme.mode == .dark ? 0.12 : 0.10)
+    }
 
-        switch clip.kind {
-        case .text:
-            return Color(red: 1, green: 0.84, blue: 0.42).opacity(opacity)
-        case .richText:
-            return Color(red: 0.75, green: 0.64, blue: 1).opacity(opacity)
-        case .code:
-            return Color(red: 0.48, green: 0.73, blue: 1).opacity(opacity)
-        case .image:
-            return Color(red: 1, green: 0.55, blue: 0.55).opacity(opacity)
-        case .file:
-            return Color(red: 1, green: 0.67, blue: 0.36).opacity(opacity)
-        case .url:
-            return Color(red: 0.35, green: 0.80, blue: 0.72).opacity(opacity)
-        case .color:
-            return Color(red: 1, green: 0.58, blue: 0.76).opacity(opacity)
-        }
+    private var cardBodyTint: Color {
+        typeColor.opacity(theme.mode == .dark ? 0.05 : 0.06)
+    }
+
+    private var cardBorderTint: Color {
+        typeColor.opacity(theme.mode == .dark ? 0.22 : 0.18)
     }
 
     private var cardBodyFont: Font {
@@ -323,7 +358,7 @@ struct SBClipCardShell: View {
     // Rough line-count the taller card's preview area can hold, so text/code
     // previews actually use the extra height instead of leaving it blank.
     private var bodyLineLimit: Int {
-        let bodyAreaHeight = height - 30 - 20
+        let bodyAreaHeight = height - 34 - 24
         let approxLineHeight: CGFloat = 16
         return max(3, Int((bodyAreaHeight / approxLineHeight).rounded(.down)))
     }
@@ -343,19 +378,38 @@ struct SBClipCardShell: View {
     private var clipKindLabel: String {
         switch clip.kind {
         case .text:
-            return "Text"
+            return copy.text(.contentText)
         case .code:
-            return "Code"
+            return copy.text(.contentCode)
         case .image:
-            return "Image"
+            return copy.text(.contentImage)
         case .file:
-            return "File"
+            return copy.text(.contentFile)
         case .url:
-            return "URL"
+            return copy.text(.contentURL)
         case .color:
-            return "Color"
+            return copy.text(.contentColor)
         case .richText:
-            return "Rich Text"
+            return copy.text(.contentRichText)
+        }
+    }
+
+    private var clipKindSymbolName: String {
+        switch clip.kind {
+        case .text:
+            return "text.alignleft"
+        case .code:
+            return "chevron.left.forwardslash.chevron.right"
+        case .image:
+            return "photo"
+        case .file:
+            return "paperclip"
+        case .url:
+            return "link"
+        case .color:
+            return "paintpalette"
+        case .richText:
+            return "textformat"
         }
     }
 
@@ -412,12 +466,12 @@ struct SBClipCardShell: View {
         VStack(alignment: .leading, spacing: theme.spacing.control8) {
             HStack(spacing: theme.spacing.control6) {
                 SBStatusPill(
-                    title: securitySnapshot?.lockState.revealsProtectedContent == false ? "LOCKED" : "PRIVATE",
+                    title: securitySnapshot?.lockState.revealsProtectedContent == false ? copy.text(.popupLocked).uppercased() : copy.text(.popupPrivate).uppercased(),
                     theme: theme,
                     tone: redactionTone
                 )
 
-                Text(securitySnapshot?.lockState.revealsProtectedContent == false ? "Unlock required" : "Preview hidden")
+                Text(securitySnapshot?.lockState.revealsProtectedContent == false ? copy.text(.popupUnlockRequired) : copy.text(.popupPreviewHidden))
                     .font(theme.typography.meta)
                     .foregroundStyle(theme.palette.textTertiary)
                     .lineLimit(1)
@@ -442,14 +496,51 @@ struct SBClipCardShell: View {
 
     private var redactionDetailText: String {
         guard let securitySnapshot else {
-            return "Protected previews stay hidden in this shell."
+            return copy.text(.clipRedactionNoSnapshot)
         }
 
         if securitySnapshot.lockState.revealsProtectedContent == false {
-            return "SlipBoard is locked, so clip previews and note bodies stay hidden until unlock succeeds."
+            return copy.text(.clipRedactionLocked)
         }
 
-        return "Privacy mode is redacting this preview on the existing shell surface."
+        return copy.text(.clipRedactionPrivacy)
+    }
+}
+
+private struct SBRightClickGesture: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        view.wantsLayer = false
+        view.addGestureRecognizer(context.coordinator.recognizer)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.action = action
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        let recognizer: NSClickGestureRecognizer
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+            recognizer = NSClickGestureRecognizer()
+            super.init()
+            recognizer.target = self
+            recognizer.action = #selector(handleRightClick)
+            recognizer.buttonMask = 0x2
+        }
+
+        @objc private func handleRightClick() {
+            action()
+        }
     }
 }
 
@@ -506,12 +597,13 @@ private enum SBRichTextPreview {
 
 private struct SBRichTextPreviewFallback: View {
     let theme: SBTheme
+    @SBLocalizedCopy private var copy
 
     var body: some View {
         HStack(spacing: theme.spacing.control6) {
             Image(systemName: "doc.richtext")
                 .foregroundStyle(theme.accent(for: .primary))
-            Text("Rich content")
+            Text(copy.text(.popupRichContent))
                 .font(theme.typography.rowPrimary)
                 .foregroundStyle(theme.palette.textSecondary)
         }
@@ -527,6 +619,7 @@ struct SBHorizontalClipRail: View {
     let theme: SBTheme
     let emptyTitle: String
     let emptyDetail: String
+    var cardWidth: CGFloat = 216
     var cardHeight: CGFloat = 128
     var selectedClipID: String?
     var securitySnapshot: SecurityRuntimeSnapshot? = nil
@@ -541,6 +634,9 @@ struct SBHorizontalClipRail: View {
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
     @State private var visibleClipIDs: Set<String> = []
+    @State private var scrollMetrics = SBRailScrollMetrics()
+    @State private var scrollPosition = ScrollPosition(x: 0)
+    @State private var isHoveringRail = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -558,6 +654,7 @@ struct SBHorizontalClipRail: View {
                             SBClipCardShell(
                                 clip: clip,
                                 theme: theme,
+                                width: cardWidth,
                                 height: cardHeight,
                                 isSelected: clip.id == selectedClipID,
                                 securitySnapshot: securitySnapshot,
@@ -595,6 +692,7 @@ struct SBHorizontalClipRail: View {
                                 onPerformContextAction: onPerformContextAction
                             )
                             .id(clip.id)
+                            .transition(.opacity.combined(with: .scale(scale: 0.94)))
                             .onScrollVisibilityChange(threshold: 0.85) { isVisible in
                                 if isVisible {
                                     visibleClipIDs.insert(clip.id)
@@ -605,15 +703,47 @@ struct SBHorizontalClipRail: View {
                         }
                     }
                 }
-                .padding(.horizontal, theme.spacing.popupPadding)
+                .animation(.easeInOut(duration: 0.22), value: clips)
                 .padding(.top, 5)
                 .padding(.bottom, 2)
             }
+            .contentMargins(.horizontal, theme.spacing.popupPadding, for: .scrollContent)
+            .scrollPosition($scrollPosition)
             .onAppear {
                 scrollToSelectionIfNeeded(using: proxy, animated: false)
             }
             .onChange(of: selectedClipID) { _, _ in
                 scrollToSelectionIfNeeded(using: proxy, animated: true)
+            }
+            .onScrollGeometryChange(for: SBRailScrollMetrics.self) { geometry in
+                SBRailScrollMetrics(
+                    contentWidth: geometry.contentSize.width,
+                    viewportWidth: geometry.containerSize.width,
+                    offsetX: geometry.contentOffset.x
+                )
+            } action: { _, newValue in
+                scrollMetrics = newValue
+            }
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHoveringRail = hovering
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if scrollMetrics.contentWidth > scrollMetrics.viewportWidth + 1 {
+                    SBRailScrollbarThumb(
+                        contentWidth: scrollMetrics.contentWidth,
+                        viewportWidth: max(scrollMetrics.viewportWidth - theme.spacing.popupPadding * 2, 0),
+                        offsetX: scrollMetrics.offsetX,
+                        theme: theme,
+                        isVisible: isHoveringRail,
+                        onDrag: { targetOffsetX in
+                            scrollPosition = ScrollPosition(x: targetOffsetX)
+                        }
+                    )
+                    .padding(.horizontal, theme.spacing.popupPadding)
+                    .padding(.bottom, 3)
+                }
             }
         }
     }
@@ -635,9 +765,73 @@ struct SBHorizontalClipRail: View {
     }
 }
 
+private struct SBRailScrollMetrics: Equatable {
+    var contentWidth: CGFloat = 0
+    var viewportWidth: CGFloat = 0
+    var offsetX: CGFloat = 0
+}
+
+private struct SBRailScrollbarThumb: View {
+    let contentWidth: CGFloat
+    let viewportWidth: CGFloat
+    let offsetX: CGFloat
+    let theme: SBTheme
+    var isVisible: Bool = true
+    var onDrag: (CGFloat) -> Void = { _ in }
+
+    @State private var dragStartOffsetX: CGFloat?
+
+    private var thumbWidth: CGFloat {
+        guard contentWidth > 0 else { return 0 }
+        let ratio = viewportWidth / contentWidth
+        return max(viewportWidth * ratio, 28)
+    }
+
+    private var maxScrollable: CGFloat {
+        max(contentWidth - viewportWidth, 1)
+    }
+
+    private var maxThumbOffset: CGFloat {
+        max(viewportWidth - thumbWidth, 0)
+    }
+
+    private var thumbOffsetX: CGFloat {
+        let progress = min(max(offsetX / maxScrollable, 0), 1)
+        return maxThumbOffset * progress
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(theme.palette.accentPrimary.opacity(isVisible ? 0.65 : 0))
+            .frame(width: thumbWidth, height: 6)
+            .frame(width: thumbWidth, height: 12)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let startOffsetX = dragStartOffsetX ?? offsetX
+                        if dragStartOffsetX == nil {
+                            dragStartOffsetX = offsetX
+                        }
+                        guard maxThumbOffset > 0 else { return }
+                        let deltaProgress = value.translation.width / maxThumbOffset
+                        let newOffsetX = min(max(startOffsetX + deltaProgress * maxScrollable, 0), maxScrollable)
+                        onDrag(newOffsetX)
+                    }
+                    .onEnded { _ in
+                        dragStartOffsetX = nil
+                    }
+            )
+            .allowsHitTesting(isVisible)
+            .frame(width: viewportWidth, alignment: .leading)
+            .offset(x: thumbOffsetX)
+    }
+}
+
 private struct ClipNoteEditorInline: View {
     let state: ClipNoteEditorState
     let theme: SBTheme
+    @SBLocalizedCopy private var copy
     let onUpdateDraft: (String) -> Void
     let onSave: () -> Void
     let onCancel: () -> Void
@@ -651,7 +845,7 @@ private struct ClipNoteEditorInline: View {
                     .foregroundStyle(state.isEditable ? theme.palette.accentPrimary : theme.palette.textTertiary)
 
                 TextField(
-                    state.hasPersistedNote ? "Update note" : "Add note",
+                    state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote),
                     text: Binding(
                         get: { state.draftText },
                         set: onUpdateDraft
@@ -675,19 +869,19 @@ private struct ClipNoteEditorInline: View {
 
             HStack(spacing: theme.spacing.control6) {
                 if state.isEditable == false {
-                    Text("Notes stay hidden while search is locked.")
+                    Text(copy.text(.popupNotesLocked))
                         .font(theme.typography.keyboard)
                         .foregroundStyle(theme.palette.textTertiary)
                         .lineLimit(2)
                 } else {
-                    Button("Cancel", action: onCancel)
+                    Button(copy.text(.cancel), action: onCancel)
                         .buttonStyle(.plain)
                         .font(theme.typography.keyboard)
                         .foregroundStyle(theme.palette.textSecondary)
 
                     Spacer(minLength: theme.spacing.control6)
 
-                    Button("Save", action: onSave)
+                    Button(copy.text(.save), action: onSave)
                         .buttonStyle(.plain)
                         .font(theme.typography.keyboard)
                         .foregroundStyle(state.canSave ? Color.white : theme.palette.textTertiary)

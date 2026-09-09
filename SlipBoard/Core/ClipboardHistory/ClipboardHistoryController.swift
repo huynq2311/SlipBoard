@@ -121,6 +121,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
 
     func updateSearchQuery(_ query: String) {
         searchNotesRuntime.updateSearchQuery(query)
+        publishState()
     }
 
     func updateActiveFilter(_ filter: ClipboardHistoryFilter) {
@@ -261,6 +262,12 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
     func updateRetentionClearOnQuit(_ isEnabled: Bool) {
         retentionRuntime.updateRetentionSettings(
             retentionSnapshot.retentionSettings.updating(clearOnQuit: isEnabled)
+        )
+    }
+
+    func updateBumpPastedItemToFront(_ isEnabled: Bool) {
+        retentionRuntime.updateRetentionSettings(
+            retentionSnapshot.retentionSettings.updating(bumpPastedItemToFront: isEnabled)
         )
     }
 
@@ -411,6 +418,11 @@ extension ClipboardHistoryController {
     ) {
         guard result.didSucceed else {
             return
+        }
+
+        if retentionSnapshot.retentionSettings.bumpPastedItemToFront {
+            store.touchItem(id: sourceItem.id, at: completedAt)
+            retentionRuntime.recordHistoryMutation()
         }
 
         bridgeRuntime?.recordSuccessfulLocalPaste(

@@ -24,10 +24,10 @@ struct SBSurfaceStyle: Hashable {
         case .popup:
             return SBSurfaceStyle(
                 background: theme.palette.panel,
-                border: emphasized ? theme.palette.borderStrong : theme.palette.borderStrong,
+                border: .clear,
                 shadow: theme.palette.shadowPrimary,
                 radius: theme.radius.shell,
-                borderWidth: theme.border.hairline,
+                borderWidth: 0,
                 shadowRadius: theme.shadow.popupRadius,
                 shadowYOffset: theme.shadow.popupYOffset
             )
