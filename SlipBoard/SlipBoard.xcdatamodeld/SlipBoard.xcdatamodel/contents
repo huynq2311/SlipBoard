@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24064" systemVersion="24A335" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="AssetCacheSettingsRecord" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="currentUsageBytes" optional="NO" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastClearedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastSweepAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="maxCacheSizeMB" optional="NO" attributeType="Integer 64" defaultValueString="500" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="ClipItemRecord" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="assetCacheKey" optional="YES" attributeType="String"/>
+        <attribute name="capturedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="colorSwatchesBlob" optional="YES" attributeType="Binary"/>
+        <attribute name="estimatedByteSize" optional="NO" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="filePathsBlob" optional="YES" attributeType="Binary"/>
+        <attribute name="id" optional="NO" attributeType="String"/>
+        <attribute name="isPinned" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="kind" optional="NO" attributeType="String"/>
+        <attribute name="lastCopiedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="metadataText" optional="NO" attributeType="String"/>
+        <attribute name="normalizedHash" optional="NO" attributeType="String"/>
+        <attribute name="pinnedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="previewStyleHint" optional="YES" attributeType="String"/>
+        <attribute name="previewStyleKey" optional="NO" attributeType="String"/>
+        <attribute name="richTextAvailable" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="secondaryBadgeText" optional="YES" attributeType="String"/>
+        <attribute name="secondaryText" optional="YES" attributeType="String"/>
+        <attribute name="sourceAppAccentToken" optional="NO" attributeType="String"/>
+        <attribute name="sourceAppBundleID" optional="YES" attributeType="String"/>
+        <attribute name="sourceAppDisplayName" optional="NO" attributeType="String"/>
+        <attribute name="sourceAppSymbolName" optional="YES" attributeType="String"/>
+        <attribute name="titleText" optional="NO" attributeType="String"/>
+    </entity>
+    <entity name="GlobalHotkeyBindingEntity" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="availabilityRawValue" optional="NO" attributeType="String" defaultValueString="enabled"/>
+        <attribute name="commandIDRawValue" optional="NO" attributeType="String"/>
+        <attribute name="detailText" optional="YES" attributeType="String"/>
+        <attribute name="hotkeyDisplayLabel" optional="YES" attributeType="String"/>
+        <attribute name="hotkeyKeyCode" optional="YES" attributeType="Integer 64" usesScalarValueType="YES"/>
+        <attribute name="hotkeyKeyEquivalent" optional="YES" attributeType="String"/>
+        <attribute name="hotkeyModifiersBlob" optional="YES" attributeType="Binary"/>
+    </entity>
+    <entity name="RetentionSettingsRecord" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="bumpPastedItemToFront" optional="NO" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="clearOnQuit" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="maxItemCount" optional="NO" attributeType="Integer 64" defaultValueString="2000" usesScalarValueType="YES"/>
+        <attribute name="ttlPolicyRawValue" optional="NO" attributeType="String" defaultValueString="1mo"/>
+        <attribute name="updatedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="SnippetRecordEntity" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="content" optional="NO" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="hotkeyDisplayLabel" optional="YES" attributeType="String"/>
+        <attribute name="hotkeyKeyCode" optional="YES" attributeType="Integer 64" usesScalarValueType="YES"/>
+        <attribute name="hotkeyKeyEquivalent" optional="YES" attributeType="String"/>
+        <attribute name="hotkeyModifiersBlob" optional="YES" attributeType="Binary"/>
+        <attribute name="id" optional="NO" attributeType="String"/>
+        <attribute name="isPinned" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="kindRawValue" optional="NO" attributeType="String"/>
+        <attribute name="title" optional="NO" attributeType="String"/>
+        <attribute name="updatedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+</model>

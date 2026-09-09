@@ -1,0 +1,968 @@
+import SwiftUI
+
+// Native SwiftUI `Menu` popups don't reliably show inside the app's
+// borderless `.nonactivatingPanel` popup window, so the header's dropdown
+// controls use this hand-rolled overlay state instead (same reasoning as
+// the existing custom SBContextMenuShell/SBPasteTransformMenuShell overlays).
+enum SBHeaderMenuKind: Equatable {
+    case overflow
+    case source
+    case sort
+    case collection
+}
+
+enum SBPopupLayoutMetrics {
+    static let expandedContentHeight: CGFloat = 460
+    static let pinnedCollapsedHeightReduction: CGFloat = 93
+
+    static func contentHeight(isPinnedCollapsed: Bool) -> CGFloat {
+        expandedContentHeight - (isPinnedCollapsed ? pinnedCollapsedHeightReduction : 0)
+    }
+}
+
+struct SBPopupShellFrame<Content: View>: View {
+    let theme: SBTheme
+    let contentHeight: CGFloat
+    @ViewBuilder var content: Content
+
+    init(
+        theme: SBTheme,
+        contentHeight: CGFloat = SBPopupLayoutMetrics.expandedContentHeight,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.theme = theme
+        self.contentHeight = contentHeight
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        // The hosting panel may reserve transparent space above this surface
+        // while an action menu is open. Keep the visible shell at its normal
+        // height so that spare area becomes real overlay headroom instead of
+        // stretching the rails.
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: contentHeight, alignment: .topLeading)
+        .sbSurface(.popup, theme: theme)
+    }
+}
+
+struct SBPopupTopBar: View {
+    let theme: SBTheme
+    let filters: [PopupFilterOption]
+    let state: PopupShellViewState
+    @SBLocalizedCopy private var copy
+    var isSearchEnabled: Bool = true
+    var searchFocusRequestToken: Int = 0
+    var groupChips: [OrganizationChipSummary] = []
+    var activeGroupID: OrganizationGroupID? = nil
+    var onToggleSearchPresented: (Bool) -> Void = { _ in }
+    var onSearchQueryChange: (String) -> Void = { _ in }
+    var onSelectFilter: (String) -> Void = { _ in }
+    var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
+    var onPauseCapture: () -> Void = {}
+    var onClearHistory: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+    var onQuit: () -> Void = {}
+    @Binding var activeMenu: SBHeaderMenuKind?
+
+    @State private var searchText: String
+
+    init(
+        theme: SBTheme,
+        filters: [PopupFilterOption],
+        state: PopupShellViewState,
+        isSearchEnabled: Bool = true,
+        searchFocusRequestToken: Int = 0,
+        groupChips: [OrganizationChipSummary] = [],
+        activeGroupID: OrganizationGroupID? = nil,
+        activeMenu: Binding<SBHeaderMenuKind?>,
+        onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
+        onSearchQueryChange: @escaping (String) -> Void = { _ in },
+        onSelectFilter: @escaping (String) -> Void = { _ in },
+        onSelectThemePreview: @escaping (PopupThemePreview) -> Void = { _ in },
+        onSelectOrganizationGroup: @escaping (OrganizationGroupID) -> Void = { _ in },
+        onPauseCapture: @escaping () -> Void = {},
+        onClearHistory: @escaping () -> Void = {},
+        onOpenSettings: @escaping () -> Void = {},
+        onQuit: @escaping () -> Void = {}
+    ) {
+        self.theme = theme
+        self.filters = filters
+        self.state = state
+        self.isSearchEnabled = isSearchEnabled
+        self.searchFocusRequestToken = searchFocusRequestToken
+        self.groupChips = groupChips
+        self.activeGroupID = activeGroupID
+        _activeMenu = activeMenu
+        self.onToggleSearchPresented = onToggleSearchPresented
+        self.onSearchQueryChange = onSearchQueryChange
+        self.onSelectFilter = onSelectFilter
+        self.onSelectThemePreview = onSelectThemePreview
+        self.onSelectOrganizationGroup = onSelectOrganizationGroup
+        self.onPauseCapture = onPauseCapture
+        self.onClearHistory = onClearHistory
+        self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
+        _searchText = State(initialValue: state.searchQuery)
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: theme.spacing.control8) {
+                SBIconButton(
+                    symbolName: "magnifyingglass",
+                    theme: theme,
+                    isActive: state.isSearchPresented,
+                    accessibilityLabel: copy.text(.search),
+                    action: {
+                        guard isSearchEnabled else { return }
+                        onToggleSearchPresented(state.isSearchPresented == false)
+                    }
+                )
+                .disabled(isSearchEnabled == false)
+                .opacity(isSearchEnabled ? 1 : 0.55)
+
+                SBSearchFieldShell(
+                    text: $searchText,
+                    theme: theme,
+                    isPresented: state.isSearchPresented,
+                    trailingHint: "ESC",
+                    focusRequestToken: searchFocusRequestToken
+                )
+                .disabled(isSearchEnabled == false)
+                .opacity(isSearchEnabled ? 1 : 0.55)
+
+                Spacer(minLength: theme.spacing.control8)
+
+                SBKeyboardHint(text: "⌘K", theme: theme)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "menubar.rectangle")
+                        .font(.system(size: 11, weight: .medium))
+
+                    Text(copy.text(.appName))
+                        .font(theme.typography.chip)
+                }
+                .foregroundStyle(theme.palette.textSecondary)
+
+                overflowMenu
+            }
+            // Wins hit-testing against the filter/dropdown row below, which
+            // this menu's popout visually overlaps when open (see zIndex
+            // note on SBPopupTopBar's own call site).
+            .zIndex(1)
+
+            HStack(spacing: theme.spacing.control8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: theme.spacing.control6) {
+                        ForEach(filters) { filter in
+                            SBFilterChip(
+                                title: filter.label,
+                                systemImage: filter.iconName,
+                                countText: filter.count.map(String.init),
+                                theme: theme,
+                                isSelected: filter.id == state.activeFilterID,
+                                tintColor: SBClipTypeColor.base(forFilterID: filter.id),
+                                action: {
+                                    onSelectFilter(filter.id)
+                                }
+                            )
+                            .disabled(isSearchEnabled == false)
+                            .opacity(isSearchEnabled ? 1 : 0.55)
+                        }
+                    }
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: theme.spacing.control8)
+
+                SBUtilityDropdown(
+                    label: copy.text(.commonSource),
+                    selectionText: copy.text(.commonAll),
+                    options: [SBUtilityDropdownOption(id: "all", label: copy.text(.commonAll))],
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .source,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.source) },
+                    action: { _ in activeMenu = nil }
+                )
+
+                SBUtilityDropdown(
+                    label: copy.text(.popupSort),
+                    selectionText: copy.text(.popupSortNewestFirst),
+                    options: [SBUtilityDropdownOption(id: "newest", label: copy.text(.popupSortNewestFirst))],
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .sort,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.sort) },
+                    action: { _ in activeMenu = nil }
+                )
+
+                SBUtilityDropdown(
+                    label: copy.text(.popupCollections),
+                    selectionText: collectionSelectionText,
+                    options: groupChips,
+                    theme: theme,
+                    isEnabled: isSearchEnabled,
+                    isOpen: activeMenu == .collection,
+                    optionLabel: { $0.label },
+                    onToggle: { toggleMenu(.collection) },
+                    action: { chip in
+                        onSelectOrganizationGroup(chip.groupID)
+                        activeMenu = nil
+                    }
+                )
+            }
+        }
+        .padding(.horizontal, theme.spacing.popupPadding)
+        .padding(.vertical, theme.spacing.control8)
+        .background(theme.palette.canvas)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(theme.palette.border)
+                .frame(height: theme.border.hairline)
+        }
+        .onChange(of: searchText) { _, newValue in
+            onSearchQueryChange(newValue)
+        }
+        .onChange(of: state.searchQuery) { _, newValue in
+            if searchText != newValue {
+                searchText = newValue
+            }
+        }
+    }
+
+    private var collectionSelectionText: String {
+        groupChips.first(where: { $0.isSelected })?.label ?? copy.text(.commonAll)
+    }
+
+    private func toggleMenu(_ kind: SBHeaderMenuKind) {
+        activeMenu = activeMenu == kind ? nil : kind
+    }
+
+    private var overflowMenu: some View {
+        Button {
+            toggleMenu(.overflow)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.palette.textSecondary)
+                .frame(width: 32, height: 32)
+                .background(theme.palette.subpanel)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(theme.palette.borderStrong, lineWidth: theme.border.hairline)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(copy.text(.accessibilityMoreActions))
+        .overlay(alignment: .topTrailing) {
+            if activeMenu == .overflow {
+                overflowMenuContent
+                    .offset(y: 34)
+            }
+        }
+    }
+
+    private var overflowMenuContent: some View {
+        SBOverlayMenuShell(
+            theme: theme,
+            width: 220,
+            actions: overflowActions,
+            onSelectAction: handleOverflowAction
+        ) {
+            VStack(spacing: 0) {
+                ForEach(PopupThemePreview.allCases) { preview in
+                    Button {
+                        onSelectThemePreview(preview)
+                        activeMenu = nil
+                    } label: {
+                        HStack(spacing: theme.spacing.control8) {
+                            Image(systemName: preview == state.themePreview ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(preview == state.themePreview ? theme.palette.accentPrimary : theme.palette.textTertiary)
+
+                            Text(themePreviewLabel(for: preview))
+                                .font(theme.typography.rowPrimary)
+                                .foregroundStyle(theme.palette.textPrimary)
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, theme.spacing.control12)
+                        .padding(.vertical, theme.spacing.control6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Rectangle()
+                    .fill(theme.palette.border)
+                    .frame(height: theme.border.hairline)
+                    .padding(.top, 3)
+            }
+            .padding(.top, theme.spacing.control6)
+        }
+    }
+
+    private var overflowActions: [SBOverlayMenuAction] {
+        [
+            SBOverlayMenuAction(id: "pause", title: copy.text(.menuPauseCapture), symbolName: "pause.circle"),
+            SBOverlayMenuAction(id: "clear-history", title: copy.text(.menuClearHistory), symbolName: "trash", tone: .danger),
+            SBOverlayMenuAction(id: "settings", title: copy.text(.menuSettings), symbolName: "gearshape"),
+            SBOverlayMenuAction(id: "quit", title: copy.text(.menuQuit), symbolName: "power")
+        ]
+    }
+
+    private func handleOverflowAction(_ actionID: String) {
+        activeMenu = nil
+        switch actionID {
+        case "pause":
+            onPauseCapture()
+        case "clear-history":
+            onClearHistory()
+        case "settings":
+            onOpenSettings()
+        case "quit":
+            onQuit()
+        default:
+            break
+        }
+    }
+
+    private func themePreviewLabel(for preview: PopupThemePreview) -> String {
+        switch preview {
+        case .system:
+            return copy.text(.menuAppearanceAuto)
+        case .dark:
+            return copy.text(.menuAppearanceDark)
+        case .light:
+            return copy.text(.menuAppearanceLight)
+        }
+    }
+}
+
+struct SBPopupShell: View {
+    let theme: SBTheme
+    let filters: [PopupFilterOption]
+    let state: PopupShellViewState
+    var searchNotesState: SearchNotesProjectionState = SearchNotesProjectionState()
+    var securitySnapshot: SecurityRuntimeSnapshot? = nil
+    var showOverlayPreview: Bool = true
+    var pasteOverlayState: PasteActionOverlayState = .hidden
+    var supportedTransformActionIDs: Set<PasteActionID> = Set(PasteActionID.transformMenuOrder)
+    var searchFocusRequestToken: Int = 0
+    var onToggleSearchPresented: (Bool) -> Void = { _ in }
+    var onSearchQueryChange: (String) -> Void = { _ in }
+    var onSelectFilter: (String) -> Void = { _ in }
+    var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
+    var onPauseCapture: () -> Void = {}
+    var onClearHistory: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+    var onQuit: () -> Void = {}
+    var onSelectClip: (String) -> Void = { _ in }
+    var onToggleNoteEditor: (String) -> Void = { _ in }
+    var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
+    var onSaveNoteDraft: (String) -> Void = { _ in }
+    var onCancelNoteEditing: (String) -> Void = { _ in }
+    var onClearNote: (String) -> Void = { _ in }
+    var onPrimaryAction: (String) -> Void = { _ in }
+    var onOpenContextMenu: (String) -> Void = { _ in }
+    var onPerformContextAction: (String) -> Void = { _ in }
+    var onHighlightContextAction: (String) -> Void = { _ in }
+    var onOpenPasteTransformMenu: (String, PasteActionID) -> Void = { _, _ in }
+    var onHighlightTransformAction: (PasteActionID) -> Void = { _ in }
+    var onSelectTransformAction: (PasteActionID) -> Void = { _ in }
+    var onConfirmTransformAction: () -> Void = {}
+    var onCloseActiveOverlay: () -> Void = {}
+    var isPinnedCollapsed: Bool = false
+    var onTogglePinnedCollapsed: () -> Void = {}
+
+    @State private var activeHeaderMenu: SBHeaderMenuKind? = nil
+
+    private static let recentCardWidth: CGFloat = 216
+    private static let recentCardWidthPinnedCollapsed: CGFloat = 264
+    private static let recentCardHeight: CGFloat = 148
+    private static let recentCardHeightPinnedCollapsed: CGFloat = 190
+
+    private func togglePinnedCollapsed() {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+            onTogglePinnedCollapsed()
+        }
+    }
+
+    var body: some View {
+        SBPopupShellFrame(
+            theme: theme,
+            contentHeight: SBPopupLayoutMetrics.contentHeight(isPinnedCollapsed: isPinnedCollapsed)
+        ) {
+            VStack(spacing: 0) {
+                SBPopupTopBar(
+                    theme: theme,
+                    filters: filters,
+                    state: state,
+                    isSearchEnabled: isSearchEnabled,
+                    searchFocusRequestToken: searchFocusRequestToken,
+                    groupChips: searchNotesState.groupChips,
+                    activeGroupID: searchNotesState.activeGroupID,
+                    activeMenu: $activeHeaderMenu,
+                    onToggleSearchPresented: onToggleSearchPresented,
+                    onSearchQueryChange: onSearchQueryChange,
+                    onSelectFilter: onSelectFilter,
+                    onSelectThemePreview: onSelectThemePreview,
+                    onSelectOrganizationGroup: onSelectOrganizationGroup,
+                    onPauseCapture: onPauseCapture,
+                    onClearHistory: onClearHistory,
+                    onOpenSettings: onOpenSettings,
+                    onQuit: onQuit
+                )
+                // The header's dropdown popouts render as overlays that
+                // visually extend down into this ScrollView's territory;
+                // without a higher zIndex, this later sibling would paint
+                // (and hit-test) on top of them, per SwiftUI's normal
+                // declaration-order stacking.
+                .zIndex(1)
+
+                if let securitySnapshot, securitySnapshot.lockState.revealsProtectedContent == false {
+                    SBLockedPopupStateCard(
+                        theme: theme,
+                        snapshot: securitySnapshot
+                    )
+                    .padding(.horizontal, theme.spacing.popupPadding)
+                    .padding(.vertical, theme.spacing.control12)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: theme.spacing.control8) {
+                            ClipboardHistoryRailSection(
+                                kind: .pinned,
+                                clips: state.pinnedClips,
+                                theme: theme,
+                                selectedClipID: state.selectedClipID,
+                                searchQuery: state.searchQuery,
+                                activeFilterLabel: activeFilterLabel,
+                                activeGroupLabel: activeGroupLabel,
+                                noteEditorState: searchNotesState.activeEditor,
+                                searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                isEmphasized: true,
+                                isCollapsed: isPinnedCollapsed,
+                                onToggleCollapse: togglePinnedCollapsed,
+                                onSelectClip: onSelectClip,
+                                onToggleNoteEditor: onToggleNoteEditor,
+                                onUpdateNoteDraft: onUpdateNoteDraft,
+                                onSaveNoteDraft: onSaveNoteDraft,
+                                onCancelNoteEditing: onCancelNoteEditing,
+                                onClearNote: onClearNote,
+                                onPrimaryAction: onPrimaryAction,
+                                onOpenContextMenu: onOpenContextMenu,
+                                onPerformContextAction: onPerformContextAction
+                            )
+
+                            ClipboardHistoryRailSection(
+                                kind: .recent,
+                                clips: state.recentClips,
+                                theme: theme,
+                                selectedClipID: state.selectedClipID,
+                                searchQuery: state.searchQuery,
+                                activeFilterLabel: activeFilterLabel,
+                                activeGroupLabel: activeGroupLabel,
+                                noteEditorState: searchNotesState.activeEditor,
+                                searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                cardWidth: isPinnedCollapsed ? Self.recentCardWidthPinnedCollapsed : Self.recentCardWidth,
+                                cardHeight: isPinnedCollapsed ? Self.recentCardHeightPinnedCollapsed : Self.recentCardHeight,
+                                onSelectClip: onSelectClip,
+                                onToggleNoteEditor: onToggleNoteEditor,
+                                onUpdateNoteDraft: onUpdateNoteDraft,
+                                onSaveNoteDraft: onSaveNoteDraft,
+                                onCancelNoteEditing: onCancelNoteEditing,
+                                onClearNote: onClearNote,
+                                onPrimaryAction: onPrimaryAction,
+                                onOpenContextMenu: onOpenContextMenu,
+                                onPerformContextAction: onPerformContextAction
+                            )
+                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                }
+            }
+        }
+        .overlayPreferenceValue(SBClipCardAnchorPreferenceKey.self) { anchors in
+            GeometryReader { proxy in
+                ZStack(alignment: .topLeading) {
+                if pasteOverlayState.isPresented {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: onCloseActiveOverlay)
+                        .zIndex(0)
+                }
+
+                if showContextOverlay {
+                    SBContextMenuShell(
+                        theme: theme,
+                        highlightedActionID: contextHighlightedActionID,
+                        isPinned: selectedClip?.isPinned == true,
+                        clipKind: selectedClip?.kind,
+                        onSelectAction: onPerformContextAction,
+                        onHoverAction: { actionID in
+                            guard let actionID else { return }
+                            onHighlightContextAction(actionID)
+                        }
+                    )
+                    .offset(contextMenuOffset(in: proxy, anchors: anchors))
+                    .zIndex(1)
+                }
+
+                if showPasteOverlay {
+                    SBPasteTransformMenuShell(
+                        theme: theme,
+                        highlightedActionID: transformHighlightedActionID,
+                        previewState: pasteOverlayState.preview,
+                        supportedActionIDs: supportedTransformActionIDs,
+                        isExecuting: pasteOverlayState.isExecuting,
+                        onHighlightAction: onHighlightTransformAction,
+                        onSelectAction: onSelectTransformAction,
+                        onConfirm: onConfirmTransformAction,
+                        onCancel: onCloseActiveOverlay
+                    )
+                    .offset(pasteTransformMenuOffset(in: proxy, anchors: anchors))
+                    .zIndex(1)
+                }
+            }
+            }
+        }
+    }
+
+    private var activeFilterLabel: String? {
+        filters.first(where: { $0.id == state.activeFilterID })?.label
+    }
+
+    private var activeGroupLabel: String? {
+        searchNotesState.groupChips.first(where: { $0.groupID == searchNotesState.activeGroupID })?.label
+    }
+
+    private var showContextOverlay: Bool {
+        if isLocked {
+            return false
+        }
+
+        if pasteOverlayState.isPresented {
+            return pasteOverlayState.kind == .contextMenu
+        }
+
+        if let activeOverlay = state.activeOverlay {
+            return activeOverlay.kind == .contextMenu
+        }
+
+        return showOverlayPreview
+    }
+
+    private var showPasteOverlay: Bool {
+        if isLocked {
+            return false
+        }
+
+        if pasteOverlayState.isPresented {
+            return pasteOverlayState.kind == .pasteTransformMenu
+        }
+
+        if let activeOverlay = state.activeOverlay {
+            return activeOverlay.kind == .pasteTransformMenu
+        }
+
+        return showOverlayPreview
+    }
+
+    private var selectedClip: ClipPreviewSummary? {
+        state.allClips.first(where: { $0.id == state.selectedClipID })
+    }
+
+    private var contextHighlightedActionID: String? {
+        guard case let .contextCommand(actionID)? = pasteOverlayState.highlightedTarget else {
+            return state.activeOverlay?.highlightedRowID ?? "paste"
+        }
+
+        return actionID
+    }
+
+    private var transformHighlightedActionID: String? {
+        guard case let .action(actionID)? = pasteOverlayState.highlightedTarget else {
+            return state.activeOverlay?.highlightedRowID ?? PasteActionID.plainText.id
+        }
+
+        return actionID.id
+    }
+
+    private var isLocked: Bool {
+        guard let securitySnapshot else { return false }
+        return securitySnapshot.lockState.revealsProtectedContent == false
+    }
+
+    private var isSearchEnabled: Bool {
+        searchNotesState.isSearchEnabled && isLocked == false
+    }
+
+    private func contextMenuOffset(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGSize {
+        let menuWidth: CGFloat = 220
+        let menuHeight: CGFloat = 238
+        let gap: CGFloat = 8
+        let rect = anchoredClipRect(in: proxy, anchors: anchors)
+        let x = rect.maxX + menuWidth + gap <= proxy.size.width
+            ? rect.maxX + gap
+            : max(gap, rect.minX - menuWidth - gap)
+        let y = min(max(gap, rect.minY), max(gap, proxy.size.height - menuHeight - gap))
+        return CGSize(width: x, height: y)
+    }
+
+    private func pasteTransformMenuOffset(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGSize {
+        let menuWidth: CGFloat = 260
+        let menuHeight: CGFloat = 412
+        let gap: CGFloat = 10
+        let rect = anchoredClipRect(in: proxy, anchors: anchors)
+        let x = rect.maxX + menuWidth + gap <= proxy.size.width
+            ? rect.maxX + gap
+            : max(gap, rect.minX - menuWidth - gap)
+        // The expanded panel gives this negative offset room to render above
+        // the normal popup surface rather than clipping at its top edge.
+        let y = max(-menuHeight + gap, rect.maxY - menuHeight)
+        return CGSize(width: x, height: y)
+    }
+
+    private func anchoredClipRect(
+        in proxy: GeometryProxy,
+        anchors: [String: Anchor<CGRect>]
+    ) -> CGRect {
+        guard let anchorClipID = pasteOverlayState.anchorClipID,
+              let anchor = anchors[anchorClipID] else {
+            return CGRect(x: theme.spacing.popupPadding, y: 42, width: 216, height: 148)
+        }
+
+        return proxy[anchor]
+    }
+}
+
+
+private struct SBLockedPopupStateCard: View {
+    let theme: SBTheme
+    let snapshot: SecurityRuntimeSnapshot
+    @SBLocalizedCopy private var copy
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.control10) {
+            HStack(alignment: .top, spacing: theme.spacing.control10) {
+                lockAvatar
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(titleText)
+                        .font(theme.typography.paneTitle)
+                        .foregroundStyle(theme.palette.textPrimary)
+
+                    Text(detailText)
+                        .font(theme.typography.rowSecondary)
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: theme.spacing.control10)
+            }
+
+            HStack(spacing: theme.spacing.control8) {
+                SBStatusPill(
+                    title: footerStatusText,
+                    theme: theme,
+                    tone: statusTone
+                )
+
+                Text(hintText)
+                    .font(theme.typography.meta)
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .lineLimit(1)
+            }
+
+            if let failureText {
+                SBSecurityStatusCallout(
+                    theme: theme,
+                    title: copy.text(.securityProtectedStorageUnavailable),
+                    detailText: failureText,
+                    symbolName: "exclamationmark.lock.fill",
+                    tone: .danger
+                )
+            }
+        }
+        .padding(theme.spacing.control12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.palette.subpanel)
+        .clipShape(RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.radius.panel, style: .continuous)
+                .stroke(borderColor, lineWidth: theme.border.hairline)
+        )
+    }
+
+    private var lockAvatar: some View {
+        Circle()
+            .fill(theme.accentBackground(for: statusTone))
+            .frame(width: 36, height: 36)
+            .overlay {
+                Image(systemName: symbolName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.accent(for: statusTone))
+            }
+    }
+
+    private var titleText: String {
+        switch snapshot.lockState {
+        case .locked:
+            return copy.text(.popupLockTitleLocked)
+        case .unlocking:
+            return copy.text(.popupLockTitleUnlocking)
+        case .unlockFailed:
+            return copy.text(.popupLockTitleFailed)
+        case .unlocked:
+            return copy.text(.popupLockTitleUnlocked)
+        }
+    }
+
+    private var detailText: String {
+        if let failure = snapshot.lastFailure {
+            return failure.detailText
+        }
+
+        switch snapshot.lockState {
+        case .locked:
+            return copy.text(.popupLockDetailLocked)
+        case .unlocking:
+            return copy.text(.popupLockDetailUnlocking)
+        case .unlockFailed:
+            return copy.text(.popupLockDetailFailed)
+        case .unlocked:
+            return copy.text(.popupLockDetailUnlocked)
+        }
+    }
+
+    private var hintText: String {
+        switch snapshot.lockState {
+        case .locked:
+            return copy.text(.popupLockHintLocked)
+        case .unlocking:
+            return copy.text(.popupLockHintUnlocking)
+        case .unlockFailed:
+            return copy.text(.popupLockHintFailed)
+        case .unlocked:
+            return copy.text(.popupLockHintUnlocked)
+        }
+    }
+
+    private var footerStatusText: String {
+        switch snapshot.lockState {
+        case .locked:
+            return copy.text(.locked)
+        case .unlocking:
+            return copy.text(.securityUnlocking)
+        case .unlockFailed:
+            return copy.text(.securityUnlockFailed)
+        case .unlocked:
+            return copy.text(.unlocked)
+        }
+    }
+
+    private var statusTone: SBAccentTone {
+        switch snapshot.lockState {
+        case .locked:
+            return .danger
+        case .unlocking:
+            return .warning
+        case .unlockFailed:
+            return .danger
+        case .unlocked:
+            return .success
+        }
+    }
+
+    private var symbolName: String {
+        switch snapshot.lockState {
+        case .locked:
+            return "lock.fill"
+        case .unlocking:
+            return "lock.rotation"
+        case .unlockFailed:
+            return "exclamationmark.lock.fill"
+        case .unlocked:
+            return "lock.open.fill"
+        }
+    }
+
+    private var borderColor: Color {
+        theme.accent(for: statusTone).opacity(theme.mode == .dark ? 0.42 : 0.24)
+    }
+
+    private var failureText: String? {
+        guard case let .failed(failure) = snapshot.migrationState else {
+            return snapshot.lastFailure?.detailText
+        }
+
+        return failure.detailText
+    }
+}
+
+private extension PopupThemePreview {
+    var segmentLabel: String {
+        switch self {
+        case .system:
+            return "Auto"
+        case .dark:
+            return "Dark"
+        case .light:
+            return "Light"
+        }
+    }
+}
+
+private struct SBOverlayPreviewShell: View {
+    let theme: SBTheme
+    let width: CGFloat
+    let headerTitle: String?
+    let headerPreview: String?
+    let rows: [SBOverlayPreviewRow]
+    let footerHint: String?
+    let footerActionTitle: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let headerTitle {
+                VStack(alignment: .leading, spacing: theme.spacing.control8) {
+                    Text(headerTitle)
+                        .font(theme.typography.uppercaseLabel)
+                        .foregroundStyle(theme.palette.textTertiary)
+
+                    if let headerPreview {
+                        Text(headerPreview)
+                            .font(theme.typography.monoMeta)
+                            .foregroundStyle(theme.palette.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(theme.spacing.control8)
+                            .sbSurface(.raised, theme: theme)
+                    }
+                }
+                .padding(.horizontal, theme.spacing.control12)
+                .padding(.top, theme.spacing.control10)
+                .padding(.bottom, theme.spacing.control8)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(theme.palette.border)
+                        .frame(height: theme.border.hairline)
+                }
+            }
+
+            VStack(spacing: 0) {
+                ForEach(rows) { row in
+                    SBListRow(
+                        title: row.title,
+                        detailText: row.subtitle,
+                        accessoryText: row.shortcut,
+                        badgeText: nil,
+                        symbolName: row.symbolName,
+                        theme: theme,
+                        tone: row.tone,
+                        isHighlighted: row.isHighlighted
+                    )
+                }
+            }
+            .padding(.vertical, 4)
+
+            if footerHint != nil || footerActionTitle != nil {
+                HStack(spacing: theme.spacing.control8) {
+                    if let footerHint {
+                        HStack(spacing: theme.spacing.control4) {
+                            Image(systemName: "keyboard")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(theme.palette.textTertiary)
+
+                            Text(footerHint)
+                                .font(theme.typography.meta)
+                                .foregroundStyle(theme.palette.textTertiary)
+                        }
+                    }
+
+                    Spacer(minLength: theme.spacing.control8)
+
+                    if let footerActionTitle {
+                        Text(footerActionTitle)
+                            .font(theme.typography.chip)
+                            .foregroundStyle(Color.white)
+                            .padding(.horizontal, theme.spacing.control10)
+                            .padding(.vertical, theme.spacing.control6)
+                            .background(theme.palette.accentPrimary)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                }
+                .padding(.horizontal, theme.spacing.control12)
+                .padding(.vertical, theme.spacing.control8)
+                .background(theme.palette.canvas)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(theme.palette.border)
+                        .frame(height: theme.border.hairline)
+                }
+            }
+        }
+        .frame(width: width, alignment: .topLeading)
+        .sbSurface(.overlay, theme: theme)
+    }
+
+    static func context(theme: SBTheme) -> SBOverlayPreviewShell {
+        SBOverlayPreviewShell(
+            theme: theme,
+            width: 220,
+            headerTitle: nil,
+            headerPreview: nil,
+            rows: [
+                SBOverlayPreviewRow(title: "Paste", subtitle: nil, symbolName: "doc.on.clipboard", shortcut: "↩", tone: .neutral, isHighlighted: true),
+                SBOverlayPreviewRow(title: "Paste As…", subtitle: "Open transform menu shell", symbolName: "arrowshape.turn.up.right", shortcut: "⌘↩", tone: .neutral, isHighlighted: false),
+                SBOverlayPreviewRow(title: "Copy Again", subtitle: nil, symbolName: "square.on.square", shortcut: "⌘C", tone: .neutral, isHighlighted: false),
+                SBOverlayPreviewRow(title: "Pin Item", subtitle: nil, symbolName: "pin", shortcut: "⌘P", tone: .neutral, isHighlighted: false),
+                SBOverlayPreviewRow(title: "Delete", subtitle: nil, symbolName: "trash", shortcut: "⌫", tone: .danger, isHighlighted: false)
+            ],
+            footerHint: nil,
+            footerActionTitle: nil
+        )
+    }
+
+    static func paste(theme: SBTheme) -> SBOverlayPreviewShell {
+        SBOverlayPreviewShell(
+            theme: theme,
+            width: 260,
+            headerTitle: "Paste As…",
+            headerPreview: "Authorization: Bearer <token>\nX-Client: slipboard",
+            rows: [
+                SBOverlayPreviewRow(title: "Plain Text", subtitle: "Remove rich formatting", symbolName: "textformat", shortcut: "↵", tone: .primary, isHighlighted: true),
+                SBOverlayPreviewRow(title: "Convert to Markdown", subtitle: "Map clipboard text into markdown-friendly output", symbolName: "chevron.left.forwardslash.chevron.right", shortcut: "⌘1", tone: .neutral, isHighlighted: false),
+                SBOverlayPreviewRow(title: "Strip Unicode / Accent", subtitle: "Normalize special characters for plain transport", symbolName: "eraser", shortcut: "⌘2", tone: .neutral, isHighlighted: false),
+                SBOverlayPreviewRow(title: "UPPERCASE", subtitle: "Convert output to upper case", symbolName: "textformat.size.larger", shortcut: "⌘3", tone: .neutral, isHighlighted: false)
+            ],
+            footerHint: "ESC cancel",
+            footerActionTitle: "Paste"
+        )
+    }
+}
+
+private struct SBOverlayPreviewRow: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String?
+    let symbolName: String
+    let shortcut: String?
+    let tone: SBAccentTone
+    let isHighlighted: Bool
+}
