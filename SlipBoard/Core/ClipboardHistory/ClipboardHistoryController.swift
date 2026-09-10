@@ -359,7 +359,9 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
             in: snapshot.allItems,
             activeFilter: snapshot.activeFilter
         )
-        let itemByID = Dictionary(uniqueKeysWithValues: snapshot.allItems.map { ($0.id, $0) })
+        // Two SlipBoard instances capturing at the same moment can mint the
+        // same clip id, and a stored duplicate must not take the app down.
+        let itemByID = Dictionary(snapshot.allItems.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         return visibleIDs.compactMap { itemByID[$0] }
     }
 
