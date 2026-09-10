@@ -108,12 +108,22 @@ struct PopupFilterOption: Identifiable, Hashable {
     }
 }
 
-enum PopupThemePreview: String, CaseIterable, Identifiable, Hashable {
+enum PopupAppearance: String, CaseIterable, Identifiable, Hashable {
     case system
     case dark
     case light
 
     var id: String { rawValue }
+}
+
+/// Which bundled theme file the popup uses, and whether it follows the system
+/// appearance or pins light/dark.
+struct PopupThemeSelection: Hashable {
+    static let defaultThemeID = "default"
+    static let fallback = PopupThemeSelection(themeID: defaultThemeID, appearance: .light)
+
+    var themeID: String
+    var appearance: PopupAppearance
 }
 
 enum PopupStatusTone: String, Hashable {
@@ -172,7 +182,7 @@ struct PopupShellViewState: Hashable {
     var searchQuery: String
     var isSearchPresented: Bool
     var activeFilterID: String
-    var themePreview: PopupThemePreview
+    var themePreview: PopupThemeSelection
     var pinnedClips: [ClipPreviewSummary]
     var recentClips: [ClipPreviewSummary]
     var status: PopupStatusSummary
@@ -187,7 +197,7 @@ struct PopupShellViewState: Hashable {
         searchQuery: String = "",
         isSearchPresented: Bool = false,
         activeFilterID: String = "all",
-        themePreview: PopupThemePreview = .light,
+        themePreview: PopupThemeSelection = .fallback,
         pinnedClips: [ClipPreviewSummary] = [],
         recentClips: [ClipPreviewSummary] = [],
         status: PopupStatusSummary,

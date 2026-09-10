@@ -53,7 +53,10 @@ struct SBSurfaceStyle: Hashable {
             )
         case .overlay:
             return SBSurfaceStyle(
-                background: theme.mode == .dark ? theme.palette.subpanel.opacity(0.92) : theme.palette.panel.opacity(0.9),
+                // Glass palettes are translucent by design; menus floating over
+                // clip cards must stay fully opaque to remain readable.
+                background: theme.glassRim?.overlaySurface
+                    ?? (theme.mode == .dark ? theme.palette.subpanel.opacity(0.92) : theme.palette.panel.opacity(0.9)),
                 border: theme.palette.borderStrong,
                 shadow: theme.palette.shadowPrimary,
                 radius: theme.radius.panel,
@@ -116,7 +119,12 @@ struct SBSurfaceModifier: ViewModifier {
 }
 
 extension View {
+    @ViewBuilder
     func sbSurface(_ role: SBSurfaceRole, theme: SBTheme, emphasized: Bool = false) -> some View {
-        modifier(SBSurfaceModifier(style: .make(role: role, theme: theme, emphasized: emphasized)))
+        if role == .popup, let rim = theme.glassRim {
+            modifier(SBLiquidGlassPanel(theme: theme, rim: rim))
+        } else {
+            modifier(SBSurfaceModifier(style: .make(role: role, theme: theme, emphasized: emphasized)))
+        }
     }
 }

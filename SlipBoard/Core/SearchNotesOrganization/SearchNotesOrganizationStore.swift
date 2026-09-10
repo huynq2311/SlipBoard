@@ -81,7 +81,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
     }
 
     func synchronizeHistoryItems(_ items: [ClipboardHistoryItem], includeProtectedContent: Bool) {
-        historyItemsByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        historyItemsByID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         let nextIDs = Set(items.map(\.id))
         let staleIDs = snapshot.documents
             .map(\.itemID)
