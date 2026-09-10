@@ -285,8 +285,12 @@ struct SBClipCardShell: View {
 
         let clipID = clip.id
         let decoded = await Task.detached(priority: .userInitiated) { () -> NSImage? in
-            guard let data = SBClipThumbnailCache.assetStore.data(for: clipID) else { return nil }
-            return NSImage(data: data)
+            // 768 px covers the largest card (264 x 190 pt) at 2x with room for
+            // aspect-fill cropping.
+            guard let thumbnail = SBClipThumbnailCache.assetStore.thumbnail(for: clipID, maxPixelSize: 768) else {
+                return nil
+            }
+            return NSImage(cgImage: thumbnail, size: .zero)
         }.value
 
         guard let decoded else { return }
