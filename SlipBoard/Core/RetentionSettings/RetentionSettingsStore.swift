@@ -5,7 +5,7 @@ struct RetentionStoreConfiguration: Hashable {
     var storeURL: URL
     var assetCacheDirectoryURL: URL
 
-    static func `default`(fileManager: FileManager = .default) -> RetentionStoreConfiguration {
+    nonisolated static func `default`(fileManager: FileManager = .default) -> RetentionStoreConfiguration {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let slipBoardURL = baseURL.appendingPathComponent("SlipBoard", isDirectory: true)

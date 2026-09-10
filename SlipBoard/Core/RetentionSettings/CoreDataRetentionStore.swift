@@ -277,7 +277,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         object.setValue(clip.assetCacheKey, forKey: "assetCacheKey")
     }
 
-    private static func makeManagedClip(from object: NSManagedObject) -> RetentionManagedClip? {
+    private nonisolated static func makeManagedClip(from object: NSManagedObject) -> RetentionManagedClip? {
         guard
             let id = object.value(forKey: "id") as? String,
             let normalizedHash = object.value(forKey: "normalizedHash") as? String,
@@ -324,7 +324,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         try? JSONEncoder().encode(values)
     }
 
-    private static func decodeStringArray(_ data: Data?) -> [String] {
+    private nonisolated static func decodeStringArray(_ data: Data?) -> [String] {
         guard let data else {
             return []
         }

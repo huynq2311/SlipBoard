@@ -15,7 +15,7 @@ struct ExcludedAppRule: Identifiable, Hashable {
     var detailText: String
     var matchStrategy: ExcludedAppMatchStrategy
 
-    init(
+    nonisolated init(
         id: String,
         bundleID: String? = nil,
         displayName: String,
@@ -51,14 +51,14 @@ struct ExcludedAppRule: Identifiable, Hashable {
             .lowercased()
     }
 
-    private static func cleanOptionalText(_ value: String?) -> String? {
+    private nonisolated static func cleanOptionalText(_ value: String?) -> String? {
         guard let value else { return nil }
 
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
-    private static func defaultDetailText(
+    private nonisolated static func defaultDetailText(
         bundleID: String?,
         matchStrategy: ExcludedAppMatchStrategy
     ) -> String {

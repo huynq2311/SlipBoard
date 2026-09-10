@@ -238,7 +238,7 @@ final class RetentionCleanupCoordinator: RetentionCleanupCoordinating {
         return parts.joined(separator: " ")
     }
 
-    private static func sortNewestFirst(_ lhs: RetentionManagedClip, _ rhs: RetentionManagedClip) -> Bool {
+    private nonisolated static func sortNewestFirst(_ lhs: RetentionManagedClip, _ rhs: RetentionManagedClip) -> Bool {
         if lhs.lastCopiedAt == rhs.lastCopiedAt {
             return lhs.id > rhs.id
         }

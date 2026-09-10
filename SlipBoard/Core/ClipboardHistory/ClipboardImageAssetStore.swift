@@ -18,7 +18,7 @@ final class ClipboardImageAssetStore {
     private nonisolated(unsafe) let fileManager: FileManager
     private let directoryURL: URL
 
-    init(
+    nonisolated init(
         configuration: RetentionStoreConfiguration = .default(),
         fileManager: FileManager = .default
     ) {

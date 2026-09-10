@@ -387,7 +387,7 @@ private struct EncryptedPayloadEnvelopeRecord: Codable {
     var authenticationTag: Data
     var updatedAt: Date
 
-    init(envelope: EncryptedPayloadEnvelope) {
+    nonisolated init(envelope: EncryptedPayloadEnvelope) {
         itemID = envelope.itemID
         keyVersion = envelope.keyVersion
         algorithmRawValue = envelope.algorithm.rawValue

@@ -224,7 +224,7 @@ struct RetentionManagedClip: Identifiable, Hashable {
     var estimatedByteSize: Int64
     var assetCacheKey: String?
 
-    init(
+    nonisolated init(
         id: String,
         normalizedHash: String,
         kind: RetentionClipKind,
