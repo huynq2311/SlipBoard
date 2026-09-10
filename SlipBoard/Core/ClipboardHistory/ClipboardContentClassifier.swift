@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import Foundation
+import UniformTypeIdentifiers
 
 enum ClipboardClassificationResult {
     case sample(ClipboardCaptureSample)
@@ -97,12 +98,35 @@ struct ClipboardContentClassifier {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Universal Clipboard (iPhone/iPad → Mac) hands an image over as a file in
+    /// a temporary shared-pasteboard container that is deleted shortly after,
+    /// so it has to be captured as image data rather than as a file path.
+    private func handoffImageFileURL(in pasteboard: NSPasteboard) -> URL? {
+        guard
+            let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+            urls.count == 1,
+            let url = urls.first,
+            url.isFileURL,
+            url.path.contains("/group.com.apple.coreservices.useractivityd/shared-pasteboard/"),
+            UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+        else {
+            return nil
+        }
+
+        return url
+    }
+
     private func classifyFileURLs(
         from pasteboard: NSPasteboard,
         changeCount: Int,
         capturedAt: Date,
         sourceApp: ClipboardSourceAppSummary
     ) -> ClipboardCaptureSample? {
+        // Leave Universal Clipboard images to `classifyImage`.
+        guard handoffImageFileURL(in: pasteboard) == nil else {
+            return nil
+        }
+
         guard
             let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]
         else {
@@ -137,9 +161,9 @@ struct ClipboardContentClassifier {
         capturedAt: Date,
         sourceApp: ClipboardSourceAppSummary
     ) -> ClipboardCaptureSample? {
-        guard
-            let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
-            let image = images.first
+        let pasteboardImage = (pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage])?.first
+        guard let image = pasteboardImage
+            ?? handoffImageFileURL(in: pasteboard).flatMap(NSImage.init(contentsOf:))
         else {
             return nil
         }
