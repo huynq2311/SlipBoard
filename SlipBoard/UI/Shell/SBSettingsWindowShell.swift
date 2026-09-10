@@ -372,6 +372,8 @@ struct SBSettingsWindowShell: View {
         var localized = section
 
         switch section.id {
+        case "startup":
+            localized.title = copy.text(.settingsStartupHeading)
         case "organization.search":
             localized.title = copy.text(.settingsSearchHeading)
             localized.descriptionText = copy.text(.settingsSearchDescription)
@@ -510,6 +512,9 @@ struct SBSettingsWindowShell: View {
         switch row {
         case .toggle(var item):
             switch item.id {
+            case "startup.launch-at-login":
+                item.title = copy.text(.settingsLaunchAtLogin)
+                item.detailText = copy.text(.settingsLaunchAtLoginDetail)
             case "clear-on-quit": item.title = copy.text(.settingsClearOnQuit)
                 item.detailText = copy.text(.settingsClearOnQuitDetail)
             case "bump-pasted-item-to-front":
