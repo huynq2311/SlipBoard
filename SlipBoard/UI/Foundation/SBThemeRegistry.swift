@@ -41,6 +41,13 @@ enum SBThemeRegistry {
 
     private static let logger = Logger(subsystem: "huynq.SlipBoard", category: "Themes")
 
+    private static var isGlassAvailable: Bool {
+        if #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
     private static func loadBundledThemes() -> [SBThemeDefinition] {
         let urls = (Bundle.main.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? [])
             .filter { $0.lastPathComponent.hasSuffix(".theme.json") }
@@ -50,6 +57,10 @@ enum SBThemeRegistry {
             do {
                 let file = try JSONDecoder().decode(SBThemeFile.self, from: Data(contentsOf: url))
                 let definition = try file.makeDefinition()
+                // Glass themes render with `.glassEffect`, which only exists on macOS 26.
+                guard definition.light.treatment != .liquidGlass || isGlassAvailable else {
+                    continue
+                }
                 guard definitions.contains(where: { $0.id == definition.id }) == false else {
                     logger.error("Skipping \(url.lastPathComponent, privacy: .public): duplicate theme id \(definition.id, privacy: .public)")
                     continue
