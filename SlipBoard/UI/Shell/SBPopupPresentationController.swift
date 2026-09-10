@@ -48,6 +48,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     private var isDismissing = false
     private var reservesOverlayHeadroom = false
     private var isPinnedCollapsed = false
+    private var shellMargin = EdgeInsets()
 
     override init() {
         super.init()
@@ -80,12 +81,14 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         isLocked: Bool = false,
         reservesOverlayHeadroom: Bool = false,
         isPinnedCollapsed: Bool = false,
+        shellMargin: EdgeInsets = EdgeInsets(),
         @ViewBuilder content: () -> Content
     ) {
         let rootView = AnyView(content())
         isLockedPresentation = isLocked
         self.reservesOverlayHeadroom = reservesOverlayHeadroom
         self.isPinnedCollapsed = isPinnedCollapsed
+        self.shellMargin = shellMargin
         capturePasteTargetApplication()
         // `.nonactivatingPanel` + makeKeyAndOrderFront already grants this
         // panel keyboard focus without the app becoming frontmost. Forcing
@@ -339,11 +342,13 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         let requestedHeight = baseHeight + (reservesOverlayHeadroom ? Layout.overlayHeadroom : 0)
         let height = max(1, min(requestedHeight, visibleFrame.height - Layout.dockRevealInset - (Layout.verticalInset * 2)))
 
+        // The shell keeps its on-screen position; only the transparent window
+        // grows around it.
         return NSRect(
-            x: visibleFrame.minX + Layout.horizontalInset,
-            y: visibleFrame.minY + Layout.dockRevealInset + Layout.verticalInset,
-            width: width,
-            height: height
+            x: visibleFrame.minX + Layout.horizontalInset - shellMargin.leading,
+            y: visibleFrame.minY + Layout.dockRevealInset + Layout.verticalInset - shellMargin.bottom,
+            width: width + shellMargin.leading + shellMargin.trailing,
+            height: height + shellMargin.top + shellMargin.bottom
         )
     }
 
@@ -479,7 +484,13 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
             guard let self, let panel = self.panel, panel.isVisible else { return }
-            guard panel.frame.contains(NSEvent.mouseLocation) == false else { return }
+            let shellFrame = NSRect(
+                x: panel.frame.minX + self.shellMargin.leading,
+                y: panel.frame.minY + self.shellMargin.bottom,
+                width: panel.frame.width - self.shellMargin.leading - self.shellMargin.trailing,
+                height: panel.frame.height - self.shellMargin.top - self.shellMargin.bottom
+            )
+            guard shellFrame.contains(NSEvent.mouseLocation) == false else { return }
             self.dismiss()
         }
     }

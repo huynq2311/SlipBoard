@@ -18,7 +18,7 @@ struct ClipboardHistoryPopupView: View {
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
-    var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}

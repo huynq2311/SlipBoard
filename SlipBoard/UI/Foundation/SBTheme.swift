@@ -16,12 +16,25 @@ enum SBAccentTone: String, Hashable {
     case neutral
 }
 
+/// How a theme paints its surfaces: flat fills, or the macOS 26 glass
+/// treatment where the popup shell becomes a raised piece of glass.
+enum SBSurfaceTreatment: Hashable {
+    case solid
+    case liquidGlass
+}
+
+/// Colors and shadows come from bundled `*.theme.json` files via
+/// `SBThemeRegistry`; typography, spacing and radii stay in code so no theme
+/// file can change layout.
 struct SBTheme {
     struct Palette {
         var canvas: Color
         var panel: Color
         var subpanel: Color
         var raised: Color
+        /// Clip card body fill. Separate from `subpanel` so a glass theme can
+        /// keep cards reading as solid surfaces while controls go translucent.
+        var cardBase: Color
         var border: Color
         var borderStrong: Color
         var textPrimary: Color
@@ -93,7 +106,7 @@ struct SBTheme {
         let standard: CGFloat = 1
     }
 
-    struct Shadow {
+    struct Shadow: Decodable {
         var popupRadius: CGFloat
         var popupYOffset: CGFloat
         var overlayRadius: CGFloat
@@ -109,84 +122,11 @@ struct SBTheme {
     let radius: Radius
     let border: Border
     let shadow: Shadow
+    /// Present only for glass themes.
+    var glassRim: SBGlassRim? = nil
 
-    static let dark = SBTheme(
-        mode: .dark,
-        palette: Palette(
-            canvas: Color(hex: 0x0A0A0B),
-            panel: Color(hex: 0x161618),
-            subpanel: Color(hex: 0x1E1E21),
-            raised: Color(hex: 0x2A2A2D),
-            border: Color(hex: 0x2E2E33),
-            borderStrong: Color(hex: 0x3D3D44),
-            textPrimary: Color(hex: 0xF0F0F2),
-            textSecondary: Color(hex: 0x8E8E9F),
-            textTertiary: Color(hex: 0x50505F),
-            accentPrimary: Color(hex: 0x2F7CF6),
-            accentPrimaryMuted: Color(red: 47 / 255, green: 124 / 255, blue: 246 / 255, opacity: 0.12),
-            accentSuccess: Color(hex: 0x3ECF8E),
-            accentWarning: Color(hex: 0xF59E0B),
-            accentInfo: Color(hex: 0x38BDF8),
-            accentDanger: Color(hex: 0xF87171),
-            shadowPrimary: Color.black.opacity(0.6),
-            shadowSecondary: Color.black.opacity(0.3)
-        ),
-        typography: .shared,
-        spacing: Spacing(),
-        radius: Radius(),
-        border: Border(),
-        shadow: Shadow(
-            popupRadius: 64,
-            popupYOffset: 24,
-            overlayRadius: 32,
-            overlayYOffset: 8,
-            windowRadius: 64,
-            windowYOffset: 24
-        )
-    )
-
-    static let light = SBTheme(
-        mode: .light,
-        palette: Palette(
-            canvas: Color(red: 245 / 255, green: 250 / 255, blue: 1, opacity: 1),
-            panel: Color.white.opacity(1),
-            subpanel: Color.white.opacity(0.48),
-            raised: Color.white.opacity(0.72),
-            border: Color(red: 140 / 255, green: 170 / 255, blue: 210 / 255, opacity: 0.18),
-            borderStrong: Color(red: 140 / 255, green: 170 / 255, blue: 210 / 255, opacity: 0.20),
-            textPrimary: Color(hex: 0x243042),
-            textSecondary: Color(hex: 0x6C7A90),
-            textTertiary: Color(hex: 0x7B8799),
-            accentPrimary: Color(hex: 0x2F7CF6),
-            accentPrimaryMuted: Color(red: 47 / 255, green: 124 / 255, blue: 246 / 255, opacity: 0.08),
-            accentSuccess: Color(hex: 0x3ECF8E),
-            accentWarning: Color(hex: 0xF59E0B),
-            accentInfo: Color(hex: 0x38BDF8),
-            accentDanger: Color(hex: 0xF87171),
-            shadowPrimary: Color.black.opacity(0.12),
-            shadowSecondary: Color.black.opacity(0.08)
-        ),
-        typography: .shared,
-        spacing: Spacing(),
-        radius: Radius(),
-        border: Border(),
-        shadow: Shadow(
-            popupRadius: 40,
-            popupYOffset: 12,
-            overlayRadius: 24,
-            overlayYOffset: 4,
-            windowRadius: 64,
-            windowYOffset: 24
-        )
-    )
-
-    static func theme(for mode: SBThemeMode) -> SBTheme {
-        switch mode {
-        case .dark:
-            return .dark
-        case .light:
-            return .light
-        }
+    var treatment: SBSurfaceTreatment {
+        glassRim == nil ? .solid : .liquidGlass
     }
 
     func accent(for tone: SBAccentTone) -> Color {
@@ -238,17 +178,5 @@ struct SBTheme {
         default:
             return accent(for: .primary)
         }
-    }
-}
-
-extension Color {
-    fileprivate init(hex: UInt32, opacity: Double = 1) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xFF) / 255,
-            green: Double((hex >> 8) & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255,
-            opacity: opacity
-        )
     }
 }

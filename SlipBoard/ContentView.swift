@@ -573,15 +573,33 @@ struct ContentView: View {
                 .foregroundStyle(theme.palette.textTertiary)
 
             Picker("Preview Theme", selection: Binding(
-                get: { runtime.popupState.themePreview },
-                set: runtime.selectThemePreview
+                get: { runtime.popupState.themePreview.appearance },
+                set: { appearance in
+                    var selection = runtime.popupState.themePreview
+                    selection.appearance = appearance
+                    runtime.selectThemePreview(selection)
+                }
             )) {
-                Text("Auto").tag(PopupThemePreview.system)
-                Text("Dark").tag(PopupThemePreview.dark)
-                Text("Light").tag(PopupThemePreview.light)
+                Text("Auto").tag(PopupAppearance.system)
+                Text("Dark").tag(PopupAppearance.dark)
+                Text("Light").tag(PopupAppearance.light)
             }
             .pickerStyle(.segmented)
             .frame(width: 200)
+
+            Picker("Theme", selection: Binding(
+                get: { runtime.popupState.themePreview.themeID },
+                set: { themeID in
+                    var selection = runtime.popupState.themePreview
+                    selection.themeID = themeID
+                    runtime.selectThemePreview(selection)
+                }
+            )) {
+                ForEach(SBThemeRegistry.themes) { definition in
+                    Text(definition.name(in: runtime.appLanguage)).tag(definition.id)
+                }
+            }
+            .frame(width: 160)
         }
     }
 

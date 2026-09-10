@@ -33,7 +33,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     private let shellCoordinator: FoundationShellCoordinator
     private let snippetsHotkeysRuntime: SnippetsHotkeysRuntimeController
     private var baseMenuBarSummary: MenuBarSummaryState
-    private var themePreview: PopupThemePreview
+    private var themePreview: PopupThemeSelection
     private var isSearchPresented: Bool
     private var runtimeStatusOverride: RuntimeStatusOverride?
     private var localizationCancellable: AnyCancellable?
@@ -85,7 +85,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         )
 
         let projection = resolvedController.projection
-        self.themePreview = projection.popupState.themePreview
+        self.themePreview = Self.loadThemeSelection()
         self.isSearchPresented = projection.popupState.isSearchPresented
 
         var popupState = projection.popupState
@@ -144,16 +144,22 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     }
 
     var popupTheme: SBTheme {
-        switch themePreview {
-        case .system, .dark:
+        SBThemeRegistry.definition(for: themePreview.themeID).theme(for: popupThemeMode)
+    }
+
+    private var popupThemeMode: SBThemeMode {
+        switch themePreview.appearance {
+        case .dark:
             return .dark
         case .light:
             return .light
+        case .system:
+            return NSApplication.shared.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
         }
     }
 
     var settingsTheme: SBTheme {
-        popupTheme.mode == .dark ? .dark : .light
+        SBThemeRegistry.definition(for: PopupThemeSelection.defaultThemeID).theme(for: popupTheme.mode)
     }
 
     func setAppLanguage(_ language: AppLanguage) {
@@ -527,10 +533,28 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         controller.updateActiveFilter(filter)
     }
 
-    func selectThemePreview(_ preview: PopupThemePreview) {
+    func selectThemePreview(_ preview: PopupThemeSelection) {
         recordSecurityInteraction()
         themePreview = preview
+        UserDefaults.standard.set(preview.themeID, forKey: Self.themeIDDefaultsKey)
+        UserDefaults.standard.set(preview.appearance.rawValue, forKey: Self.themeAppearanceDefaultsKey)
         publishCurrentProjection()
+    }
+
+    private static let themeIDDefaultsKey = "SlipBoard.Appearance.themeID"
+    private static let themeAppearanceDefaultsKey = "SlipBoard.Appearance.mode"
+
+    /// A stored id whose theme file is no longer bundled falls back to the
+    /// default theme, so the menu checkmark always matches what is drawn.
+    private static func loadThemeSelection() -> PopupThemeSelection {
+        let defaults = UserDefaults.standard
+        let themeID = defaults.string(forKey: themeIDDefaultsKey)
+            .flatMap { id in SBThemeRegistry.themes.contains { $0.id == id } ? id : nil }
+            ?? PopupThemeSelection.fallback.themeID
+        let appearance = defaults.string(forKey: themeAppearanceDefaultsKey)
+            .flatMap(PopupAppearance.init(rawValue:))
+            ?? PopupThemeSelection.fallback.appearance
+        return PopupThemeSelection(themeID: themeID, appearance: appearance)
     }
 
     var isPinnedCollapsed: Bool {
@@ -2316,6 +2340,8 @@ struct SlipBoardApp: App {
     @State private var popupPresentationController = SBPopupPresentationController()
     @State private var didInitializeShellLifecycle = false
     @State private var wasPopupPresented = false
+    @State private var openSettingsAction: OpenSettingsAction?
+    @State private var popupPresentationID = 0
 
     var body: some Scene {
         MenuBarExtra {
@@ -2347,7 +2373,8 @@ struct SlipBoardApp: App {
                 onInitialAppear: initializeShellLifecycleIfNeeded,
                 onAppDidBecomeActive: handleAppDidBecomeActive,
                 onAppWillTerminate: handleAppWillTerminate,
-                onSyncPopupPresentation: syncPopupPresentation
+                onSyncPopupPresentation: syncPopupPresentation,
+                onReceiveOpenSettings: { openSettingsAction = $0 }
             )
         }
 
@@ -2445,6 +2472,7 @@ struct SlipBoardApp: App {
         if wasPopupPresented == false {
             let firstClipID = runtime.popupState.recentClips.first?.id
             runtime.selectClip(id: firstClipID)
+            popupPresentationID += 1
         }
         wasPopupPresented = true
 
@@ -2453,8 +2481,13 @@ struct SlipBoardApp: App {
             reservesOverlayHeadroom: runtime.pasteOverlayState.isPresented
                 && runtime.pasteOverlayState.kind == .pasteTransformMenu,
             isPinnedCollapsed: runtime.isPinnedCollapsed,
+            shellMargin: popupShellMargin,
             content: popupContent
         )
+    }
+
+    private var popupShellMargin: EdgeInsets {
+        runtime.popupTheme.treatment == .liquidGlass ? SBPopupLayoutMetrics.glassShellMargin : EdgeInsets()
     }
 
     private func popupContent() -> some View {
@@ -2496,6 +2529,8 @@ struct SlipBoardApp: App {
             isPinnedCollapsed: runtime.isPinnedCollapsed,
             onTogglePinnedCollapsed: runtime.togglePinnedCollapsed
         )
+        .padding(popupShellMargin)
+        .environment(\.sbPopupPresentationID, popupPresentationID)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .sbLocalization(runtime.localization, language: runtime.appLanguage)
     }
@@ -2539,8 +2574,10 @@ struct SlipBoardApp: App {
     private func showSettingsWindow(selecting section: SettingsSectionID = .general) {
         runtime.showSettingsPresentation(selecting: section)
         NSApp.activate(ignoringOtherApps: true)
+        // The private `showSettingsWindow:` selector is ignored since macOS 14;
+        // SwiftUI only opens the Settings scene through `openSettings`.
         DispatchQueue.main.async {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            openSettingsAction?()
         }
     }
 
@@ -2593,6 +2630,11 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
     let onAppDidBecomeActive: () -> Void
     let onAppWillTerminate: () -> Void
     let onSyncPopupPresentation: () -> Void
+    let onReceiveOpenSettings: (OpenSettingsAction) -> Void
+
+    // `Scene` code has no environment, so the Settings opener is lifted out of
+    // this always-alive label view for the App to call.
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         SBMenuBarLabel(
@@ -2601,7 +2643,10 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
             theme: theme,
             securitySnapshot: securitySnapshot
         )
-        .onAppear(perform: onInitialAppear)
+        .onAppear {
+            onReceiveOpenSettings(openSettings)
+            onInitialAppear()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             onAppDidBecomeActive()
         }

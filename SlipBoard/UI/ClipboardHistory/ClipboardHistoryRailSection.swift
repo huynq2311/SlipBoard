@@ -111,6 +111,7 @@ struct ClipboardHistoryRailSection: View {
                         emptyDetail: emptyStateDetail,
                         cardWidth: cardWidth,
                         cardHeight: cardHeight,
+                        reservesScrollbarTrack: kind == .recent,
                         selectedClipID: selectedClipID,
                         securitySnapshot: securitySnapshot,
                         onSelectClip: onSelectClip,

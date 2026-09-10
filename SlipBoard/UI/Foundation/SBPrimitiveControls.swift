@@ -111,7 +111,16 @@ struct SBFilterChip: View {
             .padding(.horizontal, theme.spacing.control10)
             .padding(.vertical, theme.spacing.control6)
             .frame(height: 32)
-            .background(chipBackground)
+            .background {
+                ZStack {
+                    // Type tints are only 10–16% opaque; on clear glass they
+                    // need a surface under them or the wallpaper shows through.
+                    if theme.treatment == .liquidGlass {
+                        theme.palette.raised
+                    }
+                    chipBackground
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
