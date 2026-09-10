@@ -2155,8 +2155,10 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         securityRuntime: SecurityRuntimeController?,
         bridgeRuntime: CloudBridgeRuntimeController?
     ) -> RuntimeComponents {
+        // The bridge runtime is intentionally not attached to the history controller
+        // while Bridge is hidden for v1.0, so pastes are never published and no
+        // inbound records are imported.
         if let controller, let securityRuntime, let bridgeRuntime {
-            controller.attachBridgeRuntime(bridgeRuntime)
             return RuntimeComponents(
                 controller: controller,
                 securityRuntime: securityRuntime,
@@ -2181,10 +2183,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             lockStateProvider: resolvedSecurityRuntime
         )
         let resolvedController = controller ?? ClipboardHistoryController(
-            searchNotesRuntime: searchRuntime,
-            bridgeRuntime: resolvedBridgeRuntime
+            searchNotesRuntime: searchRuntime
         )
-        resolvedController.attachBridgeRuntime(resolvedBridgeRuntime)
         return RuntimeComponents(
             controller: resolvedController,
             securityRuntime: resolvedSecurityRuntime,

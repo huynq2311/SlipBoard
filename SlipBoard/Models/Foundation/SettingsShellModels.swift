@@ -295,8 +295,10 @@ struct SettingsShellState: Hashable {
     var security: SettingsPaneModel
     var bridge: SettingsPaneModel
 
+    // Bridge is hidden for v1.0: Universal Clipboard already covers iPhone <-> Mac
+    // transfer and the bridge transport has no real CloudKit backend yet.
     var allSections: [SettingsPaneModel] {
-        [general, bridge, retention, exclusions, hotkeys, snippets, security]
+        [general, retention, exclusions, hotkeys, snippets, security]
     }
 
     init(
