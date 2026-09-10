@@ -2,9 +2,12 @@ import AppKit
 import ApplicationServices
 import CryptoKit
 import Foundation
+import UniformTypeIdentifiers
 
 final class PasteActionExecutor: PasteActionExecuting {
     private let pasteboard: NSPasteboard
+    /// Keeps the on-demand TIFF conversion of the last pasted image alive.
+    private var imageTIFFProvider: ImageTIFFDataProvider?
 
     init(pasteboard: NSPasteboard = .general) {
         self.pasteboard = pasteboard
@@ -43,7 +46,6 @@ final class PasteActionExecutor: PasteActionExecuting {
         if let imageData {
             directPasteResult = executeDirectImagePaste(
                 imageData: imageData,
-                sourceHash: request.sourceItem.normalizedHash,
                 previewText: payloadText
             )
         } else {
@@ -121,13 +123,13 @@ final class PasteActionExecutor: PasteActionExecuting {
 
     private func executeDirectImagePaste(
         imageData: Data,
-        sourceHash: String,
         previewText: String
     ) -> DirectPasteDispatchResult {
         let didWrite = writeImageToPasteboard(imageData)
-        let suppressionToken = didWrite
-            ? makeCaptureSuppressionToken(for: previewText, fallbackHash: sourceHash)
-            : nil
+        // Match the capture of exactly the bytes written: a clip's hash can come
+        // from bytes that were compacted before storage (TIFF saved as PNG).
+        let writtenHash = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
+        let suppressionToken = didWrite ? "programmatic-write:\(writtenHash)" : nil
 
         return DirectPasteDispatchResult(
             didWrite: didWrite,
@@ -143,9 +145,21 @@ final class PasteActionExecutor: PasteActionExecuting {
     }
 
     private func writeImageToPasteboard(_ data: Data) -> Bool {
-        guard let image = NSImage(data: data) else { return false }
+        guard let type = ClipboardImageAssetStore.imageType(of: data) else { return false }
+
+        let item = NSPasteboardItem()
+        guard item.setData(data, forType: NSPasteboard.PasteboardType(type.identifier)) else { return false }
+
+        // Paste the stored bytes as they are. Apps that cannot read formats
+        // such as HEIC or JPEG ask for TIFF, which is only encoded if they do.
+        if type != .png && type != .tiff {
+            let provider = ImageTIFFDataProvider(imageData: data)
+            guard item.setDataProvider(provider, forTypes: [.tiff]) else { return false }
+            imageTIFFProvider = provider
+        }
+
         pasteboard.clearContents()
-        return pasteboard.writeObjects([image])
+        return pasteboard.writeObjects([item])
     }
 
     private func postPasteShortcut() -> Bool {
@@ -213,6 +227,23 @@ struct DirectPasteDispatchResult: Hashable {
     var didDispatchPasteShortcut: Bool
     var pastedPreviewText: String
     var captureSuppressionToken: String?
+}
+
+private final class ImageTIFFDataProvider: NSObject, NSPasteboardItemDataProvider {
+    private let imageData: Data
+
+    init(imageData: Data) {
+        self.imageData = imageData
+    }
+
+    func pasteboard(
+        _ pasteboard: NSPasteboard?,
+        item: NSPasteboardItem,
+        provideDataForType type: NSPasteboard.PasteboardType
+    ) {
+        guard let tiffData = NSImage(data: imageData)?.tiffRepresentation else { return }
+        item.setData(tiffData, forType: type)
+    }
 }
 
 private extension PasteActionCloseBehavior {

@@ -155,20 +155,42 @@ struct ClipboardContentClassifier {
         )
     }
 
+    /// Image types kept exactly as the source app offered them, in order of
+    /// preference. TIFF is compacted to PNG later, when the asset is saved.
+    private static let storedImageTypes: [NSPasteboard.PasteboardType] = [
+        .png,
+        NSPasteboard.PasteboardType(UTType.heic.identifier),
+        NSPasteboard.PasteboardType(UTType.jpeg.identifier),
+        .tiff
+    ]
+
+    /// Reads image bytes without re-encoding them, so capture stays cheap on
+    /// the main thread and repeated copies of one image hash the same.
+    private func originalImageData(in pasteboard: NSPasteboard) -> Data? {
+        if let type = pasteboard.availableType(from: Self.storedImageTypes),
+           let data = pasteboard.data(forType: type) {
+            return data
+        }
+
+        if let handoffURL = handoffImageFileURL(in: pasteboard) {
+            return try? Data(contentsOf: handoffURL)
+        }
+
+        return (pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage])?
+            .first?
+            .tiffRepresentation
+    }
+
     private func classifyImage(
         from pasteboard: NSPasteboard,
         changeCount: Int,
         capturedAt: Date,
         sourceApp: ClipboardSourceAppSummary
     ) -> ClipboardCaptureSample? {
-        let pasteboardImage = (pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage])?.first
-        guard let image = pasteboardImage
-            ?? handoffImageFileURL(in: pasteboard).flatMap(NSImage.init(contentsOf:))
+        guard
+            let imageData = originalImageData(in: pasteboard),
+            let image = NSImage(data: imageData)
         else {
-            return nil
-        }
-
-        guard let imageData = image.tiffRepresentation else {
             return nil
         }
 

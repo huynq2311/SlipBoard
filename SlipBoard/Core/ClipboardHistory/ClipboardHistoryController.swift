@@ -96,6 +96,14 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         synchronizeSearchNotesRuntime()
         attachBridgeRuntime(bridgeRuntime)
         publishState()
+
+        let imageAssetStore = imageAssetStore
+        Task { [weak self] in
+            await Task.detached(priority: .utility) {
+                imageAssetStore.compactLegacyTIFFAssets()
+            }.value
+            self?.retentionRuntime.refreshCacheUsage()
+        }
     }
 
     deinit {
@@ -478,7 +486,7 @@ extension ClipboardHistoryController {
         guard let item = snapshot.allItems.first(where: { $0.dedupeKey == "\(sample.kind.rawValue):\(sample.normalizedHash ?? "")" }) else {
             return
         }
-        _ = imageAssetStore.save(imageData, for: item.id)
+        imageAssetStore.save(imageData, for: item.id)
     }
 
     func registerProgrammaticPasteSuppressionToken(_ token: String?) {
