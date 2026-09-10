@@ -54,7 +54,13 @@ struct SBLiquidGlassPanel: ViewModifier {
             shape.fill(rim.opaquePanel)
         } else {
             ZStack {
-                Color.clear.glassEffect(.clear.tint(rim.tint), in: shape)
+                // Glass themes are not offered below macOS 26 (SBThemeRegistry),
+                // so this fallback only guards an unexpected selection.
+                if #available(macOS 26.0, *) {
+                    Color.clear.glassEffect(.clear.tint(rim.tint), in: shape)
+                } else {
+                    shape.fill(rim.opaquePanel)
+                }
 
                 // Feathered away from the edge so the rim band stays clear
                 // like the thin edge of a droplet.
