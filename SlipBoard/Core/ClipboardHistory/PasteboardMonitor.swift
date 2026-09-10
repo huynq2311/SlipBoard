@@ -2,6 +2,17 @@ import AppKit
 import Foundation
 
 enum ClipboardApplicationSummaryFactory {
+    static let universalClipboardBundleID = "com.apple.universal-clipboard"
+
+    /// Content arriving over Universal Clipboard from an iPhone, iPad or
+    /// another Mac. macOS does not say which device sent it.
+    static let universalClipboardSummary = ClipboardSourceAppSummary(
+        bundleID: universalClipboardBundleID,
+        displayName: "Handoff",
+        symbolName: symbolName(for: universalClipboardBundleID, displayName: "Handoff"),
+        accentToken: accentToken(for: universalClipboardBundleID, displayName: "Handoff")
+    )
+
     static func makeSummary(from app: NSRunningApplication?) -> ClipboardSourceAppSummary {
         guard let app else {
             return ClipboardSourceAppSummary(
@@ -25,6 +36,9 @@ enum ClipboardApplicationSummaryFactory {
     static func symbolName(for bundleID: String?, displayName: String) -> String {
         let label = (bundleID ?? displayName).lowercased()
 
+        if bundleID == universalClipboardBundleID {
+            return "laptopcomputer.and.iphone"
+        }
         if label.contains("terminal") {
             return "terminal"
         }
@@ -50,6 +64,9 @@ enum ClipboardApplicationSummaryFactory {
     static func accentToken(for bundleID: String?, displayName: String) -> String {
         let label = (bundleID ?? displayName).lowercased()
 
+        if bundleID == universalClipboardBundleID {
+            return "accent.info"
+        }
         if label.contains("terminal") {
             return "accent.info"
         }
@@ -66,6 +83,8 @@ enum ClipboardApplicationSummaryFactory {
 
 final class PasteboardMonitor: ClipboardPasteboardMonitoring {
     typealias IgnoredSampleHandler = (_ changeCount: Int, _ reason: String) -> Void
+
+    private static let remoteClipboardType = NSPasteboard.PasteboardType("com.apple.is-remote-clipboard")
 
     var latestChangeCount: Int
     var isRunning: Bool { timer != nil }
@@ -123,7 +142,11 @@ final class PasteboardMonitor: ClipboardPasteboardMonitoring {
 
         latestChangeCount = currentChangeCount
         let capturedAt = Date()
-        let sourceApp = currentFrontmostApplication()
+        // Universal Clipboard content was copied on another device, so the
+        // Mac's frontmost app at this moment says nothing about its source.
+        let sourceApp = pasteboard.types?.contains(Self.remoteClipboardType) == true
+            ? ClipboardApplicationSummaryFactory.universalClipboardSummary
+            : currentFrontmostApplication()
 
         switch classifier.classify(
             pasteboard: pasteboard,

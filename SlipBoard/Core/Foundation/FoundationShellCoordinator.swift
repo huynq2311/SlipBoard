@@ -121,7 +121,7 @@ final class FoundationShellCoordinator: ObservableObject, PopupShellRouting {
         popupShellState.activeFilterID = id
     }
 
-    func setPopupThemePreview(_ preview: PopupThemePreview) {
+    func setPopupThemePreview(_ preview: PopupThemeSelection) {
         popupShellState.themePreview = preview
     }
 

@@ -1,0 +1,66 @@
+{
+  "id": "default",
+  "order": 0,
+  "name": { "en": "Default", "vi": "Mặc định" },
+  "treatment": "solid",
+  "light": {
+    "palette": {
+      "canvas": "#F5FAFF",
+      "panel": "#FFFFFF",
+      "subpanel": "#FFFFFF7A",
+      "raised": "#FFFFFFB8",
+      "cardBase": "#FFFFFF7A",
+      "border": "#8CAAD22E",
+      "borderStrong": "#8CAAD233",
+      "textPrimary": "#243042",
+      "textSecondary": "#6C7A90",
+      "textTertiary": "#7B8799",
+      "accentPrimary": "#2F7CF6",
+      "accentPrimaryMuted": "#2F7CF614",
+      "accentSuccess": "#3ECF8E",
+      "accentWarning": "#F59E0B",
+      "accentInfo": "#38BDF8",
+      "accentDanger": "#F87171",
+      "shadowPrimary": "#0000001F",
+      "shadowSecondary": "#00000014"
+    },
+    "shadow": {
+      "popupRadius": 40,
+      "popupYOffset": 12,
+      "overlayRadius": 24,
+      "overlayYOffset": 4,
+      "windowRadius": 64,
+      "windowYOffset": 24
+    }
+  },
+  "dark": {
+    "palette": {
+      "canvas": "#0A0A0B",
+      "panel": "#161618",
+      "subpanel": "#1E1E21",
+      "raised": "#2A2A2D",
+      "cardBase": "#1E1E21",
+      "border": "#2E2E33",
+      "borderStrong": "#3D3D44",
+      "textPrimary": "#F0F0F2",
+      "textSecondary": "#8E8E9F",
+      "textTertiary": "#50505F",
+      "accentPrimary": "#2F7CF6",
+      "accentPrimaryMuted": "#2F7CF61F",
+      "accentSuccess": "#3ECF8E",
+      "accentWarning": "#F59E0B",
+      "accentInfo": "#38BDF8",
+      "accentDanger": "#F87171",
+      "shadowPrimary": "#00000099",
+      "shadowSecondary": "#0000004D"
+    },
+    "shadow": {
+      "popupRadius": 64,
+      "popupYOffset": 24,
+      "overlayRadius": 32,
+      "overlayYOffset": 8,
+      "windowRadius": 64,
+      "windowYOffset": 24
+    }
+  }
+}

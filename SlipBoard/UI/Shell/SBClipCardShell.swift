@@ -66,15 +66,14 @@ struct SBClipCardShell: View {
         .frame(width: width, height: height, alignment: .topLeading)
         .background {
             ZStack {
-                theme.palette.subpanel
+                theme.palette.cardBase
                 cardBodyTint
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? theme.palette.accentPrimary : cardBorderTint, lineWidth: isSelected ? 1.5 : theme.border.hairline)
-        }
+        .overlay { cardRim }
+        .shadow(color: restingShadowColor, radius: 6, x: 0, y: 2)
+        .shadow(color: selectionGlowColor, radius: isSelected ? 10 : 0, x: 0, y: isSelected ? 2 : 0)
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture(count: 2) {
             onSelect()
@@ -310,7 +309,64 @@ struct SBClipCardShell: View {
     }
 
     private var cardBorderTint: Color {
-        typeColor.opacity(theme.mode == .dark ? 0.22 : 0.18)
+        guard let rim = theme.glassRim else {
+            return typeColor.opacity(theme.mode == .dark ? 0.22 : 0.18)
+        }
+        return typeColor.opacity(rim.cardBorderOpacity)
+    }
+
+    /// Cards stay on their type color and never become glass themselves. On a
+    /// glass theme they only pick up a softer rim, a top highlight that catches
+    /// the same light as the shell, and a lit selection instead of a hard border.
+    @ViewBuilder
+    private var cardRim: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        if let rim = theme.glassRim {
+
+            ZStack {
+                shape.strokeBorder(cardBorderTint, lineWidth: theme.border.hairline)
+
+                shape
+                    .inset(by: 0.5)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [rim.cardHighlight, .clear],
+                            startPoint: .top,
+                            endPoint: .center
+                        ),
+                        lineWidth: theme.border.hairline
+                    )
+
+                if isSelected {
+                    shape.strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                theme.palette.accentPrimary.opacity(0.85),
+                                theme.palette.accentPrimary.opacity(0.35)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
+                }
+            }
+        } else {
+            shape.stroke(
+                isSelected ? theme.palette.accentPrimary : cardBorderTint,
+                lineWidth: isSelected ? 1.5 : theme.border.hairline
+            )
+        }
+    }
+
+    private var restingShadowColor: Color {
+        theme.glassRim?.cardShadow ?? .clear
+    }
+
+    private var selectionGlowColor: Color {
+        guard isSelected, let rim = theme.glassRim else { return .clear }
+        return rim.selectionGlow
     }
 
     private var cardBodyFont: Font {
@@ -621,6 +677,9 @@ struct SBHorizontalClipRail: View {
     let emptyDetail: String
     var cardWidth: CGFloat = 216
     var cardHeight: CGFloat = 128
+    /// Puts the scrollbar in its own strip below the cards instead of over
+    /// their bottom edge. Only for a rail with free space underneath it.
+    var reservesScrollbarTrack: Bool = false
     var selectedClipID: String?
     var securitySnapshot: SecurityRuntimeSnapshot? = nil
     var onSelectClip: (String) -> Void = { _ in }
@@ -637,6 +696,7 @@ struct SBHorizontalClipRail: View {
     @State private var scrollMetrics = SBRailScrollMetrics()
     @State private var scrollPosition = ScrollPosition(x: 0)
     @State private var isHoveringRail = false
+    @Environment(\.sbPopupPresentationID) private var popupPresentationID
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -715,6 +775,12 @@ struct SBHorizontalClipRail: View {
             .onChange(of: selectedClipID) { _, _ in
                 scrollToSelectionIfNeeded(using: proxy, animated: true)
             }
+            .onChange(of: popupPresentationID) { _, _ in
+                // The panel keeps this view alive while hidden, so its scroll
+                // offset survives a reopen; start again from the newest clip.
+                guard let firstClipID = clips.first?.id else { return }
+                proxy.scrollTo(firstClipID, anchor: .leading)
+            }
             .onScrollGeometryChange(for: SBRailScrollMetrics.self) { geometry in
                 SBRailScrollMetrics(
                     contentWidth: geometry.contentSize.width,
@@ -724,11 +790,10 @@ struct SBHorizontalClipRail: View {
             } action: { _, newValue in
                 scrollMetrics = newValue
             }
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHoveringRail = hovering
-                }
-            }
+            .padding(.bottom, reservesScrollbarTrack ? Self.scrollbarTrackHeight : 0)
+            // Empty padding isn't hit-testable; without this the track strip
+            // under the cards would not count as hovering the rail.
+            .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if scrollMetrics.contentWidth > scrollMetrics.viewportWidth + 1 {
                     SBRailScrollbarThumb(
@@ -737,16 +802,26 @@ struct SBHorizontalClipRail: View {
                         offsetX: scrollMetrics.offsetX,
                         theme: theme,
                         isVisible: isHoveringRail,
+                        hitHeight: reservesScrollbarTrack ? Self.scrollbarTrackHeight : 12,
                         onDrag: { targetOffsetX in
                             scrollPosition = ScrollPosition(x: targetOffsetX)
                         }
                     )
                     .padding(.horizontal, theme.spacing.popupPadding)
-                    .padding(.bottom, 3)
+                    .padding(.bottom, reservesScrollbarTrack ? 0 : 3)
+                }
+            }
+            // After the overlay, so the pointer resting on the thumb itself
+            // still counts as hovering the rail.
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHoveringRail = hovering
                 }
             }
         }
     }
+
+    private static let scrollbarTrackHeight: CGFloat = 16
 
     private func scrollToSelectionIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
         guard let selectedClipID,
@@ -765,6 +840,11 @@ struct SBHorizontalClipRail: View {
     }
 }
 
+extension EnvironmentValues {
+    /// Bumped each time the popup is shown again.
+    @Entry var sbPopupPresentationID = 0
+}
+
 private struct SBRailScrollMetrics: Equatable {
     var contentWidth: CGFloat = 0
     var viewportWidth: CGFloat = 0
@@ -777,6 +857,7 @@ private struct SBRailScrollbarThumb: View {
     let offsetX: CGFloat
     let theme: SBTheme
     var isVisible: Bool = true
+    var hitHeight: CGFloat = 12
     var onDrag: (CGFloat) -> Void = { _ in }
 
     @State private var dragStartOffsetX: CGFloat?
@@ -801,13 +882,19 @@ private struct SBRailScrollbarThumb: View {
     }
 
     var body: some View {
+        // Stay visible and grabbable mid-drag even if the pointer slips off
+        // the rail; otherwise hover ends and the drag is cancelled.
+        let isActive = isVisible || dragStartOffsetX != nil
+
         Capsule()
-            .fill(theme.palette.accentPrimary.opacity(isVisible ? 0.65 : 0))
+            .fill(theme.palette.accentPrimary.opacity(isActive ? 0.65 : 0))
             .frame(width: thumbWidth, height: 6)
-            .frame(width: thumbWidth, height: 12)
+            .frame(width: thumbWidth, height: hitHeight)
             .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                // Global space: the thumb moves while dragging, so a local
+                // translation shrinks under the pointer and the thumb lags.
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
                         let startOffsetX = dragStartOffsetX ?? offsetX
                         if dragStartOffsetX == nil {
@@ -822,7 +909,7 @@ private struct SBRailScrollbarThumb: View {
                         dragStartOffsetX = nil
                     }
             )
-            .allowsHitTesting(isVisible)
+            .allowsHitTesting(isActive)
             .frame(width: viewportWidth, alignment: .leading)
             .offset(x: thumbOffsetX)
     }

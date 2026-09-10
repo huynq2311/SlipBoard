@@ -58,7 +58,7 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             searchQuery: searchQuery,
             isSearchPresented: searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
             activeFilterID: snapshot.activeFilter.id,
-            themePreview: .light,
+            themePreview: .fallback,
             pinnedClips: snapshot.pinnedItems
                 .filter { visibleItemIDs.contains($0.id) }
                 .map {

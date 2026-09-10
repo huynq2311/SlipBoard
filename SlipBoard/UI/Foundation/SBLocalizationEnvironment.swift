@@ -40,6 +40,8 @@ struct SBLocalizedCopy: DynamicProperty {
 
     var wrappedValue: SBLocalizedCopy { self }
 
+    var currentLanguage: AppLanguage { language }
+
     func text(_ key: LocalizationKey, _ arguments: [String: String] = [:]) -> String {
         _ = language
         return provider?.text(key, arguments) ?? key.englishFallback

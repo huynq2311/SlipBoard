@@ -14,6 +14,10 @@ enum SBHeaderMenuKind: Equatable {
 enum SBPopupLayoutMetrics {
     static let expandedContentHeight: CGFloat = 460
     static let pinnedCollapsedHeightReduction: CGFloat = 93
+    /// Transparent room around a glass shell so the borderless panel does not
+    /// clip its shadow and rim into square corners. Bottom stays below the
+    /// Dock reveal inset.
+    static let glassShellMargin = EdgeInsets(top: 32, leading: 32, bottom: 12, trailing: 32)
 
     static func contentHeight(isPinnedCollapsed: Bool) -> CGFloat {
         expandedContentHeight - (isPinnedCollapsed ? pinnedCollapsedHeightReduction : 0)
@@ -61,7 +65,7 @@ struct SBPopupTopBar: View {
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
-    var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}
@@ -83,7 +87,7 @@ struct SBPopupTopBar: View {
         onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
-        onSelectThemePreview: @escaping (PopupThemePreview) -> Void = { _ in },
+        onSelectThemePreview: @escaping (PopupThemeSelection) -> Void = { _ in },
         onSelectOrganizationGroup: @escaping (OrganizationGroupID) -> Void = { _ in },
         onPauseCapture: @escaping () -> Void = {},
         onClearHistory: @escaping () -> Void = {},
@@ -222,7 +226,7 @@ struct SBPopupTopBar: View {
         }
         .padding(.horizontal, theme.spacing.popupPadding)
         .padding(.vertical, theme.spacing.control8)
-        .background(theme.palette.canvas)
+        .background(SBPopupToolbarBackground(theme: theme))
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(theme.palette.border)
@@ -278,27 +282,31 @@ struct SBPopupTopBar: View {
             onSelectAction: handleOverflowAction
         ) {
             VStack(spacing: 0) {
-                ForEach(PopupThemePreview.allCases) { preview in
-                    Button {
-                        onSelectThemePreview(preview)
-                        activeMenu = nil
-                    } label: {
-                        HStack(spacing: theme.spacing.control8) {
-                            Image(systemName: preview == state.themePreview ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(preview == state.themePreview ? theme.palette.accentPrimary : theme.palette.textTertiary)
-
-                            Text(themePreviewLabel(for: preview))
-                                .font(theme.typography.rowPrimary)
-                                .foregroundStyle(theme.palette.textPrimary)
-
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, theme.spacing.control12)
-                        .padding(.vertical, theme.spacing.control6)
-                        .contentShape(Rectangle())
+                ForEach(PopupAppearance.allCases) { appearance in
+                    themeMenuRow(
+                        title: appearanceLabel(for: appearance),
+                        isSelected: appearance == state.themePreview.appearance
+                    ) {
+                        var selection = state.themePreview
+                        selection.appearance = appearance
+                        onSelectThemePreview(selection)
                     }
-                    .buttonStyle(.plain)
+                }
+
+                Rectangle()
+                    .fill(theme.palette.border)
+                    .frame(height: theme.border.hairline)
+                    .padding(.vertical, 3)
+
+                ForEach(SBThemeRegistry.themes) { definition in
+                    themeMenuRow(
+                        title: definition.name(in: copy.currentLanguage),
+                        isSelected: definition.id == state.themePreview.themeID
+                    ) {
+                        var selection = state.themePreview
+                        selection.themeID = definition.id
+                        onSelectThemePreview(selection)
+                    }
                 }
 
                 Rectangle()
@@ -335,8 +343,31 @@ struct SBPopupTopBar: View {
         }
     }
 
-    private func themePreviewLabel(for preview: PopupThemePreview) -> String {
-        switch preview {
+    private func themeMenuRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            activeMenu = nil
+        } label: {
+            HStack(spacing: theme.spacing.control8) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? theme.palette.accentPrimary : theme.palette.textTertiary)
+
+                Text(title)
+                    .font(theme.typography.rowPrimary)
+                    .foregroundStyle(theme.palette.textPrimary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, theme.spacing.control12)
+            .padding(.vertical, theme.spacing.control6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func appearanceLabel(for appearance: PopupAppearance) -> String {
+        switch appearance {
         case .system:
             return copy.text(.menuAppearanceAuto)
         case .dark:
@@ -360,7 +391,7 @@ struct SBPopupShell: View {
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
-    var onSelectThemePreview: (PopupThemePreview) -> Void = { _ in }
+    var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}
@@ -813,19 +844,6 @@ private struct SBLockedPopupStateCard: View {
         }
 
         return failure.detailText
-    }
-}
-
-private extension PopupThemePreview {
-    var segmentLabel: String {
-        switch self {
-        case .system:
-            return "Auto"
-        case .dark:
-            return "Dark"
-        case .light:
-            return "Light"
-        }
     }
 }
 
