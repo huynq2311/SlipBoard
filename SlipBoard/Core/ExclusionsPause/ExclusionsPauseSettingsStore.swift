@@ -180,7 +180,7 @@ final class ExclusionsPauseSettingsStore: ExclusionsPauseSettingsStoring {
         )
     }
 
-    private static func normalizedRule(_ rule: ExcludedAppRule) -> ExcludedAppRule {
+    private nonisolated static func normalizedRule(_ rule: ExcludedAppRule) -> ExcludedAppRule {
         let trimmedDisplayName = rule.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = trimmedDisplayName.isEmpty ? "Unknown App" : trimmedDisplayName
         let detailText = rule.detailText.trimmingCharacters(in: .whitespacesAndNewlines)
