@@ -698,7 +698,20 @@ struct SBSettingsWindowShell: View {
                         : copy.text(.securitySystemPassword)
                     return option
                 }
-            case "security.auto-lock": item.title = copy.text(.securityTimeout)
+            case "security.auto-lock":
+                item.title = copy.text(.securityTimeout)
+                item.options = item.options.map { option in
+                    var option = option
+                    switch SecurityAutoLockInterval(rawValue: option.id) {
+                    case .never: option.label = copy.text(.retentionNever)
+                    case .oneMinute: option.label = copy.text(.securityAutoLockOneMinute)
+                    case .fiveMinutes: option.label = copy.text(.securityAutoLockFiveMinutes)
+                    case .fifteenMinutes: option.label = copy.text(.securityAutoLockFifteenMinutes)
+                    case .oneHour: option.label = copy.text(.securityAutoLockOneHour)
+                    case nil: break
+                    }
+                    return option
+                }
             default: break
             }
             return .choice(item)
