@@ -878,9 +878,18 @@ struct SBSettingsWindowShell: View {
 
     @ViewBuilder
     private func organizationPaneSections(for pane: SettingsPaneModel) -> some View {
+        let startupSection = pane.sections.first { $0.id == "startup" }
         let searchSection = pane.sections.first { $0.id == "organization.search" }
         let collectionsSection = pane.sections.first { $0.id == "organization.collections" }
         let calloutPlaceholder = pane.sections.compactMap(\.placeholder).first
+
+        if let startupSection {
+            SBPaneSection(title: startupSection.title, theme: theme) {
+                ForEach(Array(startupSection.rows.enumerated()), id: \.offset) { _, row in
+                    organizationRow(row)
+                }
+            }
+        }
 
         SBPaneSection(
             title: copy.text(.settingsLanguageTitle),
