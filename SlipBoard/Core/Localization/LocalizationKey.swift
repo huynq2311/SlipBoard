@@ -75,6 +75,10 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case securityLockSlipBoard
     case securityCurrentState
     case securityUnlock
+    case securityAutoLockOneMinute
+    case securityAutoLockFiveMinutes
+    case securityAutoLockFifteenMinutes
+    case securityAutoLockOneHour
     case retentionNever
     case retentionOneWeek
     case retentionTwoWeeks
@@ -533,6 +537,10 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .securityLockSlipBoard: "Lock SlipBoard"
         case .securityCurrentState: "Current state"
         case .securityUnlock: "Unlock"
+        case .securityAutoLockOneMinute: "1 min"
+        case .securityAutoLockFiveMinutes: "5 min"
+        case .securityAutoLockFifteenMinutes: "15 min"
+        case .securityAutoLockOneHour: "1 hour"
         case .retentionNever: "Never"
         case .retentionOneWeek: "1w"
         case .retentionTwoWeeks: "2w"
@@ -1032,6 +1040,10 @@ struct LocalizationCatalog: Sendable {
         .securityLockSlipBoard: "Khóa SlipBoard",
         .securityCurrentState: "Trạng thái hiện tại",
         .securityUnlock: "Mở khóa",
+        .securityAutoLockOneMinute: "1 phút",
+        .securityAutoLockFiveMinutes: "5 phút",
+        .securityAutoLockFifteenMinutes: "15 phút",
+        .securityAutoLockOneHour: "1 giờ",
         .retentionNever: "Không bao giờ",
         .retentionOneWeek: "1 tuần",
         .retentionTwoWeeks: "2 tuần",
