@@ -5,6 +5,8 @@ design/Slipboard_Design_Doc.md
 design/slipboard_menubar_settings.html
 design/slipboard-db-design-v1.md
 *.md
+!/README.md
+!/PRIVACY.md
 
 # ── macOS ──
 .DS_Store

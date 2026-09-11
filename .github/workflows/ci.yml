@@ -8,8 +8,8 @@ on:
 
 jobs:
   ci-validation:
-    # The app targets macOS 26.5 and uses macOS 26 SDK APIs, which only ship
-    # with Xcode 26.
+    # The app ships back to macOS 15 but uses macOS 26 SDK APIs (Liquid
+    # Glass) behind availability checks, so it still needs Xcode 26 to build.
     runs-on: macos-26
 
     steps:
