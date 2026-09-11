@@ -372,6 +372,8 @@ struct SBSettingsWindowShell: View {
         var localized = section
 
         switch section.id {
+        case "startup":
+            localized.title = copy.text(.settingsStartupHeading)
         case "organization.search":
             localized.title = copy.text(.settingsSearchHeading)
             localized.descriptionText = copy.text(.settingsSearchDescription)
@@ -510,6 +512,9 @@ struct SBSettingsWindowShell: View {
         switch row {
         case .toggle(var item):
             switch item.id {
+            case "startup.launch-at-login":
+                item.title = copy.text(.settingsLaunchAtLogin)
+                item.detailText = copy.text(.settingsLaunchAtLoginDetail)
             case "clear-on-quit": item.title = copy.text(.settingsClearOnQuit)
                 item.detailText = copy.text(.settingsClearOnQuitDetail)
             case "bump-pasted-item-to-front":
@@ -873,9 +878,18 @@ struct SBSettingsWindowShell: View {
 
     @ViewBuilder
     private func organizationPaneSections(for pane: SettingsPaneModel) -> some View {
+        let startupSection = pane.sections.first { $0.id == "startup" }
         let searchSection = pane.sections.first { $0.id == "organization.search" }
         let collectionsSection = pane.sections.first { $0.id == "organization.collections" }
         let calloutPlaceholder = pane.sections.compactMap(\.placeholder).first
+
+        if let startupSection {
+            SBPaneSection(title: startupSection.title, theme: theme) {
+                ForEach(Array(startupSection.rows.enumerated()), id: \.offset) { _, row in
+                    organizationRow(row)
+                }
+            }
+        }
 
         SBPaneSection(
             title: copy.text(.settingsLanguageTitle),

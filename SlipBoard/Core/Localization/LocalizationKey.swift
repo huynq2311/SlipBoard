@@ -64,6 +64,9 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case settingsGeneral
     case settingsSecurity
     case settingsOrganization
+    case settingsStartupHeading
+    case settingsLaunchAtLogin
+    case settingsLaunchAtLoginDetail
     case settingsBridge
     case settingsRetention
     case settingsExclusions
@@ -519,6 +522,9 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .settingsGeneral: "General"
         case .settingsSecurity: "Security"
         case .settingsOrganization: "Organization"
+        case .settingsStartupHeading: "Startup"
+        case .settingsLaunchAtLogin: "Launch at login"
+        case .settingsLaunchAtLoginDetail: "Open SlipBoard automatically when you sign in."
         case .settingsBridge: "Bridge"
         case .settingsRetention: "Retention"
         case .settingsExclusions: "Exclusions"
@@ -1015,6 +1021,9 @@ struct LocalizationCatalog: Sendable {
         .settingsGeneral: "Chung",
         .settingsSecurity: "Bảo mật",
         .settingsOrganization: "Tổ chức",
+        .settingsStartupHeading: "Khởi động",
+        .settingsLaunchAtLogin: "Mở khi đăng nhập",
+        .settingsLaunchAtLoginDetail: "Tự động mở SlipBoard khi bạn đăng nhập vào máy.",
         .settingsBridge: "Cầu nối",
         .settingsRetention: "Lưu giữ",
         .settingsExclusions: "Loại trừ",

@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Combine
+import ServiceManagement
 import SwiftUI
 
 @MainActor
@@ -22,6 +23,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     @Published private(set) var snippetsHotkeysSnapshot: SnippetsHotkeysRuntimeSnapshot
     @Published private(set) var exclusionsPauseSnapshot: ExclusionsPauseSnapshot
     @Published private(set) var bridgeSnapshot: BridgeRuntimeSnapshot
+    @Published private(set) var isLaunchAtLoginEnabled: Bool
     @Published private(set) var searchFocusRequestToken: Int = 0
     // nil = no manual override yet, follow whether pinned has any clips.
     @Published private(set) var manualPinnedCollapsed: Bool? = nil
@@ -72,6 +74,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         self.retentionSnapshot = resolvedController.retentionSnapshot
         self.searchNotesState = resolvedController.searchNotesRuntime.latestProjectionState
         self.bridgeSnapshot = components.bridgeRuntime.latestSnapshot
+        let resolvedLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+        self.isLaunchAtLoginEnabled = resolvedLaunchAtLoginEnabled
         self.organizationDraftName = ""
         self.settingsState = Self.makeSettingsState(
             retentionSnapshot: resolvedController.retentionSnapshot,
@@ -81,6 +85,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: resolvedSnippetsHotkeysRuntime.latestSnapshot,
             exclusionsPauseSnapshot: resolvedController.latestExclusionsPauseSnapshot,
             bridgeSnapshot: components.bridgeRuntime.latestSnapshot,
+            isLaunchAtLoginEnabled: resolvedLaunchAtLoginEnabled,
             selectedSection: SettingsSectionID.general
         )
 
@@ -426,6 +431,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         recordSecurityInteraction()
 
         switch id {
+        case "startup.launch-at-login":
+            updateLaunchAtLogin(isOn)
         case "clear-on-quit":
             controller.updateRetentionClearOnQuit(isOn)
         case "bump-pasted-item-to-front":
@@ -452,6 +459,33 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         default:
             break
         }
+    }
+
+    private func updateLaunchAtLogin(_ isEnabled: Bool) {
+        do {
+            if isEnabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            // Reflect whatever the OS actually did (e.g. the user changed
+            // this from System Settings > Login Items) rather than trusting
+            // the requested value.
+        }
+
+        isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+        settingsState = Self.makeSettingsState(
+            retentionSnapshot: retentionSnapshot,
+            searchProjection: searchNotesState,
+            groups: organizationGroups,
+            securitySnapshot: securitySnapshot,
+            snippetsSnapshot: snippetsHotkeysSnapshot,
+            exclusionsPauseSnapshot: exclusionsPauseSnapshot,
+            bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
+            selectedSection: settingsState.selectedSection
+        )
     }
 
     func handleSettingsSlider(id: String, value: Double) {
@@ -956,6 +990,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsHotkeysSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
         synchronizeShellState()
@@ -992,6 +1027,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsHotkeysSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
     }
@@ -1006,6 +1042,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
         synchronizeShellState()
@@ -1021,6 +1058,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsHotkeysSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
     }
@@ -1035,6 +1073,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsHotkeysSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
         synchronizeShellState()
@@ -1060,6 +1099,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             snippetsSnapshot: snippetsHotkeysSnapshot,
             exclusionsPauseSnapshot: exclusionsPauseSnapshot,
             bridgeSnapshot: bridgeSnapshot,
+            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
             selectedSection: settingsState.selectedSection
         )
         publishCurrentProjection()
@@ -1281,13 +1321,15 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         snippetsSnapshot: SnippetsHotkeysRuntimeSnapshot,
         exclusionsPauseSnapshot: ExclusionsPauseSnapshot,
         bridgeSnapshot: BridgeRuntimeSnapshot,
+        isLaunchAtLoginEnabled: Bool,
         selectedSection: SettingsSectionID
     ) -> SettingsShellState {
         SettingsShellState(
             selectedSection: selectedSection,
             general: organizationPane(
                 searchProjection: searchProjection,
-                groups: groups
+                groups: groups,
+                isLaunchAtLoginEnabled: isLaunchAtLoginEnabled
             ),
             retention: retentionPane(from: retentionSnapshot),
             exclusions: exclusionsPane(from: exclusionsPauseSnapshot),
@@ -1308,7 +1350,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     private static func organizationPane(
         searchProjection: SearchNotesProjectionState,
-        groups: [OrganizationGroupSummary]
+        groups: [OrganizationGroupSummary],
+        isLaunchAtLoginEnabled: Bool
     ) -> SettingsPaneModel {
         let customGroups = groups.filter { $0.isSystem == false }
         let lockLabel = searchProjection.lockState == .locked ? "Locked" : "Unlocked"
@@ -1318,6 +1361,19 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             title: "Organization",
             subtitle: "Local search, note mirrors, and collections stay on the same runtime path as the popup and menu bar shell.",
             sections: [
+                SettingsPaneSection(
+                    id: "startup",
+                    title: "Startup",
+                    rows: [
+                        .toggle(
+                            SettingsToggleItem(
+                                id: "startup.launch-at-login",
+                                title: "Launch at login",
+                                isOn: isLaunchAtLoginEnabled
+                            )
+                        )
+                    ]
+                ),
                 SettingsPaneSection(
                     id: "organization.search",
                     title: "Search",
