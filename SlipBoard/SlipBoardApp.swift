@@ -2410,6 +2410,7 @@ struct SlipBoardApp: App {
             )
             .padding(8)
             .background(runtime.popupTheme.palette.canvas)
+            .preferredColorScheme(runtime.popupTheme.mode == .dark ? .dark : .light)
             .sbLocalization(runtime.localization, language: runtime.appLanguage)
         } label: {
             SlipBoardMenuBarLifecycleLabel(
@@ -2433,6 +2434,7 @@ struct SlipBoardApp: App {
                 onReceiveOpenSettings: { openSettingsAction = $0 }
             )
         }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SlipBoardSettingsRuntimeView(
