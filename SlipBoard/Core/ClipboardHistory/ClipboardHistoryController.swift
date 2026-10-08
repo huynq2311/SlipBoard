@@ -177,8 +177,12 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
             nextIndex = delta > 0 ? 0 : visibleItems.count - 1
         }
 
-        applySelectedItemID(visibleItems[nextIndex].id)
-        publishState()
+        // The target comes from visibleItems, so it needs no second visibility
+        // check, and the same list serves the selection normalisation below.
+        var snapshot = store.snapshot
+        snapshot.selectedItemID = visibleItems[nextIndex].id
+        _ = store.reset(with: snapshot)
+        publishState(visibleIDs: visibleItems.map(\.id))
     }
 
     func setPinned(_ isPinned: Bool, for itemID: String) {
@@ -325,9 +329,9 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
             }
             let snapshot = self.store.apply(sample)
             self.persistImageAssetIfNeeded(from: sample, snapshot: snapshot)
-            self.synchronizeSearchNotesRuntime()
+            // recordHistoryMutation publishes a retention snapshot, and that
+            // closure already re-syncs the search runtime and publishes state.
             self.retentionRuntime.recordHistoryMutation()
-            self.publishState()
         }
 
         monitor.onIgnoredSample = { [weak self] changeCount, reason in
@@ -343,8 +347,8 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         }
     }
 
-    private func publishState() {
-        normalizeSelectionIfNeeded()
+    private func publishState(visibleIDs: [String]? = nil) {
+        normalizeSelectionIfNeeded(visibleIDs: visibleIDs)
         let snapshot = store.snapshot
         onSnapshotDidChange?(snapshot)
         onProjectionDidChange?(
@@ -373,8 +377,8 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         return visibleIDs.compactMap { itemByID[$0] }
     }
 
-    private func normalizeSelectionIfNeeded() {
-        let visibleIDs = visibleHistoryItems().map(\.id)
+    private func normalizeSelectionIfNeeded(visibleIDs knownVisibleIDs: [String]? = nil) {
+        let visibleIDs = knownVisibleIDs ?? visibleHistoryItems().map(\.id)
         let nextSelectedID: String?
 
         if let currentSelectedID = store.snapshot.selectedItemID,

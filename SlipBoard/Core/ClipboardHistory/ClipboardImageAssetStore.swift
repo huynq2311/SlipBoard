@@ -11,7 +11,9 @@ final class ClipboardImageAssetStore {
     /// each keep their own copy of the same image bytes.
     private nonisolated(unsafe) static let memoryCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
-        cache.totalCostLimit = 64 * 1_024 * 1_024
+        // Only the selected clip's full bytes are ever read back, for the
+        // paste payload; disk is the source of truth for the rest.
+        cache.totalCostLimit = 24 * 1_024 * 1_024
         return cache
     }()
 
