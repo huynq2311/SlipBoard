@@ -199,6 +199,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount,
             kSecValueData: payloadKeyData,
@@ -238,6 +239,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         let context = makeAuthenticationContext()
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount,
             kSecReturnData: true,
@@ -261,6 +263,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
         let baseQuery: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.metadataService,
             kSecAttrAccount: Constants.metadataAccount
         ]
@@ -289,6 +292,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrKeySizeInBits: 256,
             kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
+            kSecUseDataProtectionKeychain: true,
             kSecPrivateKeyAttrs: [
                 kSecAttrIsPermanent: true,
                 kSecAttrApplicationTag: tagData,
@@ -305,6 +309,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         let context = makeAuthenticationContext()
         let query: [CFString: Any] = [
             kSecClass: kSecClassKey,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrApplicationTag: tagData,
             kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
             kSecReturnRef: true,
@@ -325,6 +330,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         let tagData = Data(Constants.secureEnclaveKeyTag.utf8)
         let query: [CFString: Any] = [
             kSecClass: kSecClassKey,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrApplicationTag: tagData,
             kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom
         ]
@@ -336,6 +342,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     private func deleteFallbackKeychainItem() -> Bool {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount
         ]
@@ -355,6 +362,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     private static func loadWrappedKeyRecord(decoder: JSONDecoder) -> WrappedPayloadKey? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.metadataService,
             kSecAttrAccount: Constants.metadataAccount,
             kSecReturnData: true

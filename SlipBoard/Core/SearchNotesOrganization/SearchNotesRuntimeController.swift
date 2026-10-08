@@ -81,7 +81,9 @@ final class SearchNotesRuntimeController: SearchNotesRuntimeProviding {
         if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             matchingIDs = Set(latestQueryResult.matches.map(\.itemID))
         } else if selectedGroupID == .all {
-            matchingIDs = Set(filteredItems.map(\.id))
+            // Every filtered item matches, so the Set round trip below would
+            // hand back the same list.
+            return filteredItems.map(\.id)
         } else {
             matchingIDs = Set(
                 filteredItems

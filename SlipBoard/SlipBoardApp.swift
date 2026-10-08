@@ -25,6 +25,9 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     @Published private(set) var bridgeSnapshot: BridgeRuntimeSnapshot
     @Published private(set) var isLaunchAtLoginEnabled: Bool
     @Published private(set) var searchFocusRequestToken: Int = 0
+    /// Bumped each time the popup reopens from a closed state. The rails read
+    /// it to reset their scroll offset.
+    @Published private(set) var popupPresentationID: Int = 0
     // nil = no manual override yet, follow whether pinned has any clips.
     @Published private(set) var manualPinnedCollapsed: Bool? = nil
     @Published var organizationDraftName: String
@@ -540,11 +543,14 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func setSearchPresented(_ isPresented: Bool) {
         recordSecurityInteraction()
+        let didChange = isSearchPresented != isPresented
         isSearchPresented = isPresented
 
         if isPresented == false, popupState.searchQuery.isEmpty == false {
             controller.updateSearchQuery("")
-        } else {
+        } else if didChange {
+            // Closing the popup calls this with search already dismissed, and
+            // reprojecting the whole history then changes nothing.
             publishCurrentProjection()
         }
     }
@@ -589,6 +595,21 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             .flatMap(PopupAppearance.init(rawValue:))
             ?? PopupThemeSelection.fallback.appearance
         return PopupThemeSelection(themeID: themeID, appearance: appearance)
+    }
+
+    /// Everything the popup panel's geometry and chrome depend on. The menu
+    /// bar label observes this instead of the full view state so a content-only
+    /// change no longer re-presents the panel or redraws the status item.
+    var popupWindowKey: SBPopupWindowKey {
+        SBPopupWindowKey(
+            isPresented: isPopupPresented,
+            isSuppressed: shouldSuppressPopupPresentation,
+            revealsProtectedContent: securitySnapshot.lockState.revealsProtectedContent,
+            isPinnedCollapsed: isPinnedCollapsed,
+            reservesOverlayHeadroom: pasteOverlayState.isPresented
+                && pasteOverlayState.kind == .pasteTransformMenu,
+            usesGlassShellMargin: popupTheme.treatment == .liquidGlass
+        )
     }
 
     var isPinnedCollapsed: Bool {
@@ -884,12 +905,15 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         return result
     }
 
+    var onAccessibilityPermissionRequired: (() -> Void)?
+
     func showPastePermissionRequired() {
         runtimeStatusOverride = RuntimeStatusOverride(
             message: localization.text(.alertAccessibilityMessage),
             tone: .warning
         )
         publishCurrentProjection()
+        onAccessibilityPermissionRequired?()
     }
 
     func showPasteTargetUnavailable() {
@@ -903,6 +927,9 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func setPopupPresented(_ isPresented: Bool) {
         if isPresented {
+            if isPopupPresented == false {
+                popupPresentationID += 1
+            }
             shellCoordinator.showPopup()
         } else {
             shellCoordinator.closePopup()
@@ -1130,7 +1157,10 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     }
 
     private func updateSecuritySettings(_ mutate: (inout SecuritySettings) -> Void) {
-        var settings = securitySnapshot.settings
+        // `securitySnapshot` is mirrored onto the main queue asynchronously, so
+        // two changes in one turn would have the second start from stale
+        // settings and undo the first. The runtime's own copy is current.
+        var settings = securityRuntime.latestSnapshot.settings
         mutate(&settings)
         settings.lastUpdatedAt = .now
         securityRuntime.updateSettings(settings)
@@ -2397,35 +2427,20 @@ struct SlipBoardApp: App {
     @State private var didInitializeShellLifecycle = false
     @State private var wasPopupPresented = false
     @State private var openSettingsAction: OpenSettingsAction?
-    @State private var popupPresentationID = 0
 
     var body: some Scene {
         MenuBarExtra {
-            SBMenuBarDropdownShell(
-                theme: runtime.popupTheme,
-                summary: runtime.localizedMenuBarSummary,
-                securitySnapshot: runtime.securitySnapshot,
-                onSelectQuickRetention: runtime.selectQuickRetention,
+            SBMenuBarDropdownRuntimeView(
+                runtime: runtime,
                 onSelectCommand: handleMenuCommand
             )
-            .padding(8)
-            .background(runtime.popupTheme.palette.canvas)
-            .sbLocalization(runtime.localization, language: runtime.appLanguage)
         } label: {
             SlipBoardMenuBarLifecycleLabel(
                 title: "SlipBoard",
-                badgeText: runtime.localizedMenuBarSummary.badgeText,
+                badgeText: runtime.menuBarSummary.badgeText,
                 theme: runtime.popupTheme,
                 securitySnapshot: runtime.securitySnapshot,
-                popupState: runtime.localizedPopupState,
-                filterOptions: runtime.localizedFilterOptions,
-                searchNotesState: runtime.searchNotesState,
-                exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
-                pasteOverlayState: runtime.pasteOverlayState,
-                supportedTransformActionIDs: runtime.supportedTransformActionIDs,
-                isPopupPresented: runtime.isPopupPresented,
-                manualPinnedCollapsed: runtime.manualPinnedCollapsed,
-                appLanguage: runtime.appLanguage,
+                windowKey: runtime.popupWindowKey,
                 onInitialAppear: initializeShellLifecycleIfNeeded,
                 onAppDidBecomeActive: handleAppDidBecomeActive,
                 onAppWillTerminate: handleAppWillTerminate,
@@ -2433,6 +2448,7 @@ struct SlipBoardApp: App {
                 onReceiveOpenSettings: { openSettingsAction = $0 }
             )
         }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SlipBoardSettingsRuntimeView(
@@ -2455,6 +2471,9 @@ struct SlipBoardApp: App {
             if runtime.isPopupPresented != isVisible {
                 runtime.setPopupPresented(isVisible)
             }
+        }
+        runtime.onAccessibilityPermissionRequired = {
+            presentAccessibilityPermissionAlertIfNeeded()
         }
         popupPresentationController.onDeleteRequested = {
             runtime.deleteSelectedClip()
@@ -2485,12 +2504,14 @@ struct SlipBoardApp: App {
         runtime.focusSettings(on: .general)
         runtime.startMonitoring()
         didInitializeShellLifecycle = true
-        presentAccessibilityPermissionAlertIfNeeded()
         popupPresentationController.prewarm(content: popupContent)
         syncPopupPresentation()
     }
 
-    private func presentAccessibilityPermissionAlertIfNeeded() {
+    /// Shown when a paste actually fails for want of Accessibility access.
+    /// At launch this ran a modal loop that blocked the whole app before the
+    /// user had asked it to do anything.
+    func presentAccessibilityPermissionAlertIfNeeded() {
         guard AXIsProcessTrusted() == false else { return }
 
         DispatchQueue.main.async {
@@ -2528,7 +2549,6 @@ struct SlipBoardApp: App {
         if wasPopupPresented == false {
             let firstClipID = runtime.popupState.recentClips.first?.id
             runtime.selectClip(id: firstClipID)
-            popupPresentationID += 1
         }
         wasPopupPresented = true
 
@@ -2547,48 +2567,14 @@ struct SlipBoardApp: App {
     }
 
     private func popupContent() -> some View {
-        ClipboardHistoryPopupView(
-            theme: runtime.popupTheme,
-            filters: runtime.localizedFilterOptions,
-            state: runtime.localizedPopupState,
-            exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
-            searchNotesState: runtime.searchNotesState,
-            securitySnapshot: runtime.securitySnapshot,
-            pasteOverlayState: runtime.pasteOverlayState,
-            supportedTransformActionIDs: runtime.supportedTransformActionIDs,
-            searchFocusRequestToken: runtime.searchFocusRequestToken,
-            onToggleSearchPresented: runtime.setSearchPresented,
-            onSearchQueryChange: runtime.updateSearchQuery,
-            onSelectFilter: runtime.selectFilter,
-            onSelectThemePreview: runtime.selectThemePreview,
-            onSelectOrganizationGroup: runtime.selectOrganizationGroup,
+        SBPopupRootView(
+            runtime: runtime,
             onPauseCapture: { handleMenuCommand("pause-capturing") },
             onClearHistory: handleClearHistoryCommand,
             onOpenSettings: { handleMenuCommand("open-settings") },
-            onQuit: { NSApplication.shared.terminate(nil) },
-            onSelectClipID: runtime.selectClip,
-            onMoveSelection: runtime.moveSelection,
-            onDeleteSelectedClip: runtime.deleteSelectedClip,
-            onToggleNoteEditor: runtime.toggleNoteEditor,
-            onUpdateNoteDraft: runtime.updateNoteDraft,
-            onSaveNoteDraft: runtime.saveNoteDraft,
-            onCancelNoteEditing: runtime.cancelNoteEditing,
-            onClearNote: runtime.clearNote,
-            onOpenContextMenu: runtime.openContextMenu,
-            onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
-            onCloseActiveOverlay: runtime.closeActiveOverlay,
-            onHighlightContextAction: runtime.highlightContextAction,
             onPerformContextAction: handleContextAction,
-            onHighlightTransformAction: runtime.highlightTransformAction,
-            onSelectTransformAction: runtime.selectTransformAction,
-            onExecutePasteAction: handlePasteAction,
-            isPinnedCollapsed: runtime.isPinnedCollapsed,
-            onTogglePinnedCollapsed: runtime.togglePinnedCollapsed
+            onExecutePasteAction: handlePasteAction
         )
-        .padding(popupShellMargin)
-        .environment(\.sbPopupPresentationID, popupPresentationID)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .sbLocalization(runtime.localization, language: runtime.appLanguage)
     }
 
     private func handleMenuCommand(_ commandID: String) {
@@ -2673,15 +2659,7 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
     let badgeText: String?
     let theme: SBTheme
     let securitySnapshot: SecurityRuntimeSnapshot
-    let popupState: PopupShellViewState
-    let filterOptions: [PopupFilterOption]
-    let searchNotesState: SearchNotesProjectionState
-    let exclusionsPauseSnapshot: ExclusionsPauseSnapshot
-    let pasteOverlayState: PasteActionOverlayState
-    let supportedTransformActionIDs: Set<PasteActionID>
-    let isPopupPresented: Bool
-    let manualPinnedCollapsed: Bool?
-    let appLanguage: AppLanguage
+    let windowKey: SBPopupWindowKey
     let onInitialAppear: () -> Void
     let onAppDidBecomeActive: () -> Void
     let onAppWillTerminate: () -> Void
@@ -2709,36 +2687,84 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             onAppWillTerminate()
         }
-        .onChange(of: isPopupPresented) { _, _ in
+        .onChange(of: windowKey) { _, _ in
             onSyncPopupPresentation()
         }
-        .onChange(of: manualPinnedCollapsed) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: appLanguage) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: popupState) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: filterOptions) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: searchNotesState) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: securitySnapshot) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: exclusionsPauseSnapshot) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: pasteOverlayState) { _, _ in
-            onSyncPopupPresentation()
-        }
-        .onChange(of: supportedTransformActionIDs) { _, _ in
-            onSyncPopupPresentation()
-        }
+    }
+}
+
+/// Builds the dropdown's localized summary inside its own body so the work
+/// only happens while the menu is actually on screen.
+private struct SBMenuBarDropdownRuntimeView: View {
+    @ObservedObject var runtime: ClipboardHistoryAppRuntime
+    let onSelectCommand: (String) -> Void
+
+    var body: some View {
+        SBMenuBarDropdownShell(
+            theme: runtime.popupTheme,
+            summary: runtime.localizedMenuBarSummary,
+            securitySnapshot: runtime.securitySnapshot,
+            onSelectQuickRetention: runtime.selectQuickRetention,
+            onSelectCommand: onSelectCommand
+        )
+        .padding(8)
+        .background(runtime.popupTheme.palette.canvas)
+        .preferredColorScheme(runtime.popupTheme.mode == .dark ? .dark : .light)
+        .sbLocalization(runtime.localization, language: runtime.appLanguage)
+    }
+}
+
+private struct SBPopupRootView: View {
+    @ObservedObject var runtime: ClipboardHistoryAppRuntime
+    let onPauseCapture: () -> Void
+    let onClearHistory: () -> Void
+    let onOpenSettings: () -> Void
+    let onPerformContextAction: (String) -> Void
+    let onExecutePasteAction: (PasteActionID, PasteActionCloseBehavior) -> Void
+
+    var body: some View {
+        ClipboardHistoryPopupView(
+            theme: runtime.popupTheme,
+            filters: runtime.localizedFilterOptions,
+            state: runtime.localizedPopupState,
+            exclusionsPauseSnapshot: runtime.exclusionsPauseSnapshot,
+            searchNotesState: runtime.searchNotesState,
+            securitySnapshot: runtime.securitySnapshot,
+            pasteOverlayState: runtime.pasteOverlayState,
+            supportedTransformActionIDs: runtime.supportedTransformActionIDs,
+            searchFocusRequestToken: runtime.searchFocusRequestToken,
+            onToggleSearchPresented: runtime.setSearchPresented,
+            onSearchQueryChange: runtime.updateSearchQuery,
+            onSelectFilter: runtime.selectFilter,
+            onSelectThemePreview: runtime.selectThemePreview,
+            onSelectOrganizationGroup: runtime.selectOrganizationGroup,
+            onPauseCapture: onPauseCapture,
+            onClearHistory: onClearHistory,
+            onOpenSettings: onOpenSettings,
+            onQuit: { NSApplication.shared.terminate(nil) },
+            onSelectClipID: runtime.selectClip,
+            onMoveSelection: runtime.moveSelection,
+            onDeleteSelectedClip: runtime.deleteSelectedClip,
+            onToggleNoteEditor: runtime.toggleNoteEditor,
+            onUpdateNoteDraft: runtime.updateNoteDraft,
+            onSaveNoteDraft: runtime.saveNoteDraft,
+            onCancelNoteEditing: runtime.cancelNoteEditing,
+            onClearNote: runtime.clearNote,
+            onOpenContextMenu: runtime.openContextMenu,
+            onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
+            onCloseActiveOverlay: runtime.closeActiveOverlay,
+            onHighlightContextAction: runtime.highlightContextAction,
+            onPerformContextAction: onPerformContextAction,
+            onHighlightTransformAction: runtime.highlightTransformAction,
+            onSelectTransformAction: runtime.selectTransformAction,
+            onExecutePasteAction: onExecutePasteAction,
+            isPinnedCollapsed: runtime.isPinnedCollapsed,
+            onTogglePinnedCollapsed: runtime.togglePinnedCollapsed
+        )
+        .padding(runtime.popupTheme.treatment == .liquidGlass ? SBPopupLayoutMetrics.glassShellMargin : EdgeInsets())
+        .environment(\.sbPopupPresentationID, runtime.popupPresentationID)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .sbLocalization(runtime.localization, language: runtime.appLanguage)
     }
 }
 

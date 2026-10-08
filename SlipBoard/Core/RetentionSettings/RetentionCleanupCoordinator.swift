@@ -86,7 +86,13 @@ final class RetentionCleanupCoordinator: RetentionCleanupCoordinating {
             )
         }
 
-        let clipsByID = Dictionary(uniqueKeysWithValues: request.storedClips.map { ($0.id, $0) })
+        // Clip ids are derived from the pasteboard change count, which is not
+        // unique across pasteboard server restarts, so the stored clips can
+        // contain the same id twice. Trapping here crashed the app on launch.
+        let clipsByID = Dictionary(
+            request.storedClips.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
         let removedClips = plan.clipIDsToRemove.compactMap { clipsByID[$0] }
 
         _ = retentionStore.removeStoredClips(ids: plan.clipIDsToRemove)

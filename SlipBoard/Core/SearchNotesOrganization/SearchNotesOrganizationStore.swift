@@ -5,6 +5,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
     private let payloadStore: ProtectedPayloadManaging
     private let decryptedPayloadCache: DecryptedPayloadCache
     private var historyItemsByID: [String: ClipboardHistoryItem]
+    private var lastSyncIncludedProtectedContent: Bool?
 
     init(
         indexStore: (SearchIndexStoring & OrganizationGroupStoring) = SQLiteSearchIndexStore(),
@@ -15,6 +16,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
         self.payloadStore = payloadStore
         self.decryptedPayloadCache = decryptedPayloadCache
         self.historyItemsByID = [:]
+        self.lastSyncIncludedProtectedContent = nil
     }
 
     var snapshot: SearchIndexSnapshot {
@@ -81,6 +83,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
     }
 
     func synchronizeHistoryItems(_ items: [ClipboardHistoryItem], includeProtectedContent: Bool) {
+        let previousItemsByID = historyItemsByID
         historyItemsByID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         let nextIDs = Set(items.map(\.id))
         let staleIDs = snapshot.documents
@@ -96,14 +99,28 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
             _ = indexStore.removeDocuments(ids: staleIDs)
         }
 
+        var didMigratePayloads = false
         if includeProtectedContent,
            payloadStore.activeWrappedKey != nil,
            payloadStore.keyMaterialState.hasUnwrappedKeyInMemory
         {
             _ = migrateProtectedPayloadsIfNeeded()
+            didMigratePayloads = true
         }
 
-        let documents = items.map { makeDocument(from: $0, includeProtectedContent: includeProtectedContent) }
+        // A single capture used to rebuild and upsert a document for every
+        // item in the history. Only items that actually changed need one,
+        // except when the protected-content mode flipped or payloads were
+        // rewritten underneath unchanged items.
+        let needsFullPass = didMigratePayloads
+            || lastSyncIncludedProtectedContent != includeProtectedContent
+        lastSyncIncludedProtectedContent = includeProtectedContent
+        let itemsToIndex = needsFullPass
+            ? items
+            : items.filter { previousItemsByID[$0.id] != $0 }
+
+        guard itemsToIndex.isEmpty == false else { return }
+        let documents = itemsToIndex.map { makeDocument(from: $0, includeProtectedContent: includeProtectedContent) }
         _ = indexStore.upsertDocuments(documents)
     }
 

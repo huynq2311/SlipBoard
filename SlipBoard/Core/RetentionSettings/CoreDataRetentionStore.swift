@@ -71,18 +71,33 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             let existingObjects = (try? context.fetch(request)) ?? []
             let incomingIDs = Set(clips.map(\.id))
+            // The bulk fetch above already has every stored object, so index it
+            // instead of running one predicate fetch per clip.
+            var objectsByID: [String: NSManagedObject] = [:]
+            objectsByID.reserveCapacity(existingObjects.count)
 
-            for object in existingObjects where incomingIDs.contains((object.value(forKey: "id") as? String) ?? "") == false {
-                context.delete(object)
+            for object in existingObjects {
+                let id = (object.value(forKey: "id") as? String) ?? ""
+                // Nothing constrains the id column, so drop rows this pass no
+                // longer stores and any second row for an id already seen.
+                guard incomingIDs.contains(id), objectsByID[id] == nil else {
+                    context.delete(object)
+                    continue
+                }
+                objectsByID[id] = object
             }
 
             for clip in clips {
-                let object = fetchClipObject(id: clip.id, in: context)
-                    ?? NSEntityDescription.insertNewObject(
+                if let object = objectsByID[clip.id] {
+                    Self.populate(object: object, with: clip)
+                } else {
+                    let object = NSEntityDescription.insertNewObject(
                         forEntityName: Self.clipEntityName,
                         into: context
                     )
-                Self.populate(object: object, with: clip)
+                    objectsByID[clip.id] = object
+                    Self.populate(object: object, with: clip)
+                }
             }
         }
     }
@@ -128,7 +143,10 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         performFetch { context in
             let retentionSettings = fetchRetentionSettings(in: context)
             let assetCacheSettings = fetchAssetCacheSettings(in: context)
-            let clips = fetchStoredClips(in: context)
+            // Collapse any duplicate id already on disk so the rest of the app
+            // sees one clip per id until replaceStoredClips deletes the extra.
+            var seenIDs = Set<String>()
+            let clips = fetchStoredClips(in: context).filter { seenIDs.insert($0.id).inserted }
             return RetentionPersistenceSnapshot(
                 retentionSettings: retentionSettings,
                 assetCacheSettings: assetCacheSettings,

@@ -265,6 +265,17 @@ struct MenuBarCommandRow: Identifiable, Hashable {
     }
 }
 
+/// The popup panel's geometry and chrome inputs, kept apart from the popup's
+/// content so a content-only change does not re-present the panel.
+struct SBPopupWindowKey: Hashable {
+    var isPresented: Bool
+    var isSuppressed: Bool
+    var revealsProtectedContent: Bool
+    var isPinnedCollapsed: Bool
+    var reservesOverlayHeadroom: Bool
+    var usesGlassShellMargin: Bool
+}
+
 struct MenuBarSummaryState: Hashable {
     var itemCount: Int
     var itemCountLabel: String

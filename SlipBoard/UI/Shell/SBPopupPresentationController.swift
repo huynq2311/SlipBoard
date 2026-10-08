@@ -99,8 +99,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         installEscapeKeyMonitorIfNeeded()
         installOutsideClickMonitorIfNeeded()
 
-        if let hostingController {
-            hostingController.rootView = rootView
+        if hostingController != nil {
+            // The installed root view observes the runtime, so it already
+            // reflects the current state; re-pushing it here would make
+            // SwiftUI rebuild and re-compare the whole popup graph.
             updatePanelAppearance(isLocked: isLocked)
             if let panel {
                 if panel.isVisible {
@@ -369,6 +371,9 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.presentationDuration
+            // Ease out so the panel leads with its fastest movement, which
+            // reads as more responsive than the default ease-in-ease-out.
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             context.allowsImplicitAnimation = true
             panel.animator().alphaValue = 1
             panel.animator().setFrame(targetFrame, display: true)

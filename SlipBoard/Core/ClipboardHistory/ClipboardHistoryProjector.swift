@@ -480,7 +480,9 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             return "\(hours)h"
         }
 
-        if Calendar.current.isDateInYesterday(date) {
+        // Yesterday is at most about two days back, so skip the Calendar
+        // lookup for the long tail of older clips.
+        if hours < 72, Calendar.current.isDateInYesterday(date) {
             return "Yesterday"
         }
 
@@ -489,10 +491,16 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             return "\(days)d"
         }
 
+        return monthDayFormatter.string(from: date)
+    }
+
+    // Built once: creating a DateFormatter for every old clip on every
+    // projection was a large share of the cost of changing the selection.
+    private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
+        return formatter
+    }()
 
     private func clipKind(for kind: ClipboardHistoryKind) -> ClipKind {
         switch kind {

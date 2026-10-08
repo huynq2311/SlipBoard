@@ -2,7 +2,13 @@ import AppKit
 import SwiftUI
 
 private nonisolated enum SBClipThumbnailCache {
-    static let shared = NSCache<NSString, NSImage>()
+    static let shared: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        // Without a limit the decoded card thumbnails were never evicted, so
+        // the cache grew for as long as the user kept scrolling image clips.
+        cache.totalCostLimit = 32 * 1_024 * 1_024
+        return cache
+    }()
     static let assetStore = ClipboardImageAssetStore()
 }
 
@@ -284,17 +290,17 @@ struct SBClipCardShell: View {
         guard clip.kind == .image, cachedThumbnailImage == nil else { return }
 
         let clipID = clip.id
-        let decoded = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+        let decoded = await Task.detached(priority: .userInitiated) { () -> (NSImage, Int)? in
             // 768 px covers the largest card (264 x 190 pt) at 2x with room for
             // aspect-fill cropping.
             guard let thumbnail = SBClipThumbnailCache.assetStore.thumbnail(for: clipID, maxPixelSize: 768) else {
                 return nil
             }
-            return NSImage(cgImage: thumbnail, size: .zero)
+            return (NSImage(cgImage: thumbnail, size: .zero), thumbnail.bytesPerRow * thumbnail.height)
         }.value
 
-        guard let decoded else { return }
-        SBClipThumbnailCache.shared.setObject(decoded, forKey: clipID as NSString)
+        guard let (decoded, cost) = decoded else { return }
+        SBClipThumbnailCache.shared.setObject(decoded, forKey: clipID as NSString, cost: cost)
         if clip.id == clipID {
             loadedThumbnail = decoded
         }
@@ -605,6 +611,8 @@ private struct SBRightClickGesture: NSViewRepresentable {
 }
 
 private enum SBRichTextPreview {
+    private static let previewCharacterLimit = 1_200
+
     static func makeAttributedString(from rtfData: Data, theme: SBTheme) -> AttributedString? {
         guard let source = try? NSAttributedString(
             data: rtfData,
@@ -614,7 +622,12 @@ private enum SBRichTextPreview {
             return nil
         }
 
-        let normalized = NSMutableAttributedString(attributedString: source)
+        // A card shows at most eight lines, so styling and handing SwiftUI the
+        // whole document only to truncate it is wasted layout work.
+        let previewSource = source.length > previewCharacterLimit
+            ? source.attributedSubstring(from: NSRange(location: 0, length: previewCharacterLimit))
+            : source
+        let normalized = NSMutableAttributedString(attributedString: previewSource)
         let range = NSRange(location: 0, length: normalized.length)
         normalized.enumerateAttribute(.font, in: range) { value, attributeRange, _ in
             let sourceFont = value as? NSFont
