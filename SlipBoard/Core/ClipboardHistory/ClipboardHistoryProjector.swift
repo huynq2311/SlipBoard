@@ -209,7 +209,8 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             createdLabel: createdLabel(for: item),
             previewStyle: clipPreviewStyle(for: item.previewStyle),
             secondaryBadgeText: item.secondaryBadgeText,
-            richTextRTFData: isLocked ? nil : item.richTextRTFData
+            richTextRTFData: isLocked ? nil : item.richTextRTFData,
+            filePaths: isLocked ? [] : item.filePaths
         )
     }
 
