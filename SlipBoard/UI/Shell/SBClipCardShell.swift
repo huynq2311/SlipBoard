@@ -10,6 +10,8 @@ private nonisolated enum SBClipThumbnailCache {
         return cache
     }()
     static let assetStore = ClipboardImageAssetStore()
+    static let pixelSizes = NSCache<NSString, NSValue>()
+    static let characterCounts = NSCache<NSString, NSNumber>()
 }
 
 /// Carries each visible card's bounds up to the popup shell so its action
@@ -43,6 +45,16 @@ struct SBClipCardShell: View {
 
     @State private var isHovering = false
     @State private var loadedThumbnail: NSImage?
+    @State private var loadedPixelSize: CGSize?
+    @State private var loadedFileBytes: Int64?
+    @State private var loadedCharacterCount: Int?
+
+    private static let footerHeight: CGFloat = 27
+
+    private struct FooterTaskKey: Hashable {
+        let clipID: String
+        let isVisible: Bool
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -63,11 +75,20 @@ struct SBClipCardShell: View {
                     .frame(
                         maxWidth: .infinity,
                         minHeight: 0,
-                        maxHeight: max(0, proxy.size.height - 34),
+                        maxHeight: max(0, proxy.size.height - 34 - footerReservedHeight),
                         alignment: .topLeading
                     )
                     .clipped()
+
+                if showsFooter {
+                    footer
+                }
             }
+        }
+        // Keyed on visibility too, so a card hidden by App Lock loads its
+        // metrics once it is unlocked instead of staying blank.
+        .task(id: FooterTaskKey(clipID: clip.id, isVisible: showsFooter)) {
+            await loadFooterMetricsIfNeeded()
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .background {
@@ -104,6 +125,22 @@ struct SBClipCardShell: View {
         }
     }
 
+    // A redacted card keeps the lock glyph so it does not reveal the source app.
+    @ViewBuilder
+    private var headerAvatar: some View {
+        if isPreviewRedacted {
+            SBIconAvatar(symbolName: redactionSymbolName, accentToken: clip.sourceApp.accentToken, theme: theme, size: 20)
+        } else {
+            SBSourceAppAvatar(
+                appID: clip.sourceApp.id,
+                symbolName: clip.sourceApp.symbolName,
+                accentToken: clip.sourceApp.accentToken,
+                theme: theme,
+                size: 20
+            )
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: theme.spacing.control6) {
             HStack(spacing: 6) {
@@ -134,12 +171,7 @@ struct SBClipCardShell: View {
                 .fixedSize(horizontal: true, vertical: false)
 
             Button(action: handleHeaderTap) {
-                SBIconAvatar(
-                    symbolName: isPreviewRedacted ? redactionSymbolName : clip.sourceApp.symbolName,
-                    accentToken: clip.sourceApp.accentToken,
-                    theme: theme,
-                    size: 20
-                )
+                headerAvatar
                 .overlay(alignment: .bottomTrailing) {
                     if clip.hasNote && isPreviewRedacted == false {
                         Circle()
@@ -421,10 +453,107 @@ struct SBClipCardShell: View {
         }
     }
 
+    // Colors have nothing worth measuring, and a redacted card must not reveal
+    // the length, size or dimensions of what it hides.
+    private var showsFooter: Bool {
+        guard isPreviewRedacted == false else { return false }
+        return clip.kind != .color
+    }
+
+    private var footerReservedHeight: CGFloat {
+        showsFooter ? Self.footerHeight : 0
+    }
+
+    private var footer: some View {
+        Text(footerText ?? " ")
+            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .foregroundStyle(theme.palette.textTertiary)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            // Lifts the text off the card's bottom edge.
+            .padding(.bottom, 5)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(height: Self.footerHeight)
+    }
+
+    private var footerText: String? {
+        switch clip.kind {
+        case .text, .code, .richText, .url:
+            guard let count = characterCount else { return nil }
+            let key: LocalizationKey = count == 1 ? .cardCharacterCountSingular : .cardCharacterCountPlural
+            return copy.text(key, ["count": count.formatted(.number.locale(Locale(identifier: copy.currentLanguage.localeIdentifier)))])
+        case .image:
+            guard let size = loadedPixelSize ?? SBClipThumbnailCache.pixelSizes.object(forKey: clip.id as NSString)?.sizeValue else {
+                return nil
+            }
+            return "\(Int(size.width))x\(Int(size.height))"
+        case .file:
+            guard let bytes = loadedFileBytes else { return nil }
+            return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        case .color:
+            return nil
+        }
+    }
+
+    // Counting characters walks the whole string (about 16 ms per MB of
+    // non-ASCII text), and a card redraws on every selection change. Short
+    // text is counted inline; long text is counted once in the background.
+    private static let inlineCountByteLimit = 20_000
+
+    private var characterCount: Int? {
+        if clip.titleText.utf8.count <= Self.inlineCountByteLimit {
+            return clip.titleText.count
+        }
+        return loadedCharacterCount
+            ?? SBClipThumbnailCache.characterCounts.object(forKey: clip.id as NSString)?.intValue
+    }
+
+    private func loadFooterMetricsIfNeeded() async {
+        guard showsFooter else { return }
+        let clipID = clip.id
+
+        switch clip.kind {
+        case .text, .code, .richText, .url:
+            guard clip.titleText.utf8.count > Self.inlineCountByteLimit,
+                  SBClipThumbnailCache.characterCounts.object(forKey: clipID as NSString) == nil else { return }
+            let text = clip.titleText
+            let count = await Task.detached(priority: .utility) { text.count }.value
+            SBClipThumbnailCache.characterCounts.setObject(NSNumber(value: count), forKey: clipID as NSString)
+            loadedCharacterCount = count
+        case .image:
+            if let cached = SBClipThumbnailCache.pixelSizes.object(forKey: clipID as NSString) {
+                loadedPixelSize = cached.sizeValue
+                return
+            }
+            let size = await Task.detached(priority: .utility) {
+                SBClipThumbnailCache.assetStore.pixelSize(for: clipID)
+            }.value
+            guard let size else { return }
+            SBClipThumbnailCache.pixelSizes.setObject(NSValue(size: size), forKey: clipID as NSString)
+            loadedPixelSize = size
+        case .file:
+            let paths = clip.filePaths
+            loadedFileBytes = await Task.detached(priority: .utility) {
+                var total: Int64 = 0
+                var foundAny = false
+                for path in paths {
+                    let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+                    guard attributes?[.type] as? FileAttributeType == .typeRegular,
+                          let size = attributes?[.size] as? NSNumber else { continue }
+                    total += size.int64Value
+                    foundAny = true
+                }
+                return foundAny ? total : nil
+            }.value
+        default:
+            break
+        }
+    }
+
     // Rough line-count the taller card's preview area can hold, so text/code
     // previews actually use the extra height instead of leaving it blank.
     private var bodyLineLimit: Int {
-        let bodyAreaHeight = height - 34 - 24
+        let bodyAreaHeight = height - 34 - 24 - footerReservedHeight
         let approxLineHeight: CGFloat = 16
         return max(3, Int((bodyAreaHeight / approxLineHeight).rounded(.down)))
     }
@@ -684,6 +813,65 @@ private struct SBRichTextPreviewFallback: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.accentBackground(for: .primary).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
+    }
+}
+
+/// The real icon of the app a clip was copied from. `appID` is the source
+/// app's bundle id; when no installed app has it (or it is just a display
+/// name), the symbol avatar is shown instead.
+private struct SBSourceAppAvatar: View {
+    let appID: String
+    let symbolName: String?
+    let accentToken: String
+    let theme: SBTheme
+    let size: CGFloat
+
+    @State private var icon: NSImage?
+
+    var body: some View {
+        Group {
+            if let icon = icon ?? SBSourceAppIconCache.cachedIcon(for: appID) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: size, height: size)
+            } else {
+                SBIconAvatar(symbolName: symbolName, accentToken: accentToken, theme: theme, size: size)
+            }
+        }
+        .task(id: appID) {
+            icon = await SBSourceAppIconCache.icon(for: appID)
+        }
+    }
+}
+
+private nonisolated enum SBSourceAppIconCache {
+    private static let icons = NSCache<NSString, NSImage>()
+    // Ids with no installed app, so the lookup is not repeated on every draw.
+    private static let unresolved = NSCache<NSString, NSNumber>()
+
+    static func cachedIcon(for appID: String) -> NSImage? {
+        icons.object(forKey: appID as NSString)
+    }
+
+    static func icon(for appID: String) async -> NSImage? {
+        if let cached = cachedIcon(for: appID) { return cached }
+        if unresolved.object(forKey: appID as NSString) != nil { return nil }
+
+        let resolved = await Task.detached(priority: .utility) { () -> NSImage? in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: appID) else { return nil }
+            let image = NSWorkspace.shared.icon(forFile: url.path)
+            // Twice the 20 pt avatar, so it stays sharp on Retina without keeping the full icns.
+            image.size = NSSize(width: 40, height: 40)
+            return image
+        }.value
+
+        if let resolved {
+            icons.setObject(resolved, forKey: appID as NSString)
+        } else {
+            unresolved.setObject(1, forKey: appID as NSString)
+        }
+        return resolved
     }
 }
 

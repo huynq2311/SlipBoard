@@ -119,6 +119,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case commonOpen
     case commonNow
     case contentText
+    case cardCharacterCountSingular
+    case cardCharacterCountPlural
     case contentCode
     case contentImage
     case contentFile
@@ -581,6 +583,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .commonOpen: "Open"
         case .commonNow: "Now"
         case .contentText: "Text"
+        case .cardCharacterCountSingular: "%{count} character"
+        case .cardCharacterCountPlural: "%{count} characters"
         case .contentCode: "Code"
         case .contentImage: "Image"
         case .contentFile: "File"
@@ -1084,6 +1088,8 @@ struct LocalizationCatalog: Sendable {
         .commonOpen: "Mở",
         .commonNow: "Bây giờ",
         .contentText: "Văn bản",
+        .cardCharacterCountSingular: "%{count} ký tự",
+        .cardCharacterCountPlural: "%{count} ký tự",
         .contentCode: "Mã",
         .contentImage: "Hình ảnh",
         .contentFile: "Tệp",

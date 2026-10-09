@@ -74,6 +74,28 @@ final class ClipboardImageAssetStore {
         )
     }
 
+    /// Pixel size read from the image header; the image is not decoded.
+    nonisolated func pixelSize(for clipID: String) -> CGSize? {
+        let source = Self.memoryCache.object(forKey: clipID as NSString)
+            .flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }
+            ?? CGImageSourceCreateWithURL(url(for: clipID) as CFURL, nil)
+        guard let source,
+              let properties = CGImageSourceCopyPropertiesAtIndex(
+                  source,
+                  CGImageSourceGetPrimaryImageIndex(source),
+                  nil
+              ) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int
+        else { return nil }
+
+        // EXIF orientations 5-8 are rotated a quarter turn, so width and height swap.
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        return (5...8).contains(orientation)
+            ? CGSize(width: height, height: width)
+            : CGSize(width: width, height: height)
+    }
+
     /// Rewrites assets that earlier builds saved as uncompressed TIFF as
     /// lossless PNG. Files are handled one at a time and TIFF is detected from
     /// the bytes, so an interrupted pass simply continues on the next launch.
