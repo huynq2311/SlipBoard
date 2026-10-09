@@ -125,6 +125,22 @@ struct SBClipCardShell: View {
         }
     }
 
+    // A redacted card keeps the lock glyph so it does not reveal the source app.
+    @ViewBuilder
+    private var headerAvatar: some View {
+        if isPreviewRedacted {
+            SBIconAvatar(symbolName: redactionSymbolName, accentToken: clip.sourceApp.accentToken, theme: theme, size: 20)
+        } else {
+            SBSourceAppAvatar(
+                appID: clip.sourceApp.id,
+                symbolName: clip.sourceApp.symbolName,
+                accentToken: clip.sourceApp.accentToken,
+                theme: theme,
+                size: 20
+            )
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: theme.spacing.control6) {
             HStack(spacing: 6) {
@@ -155,12 +171,7 @@ struct SBClipCardShell: View {
                 .fixedSize(horizontal: true, vertical: false)
 
             Button(action: handleHeaderTap) {
-                SBIconAvatar(
-                    symbolName: isPreviewRedacted ? redactionSymbolName : clip.sourceApp.symbolName,
-                    accentToken: clip.sourceApp.accentToken,
-                    theme: theme,
-                    size: 20
-                )
+                headerAvatar
                 .overlay(alignment: .bottomTrailing) {
                     if clip.hasNote && isPreviewRedacted == false {
                         Circle()
@@ -802,6 +813,65 @@ private struct SBRichTextPreviewFallback: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.accentBackground(for: .primary).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
+    }
+}
+
+/// The real icon of the app a clip was copied from. `appID` is the source
+/// app's bundle id; when no installed app has it (or it is just a display
+/// name), the symbol avatar is shown instead.
+private struct SBSourceAppAvatar: View {
+    let appID: String
+    let symbolName: String?
+    let accentToken: String
+    let theme: SBTheme
+    let size: CGFloat
+
+    @State private var icon: NSImage?
+
+    var body: some View {
+        Group {
+            if let icon = icon ?? SBSourceAppIconCache.cachedIcon(for: appID) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: size, height: size)
+            } else {
+                SBIconAvatar(symbolName: symbolName, accentToken: accentToken, theme: theme, size: size)
+            }
+        }
+        .task(id: appID) {
+            icon = await SBSourceAppIconCache.icon(for: appID)
+        }
+    }
+}
+
+private nonisolated enum SBSourceAppIconCache {
+    private static let icons = NSCache<NSString, NSImage>()
+    // Ids with no installed app, so the lookup is not repeated on every draw.
+    private static let unresolved = NSCache<NSString, NSNumber>()
+
+    static func cachedIcon(for appID: String) -> NSImage? {
+        icons.object(forKey: appID as NSString)
+    }
+
+    static func icon(for appID: String) async -> NSImage? {
+        if let cached = cachedIcon(for: appID) { return cached }
+        if unresolved.object(forKey: appID as NSString) != nil { return nil }
+
+        let resolved = await Task.detached(priority: .utility) { () -> NSImage? in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: appID) else { return nil }
+            let image = NSWorkspace.shared.icon(forFile: url.path)
+            // Twice the 20 pt avatar, so it stays sharp on Retina without keeping the full icns.
+            image.size = NSSize(width: 40, height: 40)
+            return image
+        }.value
+
+        if let resolved {
+            icons.setObject(resolved, forKey: appID as NSString)
+        } else {
+            unresolved.setObject(1, forKey: appID as NSString)
+        }
+        return resolved
     }
 }
 
