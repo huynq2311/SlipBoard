@@ -5,6 +5,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     private let configuration: RetentionStoreConfiguration
     private let fileManager: FileManager
     private let persistentContainer: NSPersistentContainer
+    private let longText: LongTextFileStore
     private var latestCleanupResult: RetentionCleanupResult?
 
     init(
@@ -13,6 +14,12 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     ) {
         self.configuration = configuration
         self.fileManager = fileManager
+        self.longText = LongTextFileStore(
+            directoryURL: configuration.storeURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("LongText", isDirectory: true)
+        )
         self.persistentContainer = NSPersistentContainer(
             name: configuration.modelName,
             managedObjectModel: Self.makeManagedObjectModel(named: configuration.modelName)
@@ -28,7 +35,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
 
     func storedClip(for id: String) -> RetentionManagedClip? {
         performFetch {
-            fetchClipObject(id: id, in: $0).flatMap(Self.makeManagedClip(from:))
+            fetchClipObject(id: id, in: $0).flatMap { Self.makeManagedClip(from: $0, longText: longText) }
         }
     }
 
@@ -67,10 +74,11 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
 
     @discardableResult
     func replaceStoredClips(_ clips: [RetentionManagedClip]) -> RetentionPersistenceSnapshot {
-        performMutation { context in
+        let incomingIDs = Set(clips.map(\.id))
+        // Long-text files go only after the rows that point at them are saved.
+        return performMutation(afterSave: { self.longText.prune(keeping: incomingIDs) }) { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             let existingObjects = (try? context.fetch(request)) ?? []
-            let incomingIDs = Set(clips.map(\.id))
             // The bulk fetch above already has every stored object, so index it
             // instead of running one predicate fetch per clip.
             var objectsByID: [String: NSManagedObject] = [:]
@@ -89,14 +97,14 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
 
             for clip in clips {
                 if let object = objectsByID[clip.id] {
-                    Self.populate(object: object, with: clip)
+                    Self.populate(object: object, with: clip, longText: longText)
                 } else {
                     let object = NSEntityDescription.insertNewObject(
                         forEntityName: Self.clipEntityName,
                         into: context
                     )
                     objectsByID[clip.id] = object
-                    Self.populate(object: object, with: clip)
+                    Self.populate(object: object, with: clip, longText: longText)
                 }
             }
         }
@@ -111,7 +119,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                         forEntityName: Self.clipEntityName,
                         into: context
                     )
-                Self.populate(object: object, with: clip)
+                Self.populate(object: object, with: clip, longText: longText)
             }
         }
     }
@@ -123,7 +131,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         }
 
         let idsToRemove = Set(ids)
-        return performMutation { context in
+        return performMutation(afterSave: { self.longText.remove(ids: ids) }) { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             request.predicate = NSPredicate(format: "id IN %@", Array(idsToRemove))
             let objects = (try? context.fetch(request)) ?? []
@@ -201,7 +209,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             NSSortDescriptor(key: "id", ascending: false)
         ]
         let objects = (try? context.fetch(request)) ?? []
-        return objects.compactMap(Self.makeManagedClip(from:))
+        return objects.compactMap { Self.makeManagedClip(from: $0, longText: longText) }
     }
 
     private func fetchSingletonObject(
@@ -240,14 +248,16 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     }
 
     private func performMutation(
+        afterSave: (() -> Void)? = nil,
         _ work: (NSManagedObjectContext) -> Void
     ) -> RetentionPersistenceSnapshot {
         let context = persistentContainer.viewContext
         context.performAndWait {
             work(context)
             if context.hasChanges {
-                try? context.save()
+                guard (try? context.save()) != nil else { return }
             }
+            afterSave?()
         }
         return loadSnapshot()
     }
@@ -270,7 +280,11 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         persistentContainer.viewContext.undoManager = nil
     }
 
-    private static func populate(object: NSManagedObject, with clip: RetentionManagedClip) {
+    private static func populate(
+        object: NSManagedObject,
+        with clip: RetentionManagedClip,
+        longText: LongTextFileStore
+    ) {
         object.setValue(clip.id, forKey: "id")
         object.setValue(clip.normalizedHash, forKey: "normalizedHash")
         object.setValue(clip.kind.rawValue, forKey: "kind")
@@ -278,7 +292,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         object.setValue(clip.lastCopiedAt, forKey: "lastCopiedAt")
         object.setValue(clip.isPinned, forKey: "isPinned")
         object.setValue(clip.pinnedAt, forKey: "pinnedAt")
-        object.setValue(clip.titleText, forKey: "titleText")
+        object.setValue(longText.spillIfNeeded(id: clip.id, text: clip.titleText), forKey: "titleText")
         object.setValue(clip.secondaryText, forKey: "secondaryText")
         object.setValue(clip.metadataText, forKey: "metadataText")
         object.setValue(clip.secondaryBadgeText, forKey: "secondaryBadgeText")
@@ -295,7 +309,10 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         object.setValue(clip.assetCacheKey, forKey: "assetCacheKey")
     }
 
-    private nonisolated static func makeManagedClip(from object: NSManagedObject) -> RetentionManagedClip? {
+    private nonisolated static func makeManagedClip(
+        from object: NSManagedObject,
+        longText: LongTextFileStore
+    ) -> RetentionManagedClip? {
         guard
             let id = object.value(forKey: "id") as? String,
             let normalizedHash = object.value(forKey: "normalizedHash") as? String,
@@ -320,7 +337,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             lastCopiedAt: lastCopiedAt,
             isPinned: object.value(forKey: "isPinned") as? Bool ?? false,
             pinnedAt: object.value(forKey: "pinnedAt") as? Date,
-            titleText: titleText,
+            titleText: longText.restore(id: id, storedText: titleText),
             secondaryText: object.value(forKey: "secondaryText") as? String,
             metadataText: metadataText,
             secondaryBadgeText: object.value(forKey: "secondaryBadgeText") as? String,

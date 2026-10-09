@@ -179,6 +179,19 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
         )
     }
 
+    // The protected payload keeps only the head of a very long clip.
+    private func fullPrimaryText(
+        for item: ClipboardHistoryItem,
+        protectedPayload: ProtectedClipPayload?
+    ) -> String {
+        guard let payloadText = protectedPayload?.primaryText,
+              payloadText.count < LongTextFileStore.characterLimit
+        else {
+            return item.primaryText
+        }
+        return payloadText
+    }
+
     private func makeClipPreview(
         from item: ClipboardHistoryItem,
         protectedPayload: ProtectedClipPayload?,
@@ -186,7 +199,7 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
     ) -> ClipPreviewSummary {
         let titleText = isLocked
             ? (protectedPayload?.redactedPreviewText ?? "Hidden while SlipBoard is locked")
-            : (protectedPayload?.primaryText ?? item.primaryText)
+            : fullPrimaryText(for: item, protectedPayload: protectedPayload)
         let bodyText = isLocked
             ? nil
             : (protectedPayload?.secondaryText ?? item.secondaryText)
