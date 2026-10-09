@@ -342,6 +342,12 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
         _ = indexStore.upsertDocuments([mirroredDocument])
     }
 
+    // Only the first part of a very long clip is searchable. A few multi-megabyte
+    // clips (page source, minified code) made every lock and unlock rebuild the
+    // whole index from over 12 million characters, which froze the app for
+    // seconds. The clip itself is stored in full and still pastes in full.
+    private static let indexedTextLimit = 100_000
+
     private func makeDocument(
         from item: ClipboardHistoryItem,
         includeProtectedContent: Bool
@@ -365,7 +371,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
         ]
         let normalizedPlainText = visibleSegments
             .compactMap { $0 }
-            .map(normalizedSearchText)
+            .map { normalizedSearchText(String($0.prefix(Self.indexedTextLimit))) }
             .filter { $0.isEmpty == false }
             .joined(separator: " ")
 
