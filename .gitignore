@@ -6,6 +6,7 @@ design/slipboard_menubar_settings.html
 design/slipboard-db-design-v1.md
 *.md
 !/README.md
+!/README.en.md
 !/PRIVACY.md
 
 # ── macOS ──
@@ -21,3 +22,8 @@ DerivedData/
 .build/
 
 .codex/
+
+# ── Release packaging (build_release.sh) ──
+/build/
+/Release/
+.env
