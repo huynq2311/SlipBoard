@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Very long clips (page source, minified code) used to sit inside the Core Data
@@ -63,7 +64,8 @@ nonisolated struct LongTextFileStore {
     }
 
     private func fileName(for id: String) -> String {
-        let safe = id.map { $0.isLetter || $0.isNumber || $0 == "-" ? $0 : "_" }
-        return String(safe) + ".txt"
+        // Hashed so that ids differing only in unsafe characters never share a file.
+        let digest = SHA256.hash(data: Data(id.utf8))
+        return digest.prefix(16).map { String(format: "%02x", $0) }.joined() + ".txt"
     }
 }

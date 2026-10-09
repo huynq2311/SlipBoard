@@ -74,10 +74,11 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
 
     @discardableResult
     func replaceStoredClips(_ clips: [RetentionManagedClip]) -> RetentionPersistenceSnapshot {
-        performMutation { context in
+        let incomingIDs = Set(clips.map(\.id))
+        // Long-text files go only after the rows that point at them are saved.
+        return performMutation(afterSave: { self.longText.prune(keeping: incomingIDs) }) { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             let existingObjects = (try? context.fetch(request)) ?? []
-            let incomingIDs = Set(clips.map(\.id))
             // The bulk fetch above already has every stored object, so index it
             // instead of running one predicate fetch per clip.
             var objectsByID: [String: NSManagedObject] = [:]
@@ -106,7 +107,6 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                     Self.populate(object: object, with: clip, longText: longText)
                 }
             }
-            longText.prune(keeping: incomingIDs)
         }
     }
 
@@ -131,8 +131,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         }
 
         let idsToRemove = Set(ids)
-        longText.remove(ids: ids)
-        return performMutation { context in
+        return performMutation(afterSave: { self.longText.remove(ids: ids) }) { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             request.predicate = NSPredicate(format: "id IN %@", Array(idsToRemove))
             let objects = (try? context.fetch(request)) ?? []
@@ -249,14 +248,16 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     }
 
     private func performMutation(
+        afterSave: (() -> Void)? = nil,
         _ work: (NSManagedObjectContext) -> Void
     ) -> RetentionPersistenceSnapshot {
         let context = persistentContainer.viewContext
         context.performAndWait {
             work(context)
             if context.hasChanges {
-                try? context.save()
+                guard (try? context.save()) != nil else { return }
             }
+            afterSave?()
         }
         return loadSnapshot()
     }
