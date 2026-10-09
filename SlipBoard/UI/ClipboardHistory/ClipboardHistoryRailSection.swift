@@ -38,7 +38,7 @@ struct ClipboardHistoryRailSection: View {
     var activeGroupLabel: String? = nil
     var noteEditorState: ClipNoteEditorState? = nil
     var searchDisabledMessage: SearchDisabledMessage? = nil
-    var cardWidth: CGFloat = 216
+    var cardWidth: CGFloat = SBPopupLayoutMetrics.cardWidth
     var cardHeight: CGFloat = 128
     var isEmphasized: Bool = false
     var isCollapsed: Bool = false

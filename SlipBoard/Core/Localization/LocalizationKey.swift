@@ -1095,7 +1095,7 @@ struct LocalizationCatalog: Sendable {
         .contentFile: "Tệp",
         .contentURL: "URL",
         .contentColor: "Màu",
-        .contentRichText: "Văn bản có định dạng",
+        .contentRichText: "Rich Text",
         .menuStatus: "Trạng thái",
         .menuSecurity: "Bảo mật",
         .menuPauseFor: "Tạm dừng trong %{duration}",

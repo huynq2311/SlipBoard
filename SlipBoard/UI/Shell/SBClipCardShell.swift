@@ -28,7 +28,7 @@ struct SBClipCardShell: View {
     let clip: ClipPreviewSummary
     let theme: SBTheme
     @SBLocalizedCopy private var copy
-    var width: CGFloat = 216
+    var width: CGFloat = SBPopupLayoutMetrics.cardWidth
     var height: CGFloat = 128
     var isSelected: Bool = false
     var securitySnapshot: SecurityRuntimeSnapshot? = nil
@@ -143,17 +143,22 @@ struct SBClipCardShell: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: theme.spacing.control6) {
+            // When the card is too narrow the header gives way in this order: the
+            // source app name goes first, then the kind label is cut with an
+            // ellipsis. The time and the avatar are never pushed out of the card.
             HStack(spacing: 6) {
                 Image(systemName: clipKindSymbolName)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(typeColor)
+                    .fixedSize()
 
                 Text(clipKindLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(typeColor)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(2)
 
             Spacer(minLength: theme.spacing.control4)
 
@@ -162,13 +167,14 @@ struct SBClipCardShell: View {
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .layoutPriority(1)
+                .layoutPriority(0)
 
             Text(clip.createdLabel)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(3)
 
             Button(action: handleHeaderTap) {
                 headerAvatar
@@ -182,6 +188,8 @@ struct SBClipCardShell: View {
                 }
             }
             .buttonStyle(.plain)
+            .fixedSize()
+            .layoutPriority(3)
             .disabled(isSelected == false || noteInteractionsEnabled == false)
             .accessibilityLabel(copy.text(.accessibilityClipFrom, ["app": clip.sourceApp.displayName]))
             .help(clip.sourceApp.displayName)
@@ -880,7 +888,7 @@ struct SBHorizontalClipRail: View {
     let theme: SBTheme
     let emptyTitle: String
     let emptyDetail: String
-    var cardWidth: CGFloat = 216
+    var cardWidth: CGFloat = SBPopupLayoutMetrics.cardWidth
     var cardHeight: CGFloat = 128
     /// Puts the scrollbar in its own strip below the cards instead of over
     /// their bottom edge. Only for a rail with free space underneath it.

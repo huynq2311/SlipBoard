@@ -12,6 +12,8 @@ enum SBHeaderMenuKind: Equatable {
 }
 
 enum SBPopupLayoutMetrics {
+    /// Width of a clip card when the pinned rail is open.
+    static let cardWidth: CGFloat = 216
     static let expandedContentHeight: CGFloat = 460
     static let pinnedCollapsedHeightReduction: CGFloat = 93
     /// Transparent room around a glass shell so the borderless panel does not
@@ -417,7 +419,7 @@ struct SBPopupShell: View {
 
     @State private var activeHeaderMenu: SBHeaderMenuKind? = nil
 
-    private static let recentCardWidth: CGFloat = 216
+    private static let recentCardWidth: CGFloat = SBPopupLayoutMetrics.cardWidth
     private static let recentCardWidthPinnedCollapsed: CGFloat = 264
     private static let recentCardHeight: CGFloat = 148
     private static let recentCardHeightPinnedCollapsed: CGFloat = 190
@@ -676,7 +678,7 @@ struct SBPopupShell: View {
     ) -> CGRect {
         guard let anchorClipID = pasteOverlayState.anchorClipID,
               let anchor = anchors[anchorClipID] else {
-            return CGRect(x: theme.spacing.popupPadding, y: 42, width: 216, height: 148)
+            return CGRect(x: theme.spacing.popupPadding, y: 42, width: SBPopupLayoutMetrics.cardWidth, height: 148)
         }
 
         return proxy[anchor]
