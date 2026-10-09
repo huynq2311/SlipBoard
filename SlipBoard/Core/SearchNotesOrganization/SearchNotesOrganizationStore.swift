@@ -346,7 +346,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
     // clips (page source, minified code) made every lock and unlock rebuild the
     // whole index from over 12 million characters, which froze the app for
     // seconds. The clip itself is stored in full and still pastes in full.
-    private static let indexedTextLimit = 100_000
+    private static let indexedTextLimit = LongTextFileStore.characterLimit
 
     private func makeDocument(
         from item: ClipboardHistoryItem,
@@ -392,7 +392,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
         let existingPayload = protectedPayload(for: item.id)
         let nextPayload = ProtectedClipPayload(
             itemID: item.id,
-            primaryText: item.primaryText,
+            primaryText: LongTextFileStore.head(of: item.primaryText),
             secondaryText: item.secondaryText,
             noteText: existingPayload?.noteText,
             redactedPreviewText: existingPayload?.redactedPreviewText ?? defaultRedactedPreviewText(for: item),
@@ -413,7 +413,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
 
         return ProtectedClipPayload(
             itemID: item.id,
-            primaryText: item.primaryText,
+            primaryText: LongTextFileStore.head(of: item.primaryText),
             secondaryText: item.secondaryText,
             noteText: nil,
             redactedPreviewText: defaultRedactedPreviewText(for: item),
