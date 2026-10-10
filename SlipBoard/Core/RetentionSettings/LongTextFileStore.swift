@@ -30,7 +30,8 @@ nonisolated struct LongTextFileStore {
 
         let name = fileName(for: id, text: text)
         let fileURL = directoryURL.appendingPathComponent(name)
-        if fileManager.fileExists(atPath: fileURL.path) == false {
+        let existingSize = (try? fileManager.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? nil
+        if existingSize != text.utf8.count {
             try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
             guard (try? text.write(to: fileURL, atomically: true, encoding: .utf8)) != nil else {
                 return (text, nil)
@@ -60,8 +61,7 @@ nonisolated struct LongTextFileStore {
 
         // Files written before they were content-addressed are named `<hash of id>.txt`
         // and carry no checksum; the next save rewrites them under the new name.
-        let legacyURL = directoryURL.appendingPathComponent(idHash(id) + ".txt")
-        if let fullText = try? String(contentsOf: legacyURL, encoding: .utf8),
+        if let fullText = try? String(contentsOf: legacyURL(for: id), encoding: .utf8),
            fullText.hasPrefix(storedText) {
             return fullText
         }
@@ -73,15 +73,21 @@ nonisolated struct LongTextFileStore {
             for url in files(forIDHash: idHash(id)) {
                 try? fileManager.removeItem(at: url)
             }
+            try? fileManager.removeItem(at: legacyURL(for: id))
         }
     }
 
     /// Deletes every file not in `keeping`, or only those of `ids` when given.
-    func prune(keeping fileNames: Set<String>, forIDs ids: [String]? = nil) {
+    /// Files of `protectedIDs` stay: those clips were loaded as a bare head
+    /// (a restore that failed), and saving that head must not destroy the file.
+    func prune(keeping fileNames: Set<String>, protecting protectedIDs: Set<String> = [], forIDs ids: [String]? = nil) {
         let scope = ids.map { Set($0.map(idHash(_:))) }
+        let protectedHashes = Set(protectedIDs.map(idHash(_:)))
         for name in (try? fileManager.contentsOfDirectory(atPath: directoryURL.path)) ?? [] {
             guard fileNames.contains(name) == false else { continue }
-            if let scope, scope.contains(String(name.prefix(Self.hashLength))) == false { continue }
+            let nameHash = String(name.prefix(Self.hashLength))
+            if protectedHashes.contains(nameHash) { continue }
+            if let scope, scope.contains(nameHash) == false { continue }
             try? fileManager.removeItem(at: directoryURL.appendingPathComponent(name))
         }
     }
@@ -92,6 +98,10 @@ nonisolated struct LongTextFileStore {
         ((try? fileManager.contentsOfDirectory(atPath: directoryURL.path)) ?? [])
             .filter { $0.hasPrefix(hash + "-") }
             .map { directoryURL.appendingPathComponent($0) }
+    }
+
+    private func legacyURL(for id: String) -> URL {
+        directoryURL.appendingPathComponent(idHash(id) + ".txt")
     }
 
     private func modificationDate(_ url: URL) -> Date {

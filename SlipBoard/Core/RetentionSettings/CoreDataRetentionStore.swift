@@ -76,9 +76,10 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     func replaceStoredClips(_ clips: [RetentionManagedClip]) -> RetentionPersistenceSnapshot {
         let incomingIDs = Set(clips.map(\.id))
         var keptFiles = Set<String>()
+        var protectedIDs = Set<String>()
         // Superseded long-text files go only after the rows that point at the
         // new ones are saved.
-        return performMutation(afterSave: { self.longText.prune(keeping: keptFiles) }) { context in
+        return performMutation(afterSave: { self.longText.prune(keeping: keptFiles, protecting: protectedIDs) }) { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: Self.clipEntityName)
             let existingObjects = (try? context.fetch(request)) ?? []
             // The bulk fetch above already has every stored object, so index it
@@ -101,6 +102,8 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                 if let object = objectsByID[clip.id] {
                     if let file = Self.populate(object: object, with: clip, longText: longText) {
                         keptFiles.insert(file)
+                    } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                        protectedIDs.insert(clip.id)
                     }
                 } else {
                     let object = NSEntityDescription.insertNewObject(
@@ -110,6 +113,8 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                     objectsByID[clip.id] = object
                     if let file = Self.populate(object: object, with: clip, longText: longText) {
                         keptFiles.insert(file)
+                    } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                        protectedIDs.insert(clip.id)
                     }
                 }
             }
@@ -119,9 +124,10 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
     @discardableResult
     func upsertStoredClips(_ clips: [RetentionManagedClip]) -> RetentionPersistenceSnapshot {
         var keptFiles = Set<String>()
+        var protectedIDs = Set<String>()
         let upsertedIDs = clips.map(\.id)
         return performMutation(afterSave: {
-            self.longText.prune(keeping: keptFiles, forIDs: upsertedIDs)
+            self.longText.prune(keeping: keptFiles, protecting: protectedIDs, forIDs: upsertedIDs)
         }) { context in
             for clip in clips {
                 let object = fetchClipObject(id: clip.id, in: context)
@@ -131,6 +137,8 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                     )
                 if let file = Self.populate(object: object, with: clip, longText: longText) {
                     keptFiles.insert(file)
+                } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                    protectedIDs.insert(clip.id)
                 }
             }
         }
