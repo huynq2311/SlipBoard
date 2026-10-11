@@ -5,6 +5,10 @@ import Foundation
 /// row and the encrypted payload file in full, which made both slow to load and
 /// to rewrite. Past `characterLimit` the full text lives in its own file and the
 /// stores keep only the first `characterLimit` characters.
+///
+/// Files are content-addressed: `<hash of id>-<hash of text>.txt`. A changed text
+/// gets a new file, the old one stays until the caller prunes it after the
+/// Core Data save, and a file whose content no longer matches its name is ignored.
 nonisolated struct LongTextFileStore {
     static let characterLimit = 100_000
 
@@ -16,56 +20,104 @@ nonisolated struct LongTextFileStore {
         String(text.prefix(characterLimit))
     }
 
-    /// Returns the text to store inline: the full text when it is short or the
-    /// file could not be written, otherwise its head.
-    func spillIfNeeded(id: String, text: String) -> String {
+    /// `storedText` is what to store inline: the full text when it is short or
+    /// the file could not be written, otherwise its head. `fileName` is the file
+    /// that holds the full text, if any.
+    func spillIfNeeded(id: String, text: String) -> (storedText: String, fileName: String?) {
         guard text.count > Self.characterLimit else {
-            return text
+            return (text, nil)
         }
 
-        let fileURL = url(for: id)
+        let name = fileName(for: id, text: text)
+        let fileURL = directoryURL.appendingPathComponent(name)
         let existingSize = (try? fileManager.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? nil
         if existingSize != text.utf8.count {
             try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
             guard (try? text.write(to: fileURL, atomically: true, encoding: .utf8)) != nil else {
-                return text
+                return (text, nil)
             }
         }
-        return Self.head(of: text)
+        return (Self.head(of: text), name)
     }
 
-    /// Restores the full text when `storedText` is a head with a file behind it.
+    /// Restores the full text when `storedText` is a head with a matching file
+    /// behind it. A missing or damaged file leaves the head.
     func restore(id: String, storedText: String) -> String {
-        guard storedText.count == Self.characterLimit,
-              let fullText = try? String(contentsOf: url(for: id), encoding: .utf8),
-              fullText.hasPrefix(storedText)
-        else {
+        guard storedText.count == Self.characterLimit else {
             return storedText
         }
-        return fullText
+
+        let candidates = files(forIDHash: idHash(id))
+            .sorted { modificationDate($0) > modificationDate($1) }
+        for url in candidates {
+            guard let fullText = try? String(contentsOf: url, encoding: .utf8),
+                  fullText.hasPrefix(storedText),
+                  url.lastPathComponent == fileName(for: id, text: fullText)
+            else {
+                continue
+            }
+            return fullText
+        }
+
+        // Files written before they were content-addressed are named `<hash of id>.txt`
+        // and carry no checksum; the next save rewrites them under the new name.
+        if let fullText = try? String(contentsOf: legacyURL(for: id), encoding: .utf8),
+           fullText.hasPrefix(storedText) {
+            return fullText
+        }
+        return storedText
     }
 
     func remove(ids: [String]) {
         for id in ids {
-            try? fileManager.removeItem(at: url(for: id))
+            for url in files(forIDHash: idHash(id)) {
+                try? fileManager.removeItem(at: url)
+            }
+            try? fileManager.removeItem(at: legacyURL(for: id))
         }
     }
 
-    func prune(keeping ids: Set<String>) {
-        let names = (try? fileManager.contentsOfDirectory(atPath: directoryURL.path)) ?? []
-        let keptNames = Set(ids.map(fileName(for:)))
-        for name in names where keptNames.contains(name) == false {
+    /// Deletes every file not in `keeping`, or only those of `ids` when given.
+    /// Files of `protectedIDs` stay: those clips were loaded as a bare head
+    /// (a restore that failed), and saving that head must not destroy the file.
+    func prune(keeping fileNames: Set<String>, protecting protectedIDs: Set<String> = [], forIDs ids: [String]? = nil) {
+        let scope = ids.map { Set($0.map(idHash(_:))) }
+        let protectedHashes = Set(protectedIDs.map(idHash(_:)))
+        for name in (try? fileManager.contentsOfDirectory(atPath: directoryURL.path)) ?? [] {
+            guard fileNames.contains(name) == false else { continue }
+            let nameHash = String(name.prefix(Self.hashLength))
+            if protectedHashes.contains(nameHash) { continue }
+            if let scope, scope.contains(nameHash) == false { continue }
             try? fileManager.removeItem(at: directoryURL.appendingPathComponent(name))
         }
     }
 
-    private func url(for id: String) -> URL {
-        directoryURL.appendingPathComponent(fileName(for: id))
+    private static let hashLength = 32
+
+    private func files(forIDHash hash: String) -> [URL] {
+        ((try? fileManager.contentsOfDirectory(atPath: directoryURL.path)) ?? [])
+            .filter { $0.hasPrefix(hash + "-") }
+            .map { directoryURL.appendingPathComponent($0) }
     }
 
-    private func fileName(for id: String) -> String {
-        // Hashed so that ids differing only in unsafe characters never share a file.
-        let digest = SHA256.hash(data: Data(id.utf8))
-        return digest.prefix(16).map { String(format: "%02x", $0) }.joined() + ".txt"
+    private func legacyURL(for id: String) -> URL {
+        directoryURL.appendingPathComponent(idHash(id) + ".txt")
+    }
+
+    private func modificationDate(_ url: URL) -> Date {
+        ((try? fileManager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date) ?? .distantPast
+    }
+
+    private func idHash(_ id: String) -> String {
+        Self.hex(SHA256.hash(data: Data(id.utf8)), count: Self.hashLength)
+    }
+
+    private func fileName(for id: String, text: String) -> String {
+        let digest = SHA256.hash(data: Data(text.utf8))
+        return idHash(id) + "-" + Self.hex(digest, count: 32) + ".txt"
+    }
+
+    private static func hex(_ digest: SHA256.Digest, count: Int) -> String {
+        String(digest.map { String(format: "%02x", $0) }.joined().prefix(count))
     }
 }
