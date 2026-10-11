@@ -1690,6 +1690,19 @@ private struct InteractiveSliderRow: View {
     let theme: SBTheme
     let onChange: (Double) -> Void
 
+    // Each change used to be applied on every drag tick, which saved and
+    // re-read the whole history and pruned clips along the way. Apply the
+    // value once the drag ends.
+    @State private var draft: Double?
+
+    private var displayedLabel: String? {
+        guard let label = item.valueLabel, let draft else { return item.valueLabel }
+        let suffix = label.drop { $0.isLetter == false }
+        return suffix.isEmpty
+            ? Int(draft.rounded()).formatted()
+            : "\(Int(draft.rounded()).formatted()) \(suffix)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.control8) {
             HStack(alignment: .firstTextBaseline) {
@@ -1707,7 +1720,7 @@ private struct InteractiveSliderRow: View {
 
                 Spacer(minLength: theme.spacing.control8)
 
-                if let valueLabel = item.valueLabel {
+                if let valueLabel = displayedLabel {
                     Text(valueLabel)
                         .font(theme.typography.monoMeta)
                         .foregroundStyle(theme.palette.textSecondary)
@@ -1716,11 +1729,16 @@ private struct InteractiveSliderRow: View {
 
             Slider(
                 value: Binding(
-                    get: { item.value },
-                    set: onChange
+                    get: { draft ?? item.value },
+                    set: { draft = $0 }
                 ),
                 in: item.range,
-                step: item.step
+                step: item.step,
+                onEditingChanged: { isEditing in
+                    guard isEditing == false, let committed = draft else { return }
+                    draft = nil
+                    onChange(committed)
+                }
             )
             .tint(theme.palette.accentPrimary)
         }
