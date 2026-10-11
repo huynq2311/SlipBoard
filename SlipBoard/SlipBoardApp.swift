@@ -2571,7 +2571,12 @@ struct SlipBoardApp: App {
             runtime: runtime,
             onPauseCapture: { handleMenuCommand("pause-capturing") },
             onClearHistory: handleClearHistoryCommand,
-            onOpenSettings: { handleMenuCommand("open-settings") },
+            onOpenSettings: {
+                // Settings is a window of this app, so the outside-click
+                // monitor never sees the click that moves focus there.
+                runtime.setPopupPresented(false)
+                handleMenuCommand("open-settings")
+            },
             onPerformContextAction: handleContextAction,
             onExecutePasteAction: handlePasteAction
         )

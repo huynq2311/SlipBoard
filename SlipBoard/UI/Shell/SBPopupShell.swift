@@ -229,6 +229,17 @@ struct SBPopupTopBar: View {
         .padding(.horizontal, theme.spacing.popupPadding)
         .padding(.vertical, theme.spacing.control8)
         .background(SBPopupToolbarBackground(theme: theme))
+        .background {
+            // The open menu sits above the clip list through this view's zIndex,
+            // so a clear layer behind the header (still above the list) catches
+            // the click that should dismiss it.
+            if activeMenu != nil {
+                Color.clear
+                    .frame(width: 4000, height: 4000)
+                    .contentShape(Rectangle())
+                    .onTapGesture { activeMenu = nil }
+            }
+        }
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(theme.palette.border)
