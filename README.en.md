@@ -13,7 +13,7 @@ Press a hotkey, pick what you copied recently, paste it.
 ![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
 ![Network](https://img.shields.io/badge/network-none-2ea44f)
-![License](https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey)
+[![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
 [![Tiếng Việt](https://img.shields.io/badge/Language-Ti%E1%BA%BFng_Vi%E1%BB%87t-red)](README.md)
 [![English](https://img.shields.io/badge/Language-English-green)](README.en.md)
@@ -283,4 +283,4 @@ design/                           design docs and UI contracts
 
 ## License
 
-All rights reserved.
+Released under the [MIT License](LICENSE).
