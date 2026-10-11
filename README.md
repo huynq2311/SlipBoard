@@ -13,7 +13,7 @@ Nhấn phím tắt, chọn thứ bạn vừa sao chép, dán.
 ![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
 ![Offline](https://img.shields.io/badge/m%E1%BA%A1ng-kh%C3%B4ng%20d%C3%B9ng-2ea44f)
-![License](https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey)
+[![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
 [![Tiếng Việt](https://img.shields.io/badge/Language-Ti%E1%BA%BFng_Vi%E1%BB%87t-red)](README.md)
 [![English](https://img.shields.io/badge/Language-English-green)](README.en.md)
@@ -273,4 +273,4 @@ design/                           tài liệu thiết kế
 
 ## Giấy phép
 
-Bảo lưu mọi quyền.
+Phát hành theo giấy phép [MIT](LICENSE).
