@@ -1228,7 +1228,7 @@ private extension Color {
 // A card shows a few lines of a clip. Handing a multi-megabyte string to `Text`
 // makes CoreText lay out all of it, which costs hundreds of megabytes and
 // seconds of CPU per card.
-private let sbCardDisplayCharacterLimit = 2_000
+private let sbCardDisplayCharacterLimit = 1_000
 
 private func sbCardDisplayText(_ text: String) -> String {
     text.utf8.count <= sbCardDisplayCharacterLimit
