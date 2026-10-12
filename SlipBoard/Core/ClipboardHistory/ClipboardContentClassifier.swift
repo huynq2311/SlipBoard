@@ -342,7 +342,15 @@ struct ClipboardContentClassifier {
         return text.range(of: pattern, options: .regularExpression) != nil
     }
 
-    private func looksLikeCode(_ text: String) -> Bool {
+    // Judging the start of a clip is enough to tell code from prose. Scanning a
+    // multi-megabyte clip once per keyword blocked the main thread for seconds
+    // on every copy.
+    private static let codeDetectionCharacterLimit = 20_000
+
+    private func looksLikeCode(_ fullText: String) -> Bool {
+        let text = fullText.utf8.count <= Self.codeDetectionCharacterLimit
+            ? fullText
+            : String(fullText.prefix(Self.codeDetectionCharacterLimit))
         let lowercased = text.lowercased()
         let keywords = [
             "func ", "class ", "struct ", "enum ", "protocol ", "import ",

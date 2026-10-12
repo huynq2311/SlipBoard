@@ -261,7 +261,7 @@ struct SBClipCardShell: View {
                             .foregroundStyle(theme.accent(for: .warning))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(clip.titleText)
+                            Text(sbCardDisplayText(clip.titleText))
                                 .font(cardBodyFont)
                                 .foregroundStyle(theme.palette.textPrimary)
                                 .lineLimit(1)
@@ -274,7 +274,7 @@ struct SBClipCardShell: View {
                     }
 
                     if let bodyText = clip.bodyText, bodyText.isEmpty == false {
-                        Text(bodyText)
+                        Text(sbCardDisplayText(bodyText))
                             .font(cardBodyFont)
                             .foregroundStyle(theme.palette.textSecondary)
                             .lineLimit(min(bodyLineLimit, 4))
@@ -429,13 +429,13 @@ struct SBClipCardShell: View {
 
     private func textBody(font: Font, color: Color) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.control6) {
-            Text(clip.titleText)
+            Text(sbCardDisplayText(clip.titleText))
                 .font(font)
                 .foregroundStyle(color)
                 .lineLimit(clip.kind == .url ? 2 : bodyLineLimit)
 
             if let bodyText = clip.bodyText, bodyText.isEmpty == false {
-                Text(bodyText)
+                Text(sbCardDisplayText(bodyText))
                     .font(font)
                     .foregroundStyle(theme.palette.textSecondary)
                     .lineLimit(max(2, bodyLineLimit - 2))
@@ -1223,4 +1223,15 @@ private extension Color {
             opacity: 1
         )
     }
+}
+
+// A card shows a few lines of a clip. Handing a multi-megabyte string to `Text`
+// makes CoreText lay out all of it, which costs hundreds of megabytes and
+// seconds of CPU per card.
+private let sbCardDisplayCharacterLimit = 2_000
+
+private func sbCardDisplayText(_ text: String) -> String {
+    text.utf8.count <= sbCardDisplayCharacterLimit
+        ? text
+        : String(text.prefix(sbCardDisplayCharacterLimit))
 }
