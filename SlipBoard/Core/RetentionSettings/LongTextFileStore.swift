@@ -16,6 +16,50 @@ nonisolated struct LongTextFileStore {
 
     private var fileManager: FileManager { .default }
 
+    // Every history change rewrites and reloads all stored clips. Without this,
+    // each copy re-hashed and re-read every multi-megabyte file. Entries are
+    // keyed by the content-addressed file name, so a match is the same text.
+    private final class Memo: @unchecked Sendable {
+        let lock = NSLock()
+        var textByFileName: [String: String] = [:]
+        var fileNameByID: [String: (text: String, fileName: String)] = [:]
+    }
+
+    private static let memo = Memo()
+
+    private static func memoized(_ name: String) -> String? {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        return memo.textByFileName[name]
+    }
+
+    /// Comparing against the remembered text is a pointer check when the caller
+    /// passes the same string again, which is the common case.
+    private static func knownFileName(id: String, text: String) -> String? {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        guard let entry = memo.fileNameByID[id], entry.text == text else { return nil }
+        return entry.fileName
+    }
+
+    private static func remember(id: String, text: String, fileName: String) {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        memo.fileNameByID[id] = (text, fileName)
+        memo.textByFileName[fileName] = text
+    }
+
+    private static func forget(_ name: String) {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        memo.textByFileName.removeValue(forKey: name)
+        memo.fileNameByID = memo.fileNameByID.filter { $0.value.fileName != name }
+    }
+
+    /// True when `text` has more than `characterLimit` characters, without
+    /// counting all of a multi-megabyte string.
+    private static func exceedsLimit(_ text: String) -> Bool {
+        guard text.utf8.count > characterLimit else { return false }
+        return text.index(text.startIndex, offsetBy: characterLimit, limitedBy: text.endIndex)
+            .map { $0 < text.endIndex } ?? false
+    }
+
     static func head(of text: String) -> String {
         String(text.prefix(characterLimit))
     }
@@ -24,11 +68,11 @@ nonisolated struct LongTextFileStore {
     /// the file could not be written, otherwise its head. `fileName` is the file
     /// that holds the full text, if any.
     func spillIfNeeded(id: String, text: String) -> (storedText: String, fileName: String?) {
-        guard text.count > Self.characterLimit else {
+        guard Self.exceedsLimit(text) else {
             return (text, nil)
         }
 
-        let name = fileName(for: id, text: text)
+        let name = Self.knownFileName(id: id, text: text) ?? fileName(for: id, text: text)
         let fileURL = directoryURL.appendingPathComponent(name)
         let existingSize = (try? fileManager.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? nil
         if existingSize != text.utf8.count {
@@ -37,6 +81,7 @@ nonisolated struct LongTextFileStore {
                 return (text, nil)
             }
         }
+        Self.remember(id: id, text: text, fileName: name)
         return (Self.head(of: text), name)
     }
 
@@ -50,12 +95,17 @@ nonisolated struct LongTextFileStore {
         let candidates = files(forIDHash: idHash(id))
             .sorted { modificationDate($0) > modificationDate($1) }
         for url in candidates {
+            if let fullText = Self.memoized(url.lastPathComponent), fullText.hasPrefix(storedText) {
+                Self.remember(id: id, text: fullText, fileName: url.lastPathComponent)
+                return fullText
+            }
             guard let fullText = try? String(contentsOf: url, encoding: .utf8),
                   fullText.hasPrefix(storedText),
                   url.lastPathComponent == fileName(for: id, text: fullText)
             else {
                 continue
             }
+            Self.remember(id: id, text: fullText, fileName: url.lastPathComponent)
             return fullText
         }
 
@@ -72,6 +122,7 @@ nonisolated struct LongTextFileStore {
         for id in ids {
             for url in files(forIDHash: idHash(id)) {
                 try? fileManager.removeItem(at: url)
+                Self.forget(url.lastPathComponent)
             }
             try? fileManager.removeItem(at: legacyURL(for: id))
         }
@@ -89,6 +140,7 @@ nonisolated struct LongTextFileStore {
             if protectedHashes.contains(nameHash) { continue }
             if let scope, scope.contains(nameHash) == false { continue }
             try? fileManager.removeItem(at: directoryURL.appendingPathComponent(name))
+            Self.forget(name)
         }
     }
 
