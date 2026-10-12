@@ -134,9 +134,13 @@ Cài đặt → Phím tắt). Trong popup:
   không telemetry, không dịch vụ báo lỗi, không cần tài khoản.
 - **Chỉ lưu trên máy.** Lịch sử, ghi chú, snippet và cài đặt nằm trong
   `~/Library/Application Support/SlipBoard/`.
-- **App Lock mã hóa nội dung trên đĩa.** Khi bật, nội dung và ghi chú của từng
-  mục được lưu mã hóa bằng khóa do Secure Enclave bảo vệ (Keychain là phương án
-  dự phòng), mở khóa bằng Touch ID hoặc mật khẩu hệ thống.
+- **App Lock khóa cửa sổ, không mã hóa ổ đĩa.** Nó ẩn lịch sử cho tới khi bạn
+  mở khóa bằng Touch ID hoặc mật khẩu hệ thống. Nội dung clip, file văn bản dài
+  và ảnh đã copy vẫn lưu không mã hóa trong thư mục trên, nên hãy bật FileVault
+  để bảo vệ dữ liệu khi máy tắt.
+- **Mọi thứ bạn copy đều được ghi lại,** kể cả mật khẩu copy từ trình quản lý
+  mật khẩu. Hãy loại trừ ứng dụng đó trong Cài đặt, hoặc tạm dừng ghi, nếu
+  không muốn chúng nằm trong lịch sử.
 - **Chỉ cần một quyền: Accessibility.** Dùng duy nhất để gửi phím ⌘V khi bạn
   chọn một mục. SlipBoard không ghi lại hay gửi đi các phím bạn gõ.
 
@@ -239,8 +243,9 @@ flowchart LR
 Ứng dụng là app SwiftUI trên thanh menu, với một panel AppKit cho popup. Kho
 lịch sử là nguồn dữ liệu duy nhất; projector biến nó thành trạng thái view cho
 popup, còn lưu trữ Core Data và chỉ mục toàn văn SQLite được đồng bộ từ đó. Khi
-bật App Lock, nội dung và ghi chú của từng mục còn được ghi vào một kho mã hóa
-với khóa do Secure Enclave giữ.
+bật App Lock, một bản sao nội dung và ghi chú của từng mục còn được ghi vào một
+kho mã hóa với khóa do Secure Enclave giữ. Bản thân kho Core Data không được mã
+hóa.
 
 ## Cấu trúc dự án
 

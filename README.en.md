@@ -139,10 +139,13 @@ in Settings → Hotkeys). Inside the popup:
   telemetry and no crash-reporting service. There is no account or sign-in.
 - **Local storage only.** History, notes, snippets and settings live in
   `~/Library/Application Support/SlipBoard/` on your Mac.
-- **App Lock encrypts item content on disk.** When enabled, the content and
-  notes of your items are stored encrypted with a key protected by the Secure
-  Enclave (Keychain as a fallback), unlocked with Touch ID or your system
-  password.
+- **App Lock locks the window, not the disk.** It hides your history until you
+  unlock with Touch ID or your system password. Clip text, long-text files and
+  copied images are stored unencrypted in the folder above, so use FileVault
+  to protect them at rest.
+- **Everything you copy is recorded,** including passwords copied from a
+  password manager. Exclude that app in Settings, or pause capture, to keep
+  them out of the history.
 - **One permission: Accessibility.** It is used only to send the ⌘V keystroke
   when you pick an item. SlipBoard does not log or transmit keystrokes.
 
@@ -248,9 +251,10 @@ flowchart LR
 The app is a SwiftUI menu-bar app with an AppKit panel for the popup. The
 history store is the single source of truth. The projector turns it into the
 view state the popup renders, while Core Data persistence and the SQLite
-full-text index are kept in sync from it. With App Lock on, the content and
-notes of each item are additionally written to an encrypted store whose key is
-held by the Secure Enclave.
+full-text index are kept in sync from it. With App Lock on, a copy of the
+content and notes of each item is additionally written to an encrypted store
+whose key is held by the Secure Enclave. The Core Data store itself is not
+encrypted.
 
 ## Project layout
 

@@ -1,6 +1,6 @@
 # SlipBoard Privacy Policy
 
-_Last updated: 2026-09-10_
+_Last updated: 2026-10-12_
 
 SlipBoard is a local clipboard manager for macOS. This policy describes
 what it does with your data, in plain terms.
@@ -11,6 +11,12 @@ SlipBoard watches the system clipboard (`NSPasteboard`) so it can show
 your recent copies in its popup. It also records which app was
 frontmost when you copied something, so it can show that app's name and
 icon next to the item.
+
+SlipBoard records **everything** you copy, including passwords and other
+secrets copied from a password manager. It does not detect such content
+and does not treat it differently from any other text. To keep an app's
+copies out of the history, add that app to the exclusion list in
+Settings, or pause capture before you copy.
 
 ## What SlipBoard never does
 
@@ -23,10 +29,20 @@ icon next to the item.
 
 Everything SlipBoard stores — clipboard history, snippets, settings — is
 kept only on your Mac, in your user's local Application Support folder.
-When App Lock is enabled, clipboard content and notes are additionally
-encrypted on disk using a key protected by the Secure Enclave (or the
-Keychain as a fallback), unlocked with Touch ID, Face ID, or your system
-password.
+
+**Clipboard history is stored unencrypted.** The text of your clips is in
+a local database (`Database/`), very long clips are in plain text files
+(`LongText/`), copied images are in `Cache/`, and the search index holds
+clip text while SlipBoard is unlocked. Anyone who can read your user
+account's files can read them. Turn on FileVault to protect them when
+your Mac is off or locked out.
+
+**App Lock is not disk encryption.** It locks the SlipBoard window and
+hides previews until you unlock with Touch ID or your system password,
+and it clears clip text from the search index while locked. It also
+keeps an encrypted copy of clip content and notes, with a key protected
+by the Secure Enclave, but the unencrypted copies described above stay
+on disk.
 
 iPhone ↔ Mac clipboard sharing, if you use it, goes through Apple's own
 Universal Clipboard (Handoff) feature — SlipBoard does not operate or
