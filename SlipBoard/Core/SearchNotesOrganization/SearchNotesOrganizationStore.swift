@@ -99,25 +99,23 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
             _ = indexStore.removeDocuments(ids: staleIDs)
         }
 
-        var didMigratePayloads = false
+        var rewrittenPayloadIDs = Set<String>()
         if includeProtectedContent,
            payloadStore.activeWrappedKey != nil,
            payloadStore.keyMaterialState.hasUnwrappedKeyInMemory
         {
-            _ = migrateProtectedPayloadsIfNeeded()
-            didMigratePayloads = true
+            rewrittenPayloadIDs = migrateProtectedPayloads().rewrittenItemIDs
         }
 
         // A single capture used to rebuild and upsert a document for every
-        // item in the history. Only items that actually changed need one,
-        // except when the protected-content mode flipped or payloads were
-        // rewritten underneath unchanged items.
-        let needsFullPass = didMigratePayloads
-            || lastSyncIncludedProtectedContent != includeProtectedContent
+        // item in the history. Only items that changed, or whose protected
+        // payload was rewritten, need one, unless the protected-content mode
+        // flipped.
+        let needsFullPass = lastSyncIncludedProtectedContent != includeProtectedContent
         lastSyncIncludedProtectedContent = includeProtectedContent
         let itemsToIndex = needsFullPass
             ? items
-            : items.filter { previousItemsByID[$0.id] != $0 }
+            : items.filter { previousItemsByID[$0.id] != $0 || rewrittenPayloadIDs.contains($0.id) }
 
         guard itemsToIndex.isEmpty == false else { return }
         let documents = itemsToIndex.map { makeDocument(from: $0, includeProtectedContent: includeProtectedContent) }
@@ -140,11 +138,15 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
 
     @discardableResult
     func migrateProtectedPayloadsIfNeeded() -> SecurityMigrationState {
+        migrateProtectedPayloads().state
+    }
+
+    private func migrateProtectedPayloads() -> (state: SecurityMigrationState, rewrittenItemIDs: Set<String>) {
         guard
             payloadStore.activeWrappedKey != nil,
             payloadStore.keyMaterialState.hasUnwrappedKeyInMemory
         else {
-            return payloadStore.latestMigrationState
+            return (payloadStore.latestMigrationState, [])
         }
 
         let payloadCandidates = historyItemsByID.values
@@ -157,7 +159,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
             .compactMap(makePayloadCandidate(from:))
 
         guard payloadCandidates.isEmpty == false else {
-            return payloadStore.latestMigrationState
+            return (payloadStore.latestMigrationState, [])
         }
 
         let migrationState = payloadStore.saveProtectedPayloads(payloadCandidates)
@@ -168,7 +170,7 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
                 }
             }
         }
-        return migrationState
+        return (migrationState, Set(payloadCandidates.map(\.itemID)))
     }
 
     func removeItems(ids: [String]) {
@@ -385,11 +387,13 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
     }
 
     private func makePayloadCandidate(from item: ClipboardHistoryItem) -> ProtectedClipPayload? {
-        if payloadStore.containsEnvelope(for: item.id), payloadStore.protectedPayload(for: item.id) == nil {
+        // Goes through the decrypted cache: decrypting every stored envelope on
+        // every capture just to compare it was the main cost with App Lock on.
+        let existingPayload = protectedPayload(for: item.id)
+        if payloadStore.containsEnvelope(for: item.id), existingPayload == nil {
             return nil
         }
 
-        let existingPayload = protectedPayload(for: item.id)
         let nextPayload = ProtectedClipPayload(
             itemID: item.id,
             primaryText: LongTextFileStore.head(of: item.primaryText),
