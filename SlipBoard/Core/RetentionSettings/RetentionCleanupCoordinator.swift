@@ -95,14 +95,17 @@ final class RetentionCleanupCoordinator: RetentionCleanupCoordinating {
         )
         let removedClips = plan.clipIDsToRemove.compactMap { clipsByID[$0] }
 
-        _ = retentionStore.removeStoredClips(ids: plan.clipIDsToRemove)
+        // A failed save leaves the rows in place; their cached assets must stay too.
+        let clipsAfterRemoval = retentionStore.removeStoredClips(ids: plan.clipIDsToRemove).storedClips
+        let assetKeysStillInUse = Set(clipsAfterRemoval.compactMap(\.assetCacheKey))
+        let didRemoveAllPlannedClips = Set(clipsAfterRemoval.map(\.id)).isDisjoint(with: plan.clipIDsToRemove)
 
         var removedAssetCount = 0
         var freedBytes: Int64 = 0
         var latestAssetSettings = request.assetCacheSettings
         var statusFragments: [String] = []
 
-        if plan.shouldWipeAllHistory {
+        if plan.shouldWipeAllHistory, didRemoveAllPlannedClips {
             let cacheResult = assetCacheCoordinator.clearCache(trigger: request.trigger)
             removedAssetCount += cacheResult.removedAssetCount
             freedBytes += cacheResult.freedBytes
@@ -114,7 +117,7 @@ final class RetentionCleanupCoordinator: RetentionCleanupCoordinating {
             statusFragments.append(cacheResult.statusMessage ?? "")
         } else {
             if let removedAssetResult = assetCacheCoordinator.removeAssets(
-                withKeys: plan.assetCacheKeysToRemove,
+                withKeys: plan.assetCacheKeysToRemove.filter { assetKeysStillInUse.contains($0) == false },
                 trigger: request.trigger
             ) {
                 removedAssetCount += removedAssetResult.removedAssetCount

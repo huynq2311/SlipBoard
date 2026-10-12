@@ -649,9 +649,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         controller.pasteActions.closeActiveOverlay()
         syncPasteOverlayState()
 
-        for id in popupState.allClips.map(\.id) {
-            controller.deleteItem(id: id)
-        }
+        controller.deleteAllItems()
 
         runtimeStatusOverride = RuntimeStatusOverride(
             message: localization.text(.statusClearedHistory),

@@ -699,7 +699,12 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
         customGroups rawCustomGroups: [OrganizationGroupSummary],
         memberships rawMemberships: [GroupMembershipChange]
     ) -> SearchIndexSnapshot {
-        let documentsByID = Dictionary(uniqueKeysWithValues: rawDocuments.map { ($0.itemID, sanitizedDocument($0)) })
+        // Rows come from disk and nothing guarantees one per id, so merge
+        // duplicates instead of trapping.
+        let documentsByID = Dictionary(
+            rawDocuments.map { ($0.itemID, sanitizedDocument($0)) },
+            uniquingKeysWith: { _, latest in latest }
+        )
         let documents = documentsByID.values.sorted { lhs, rhs in
             if lhs.isPinned == rhs.isPinned {
                 return lhs.itemID > rhs.itemID
@@ -708,9 +713,10 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
         }
 
         let customGroupsByID = Dictionary(
-            uniqueKeysWithValues: rawCustomGroups
+            rawCustomGroups
                 .filter { $0.groupID.isSystem == false }
-                .map { ($0.groupID, sanitizedCustomGroup($0)) }
+                .map { ($0.groupID, sanitizedCustomGroup($0)) },
+            uniquingKeysWith: { _, latest in latest }
         )
         let customGroups = customGroupsByID.values.sorted { lhs, rhs in
             lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
@@ -729,7 +735,10 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
             }
             .sorted { $0.itemID < $1.itemID }
 
-        let membershipByItemID = Dictionary(uniqueKeysWithValues: memberships.map { ($0.itemID, $0.groupIDs) })
+        let membershipByItemID = Dictionary(
+            memberships.map { ($0.itemID, $0.groupIDs) },
+            uniquingKeysWith: { $0 + $1 }
+        )
         let customGroupNameByID = Dictionary(uniqueKeysWithValues: customGroups.map { ($0.groupID, $0.name) })
 
         let normalizedDocuments = documents.map { document in

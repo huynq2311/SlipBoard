@@ -192,6 +192,21 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         publishState()
     }
 
+    /// Removes every item, including ones hidden by the current search or filter.
+    func deleteAllItems() {
+        let ids = store.snapshot.allItems.map(\.id)
+        guard ids.isEmpty == false else {
+            return
+        }
+
+        for id in ids {
+            store.removeItem(id: id, selecting: nil)
+        }
+        searchNotesRuntime.removeItems(ids: ids)
+        retentionRuntime.recordHistoryMutation()
+        publishState()
+    }
+
     func deleteItem(id: String) {
         guard store.item(for: id) != nil else {
             return
