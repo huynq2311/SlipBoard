@@ -27,8 +27,11 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
             fileManager: fileManager,
             decoder: decoder
         ) {
+            // The file is not guaranteed to hold one envelope per id; trapping
+            // here would crash the app on launch.
             self.envelopesByItemID = Dictionary(
-                uniqueKeysWithValues: loadedEnvelopes.map { ($0.itemID, $0) }
+                loadedEnvelopes.map { ($0.itemID, $0) },
+                uniquingKeysWith: { _, latest in latest }
             )
         }
 
@@ -66,7 +69,7 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
 
     @discardableResult
     func replaceEnvelopes(_ envelopes: [EncryptedPayloadEnvelope]) -> [EncryptedPayloadEnvelope] {
-        envelopesByItemID = Dictionary(uniqueKeysWithValues: envelopes.map { ($0.itemID, $0) })
+        envelopesByItemID = Dictionary(envelopes.map { ($0.itemID, $0) }, uniquingKeysWith: { _, latest in latest })
         persistEnvelopes()
         if let newestEnvelopeDate = envelopes.map(\.updatedAt).max() {
             latestMigrationState = .ready(lastCompletedAt: newestEnvelopeDate)

@@ -31,3 +31,13 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      # The shipped DMG is a Release build, so compile that configuration too.
+      - name: Build (Release)
+        run: |
+          xcodebuild \
+            -project SlipBoard.xcodeproj \
+            -target SlipBoard \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            build
