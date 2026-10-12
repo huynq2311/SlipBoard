@@ -65,25 +65,32 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
         for document in documents {
             documentsByID[document.itemID] = sanitizedDocument(document)
         }
+        let upsertedIDs = Set(documents.map(\.itemID))
 
+        // Only the upserted documents are new; the rest of the snapshot is
+        // already normalized and already on disk. Re-normalizing and rewriting
+        // the whole index here ran on every copy.
         snapshot = normalizedSnapshot(
             documents: Array(documentsByID.values),
             customGroups: customGroups(from: snapshot.groups),
-            memberships: snapshot.memberships
+            memberships: snapshot.memberships,
+            normalizedDocumentIDs: Set(documentsByID.keys).subtracting(upsertedIDs)
         )
-        persistSnapshot()
+        persistDocumentRows(upserting: upsertedIDs, removing: [])
         return snapshot
     }
 
     @discardableResult
     func removeDocuments(ids: [String]) -> SearchIndexSnapshot {
         let removedIDs = Set(ids)
+        let remainingDocuments = snapshot.documents.filter { removedIDs.contains($0.itemID) == false }
         snapshot = normalizedSnapshot(
-            documents: snapshot.documents.filter { removedIDs.contains($0.itemID) == false },
+            documents: remainingDocuments,
             customGroups: customGroups(from: snapshot.groups),
-            memberships: snapshot.memberships.filter { removedIDs.contains($0.itemID) == false }
+            memberships: snapshot.memberships.filter { removedIDs.contains($0.itemID) == false },
+            normalizedDocumentIDs: Set(remainingDocuments.map(\.itemID))
         )
-        persistSnapshot()
+        persistDocumentRows(upserting: [], removing: removedIDs)
         return snapshot
     }
 
@@ -595,7 +602,37 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
         sqlite3_exec(database, "COMMIT TRANSACTION;", nil, nil, nil)
     }
 
-    private func persistDocuments(database: OpaquePointer) {
+    /// Writes only the rows of the given documents. Groups and memberships
+    /// are untouched, except memberships of removed documents.
+    private func persistDocumentRows(upserting upsertedIDs: Set<String>, removing removedIDs: Set<String>) {
+        guard let database else { return }
+        let changedIDs = upsertedIDs.union(removedIDs)
+        guard changedIDs.isEmpty == false else { return }
+
+        sqlite3_exec(database, "BEGIN IMMEDIATE TRANSACTION;", nil, nil, nil)
+        execute("DELETE FROM fts_index WHERE item_id = ?;", for: changedIDs, in: database)
+        execute("DELETE FROM group_membership WHERE item_id = ?;", for: removedIDs, in: database)
+        persistDocuments(database: database, only: upsertedIDs)
+        sqlite3_exec(database, "COMMIT TRANSACTION;", nil, nil, nil)
+    }
+
+    private func execute(_ sql: String, for itemIDs: Set<String>, in database: OpaquePointer) {
+        guard itemIDs.isEmpty == false else { return }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
+            return
+        }
+        defer { sqlite3_finalize(statement) }
+
+        for itemID in itemIDs {
+            sqlite3_reset(statement)
+            sqlite3_clear_bindings(statement)
+            bindText(itemID, at: 1, in: statement)
+            sqlite3_step(statement)
+        }
+    }
+
+    private func persistDocuments(database: OpaquePointer, only itemIDs: Set<String>? = nil) {
         let sql = """
         INSERT INTO fts_index (
             item_id,
@@ -612,7 +649,7 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
         }
         defer { sqlite3_finalize(statement) }
 
-        for document in snapshot.documents {
+        for document in snapshot.documents where itemIDs?.contains(document.itemID) ?? true {
             sqlite3_reset(statement)
             sqlite3_clear_bindings(statement)
             bindText(document.itemID, at: 1, in: statement)
@@ -697,12 +734,16 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
     private func normalizedSnapshot(
         documents rawDocuments: [SearchIndexDocument],
         customGroups rawCustomGroups: [OrganizationGroupSummary],
-        memberships rawMemberships: [GroupMembershipChange]
+        memberships rawMemberships: [GroupMembershipChange],
+        normalizedDocumentIDs: Set<String> = []
     ) -> SearchIndexSnapshot {
         // Rows come from disk and nothing guarantees one per id, so merge
-        // duplicates instead of trapping.
+        // duplicates instead of trapping. Documents listed in
+        // `normalizedDocumentIDs` are already sanitized (it is idempotent).
         let documentsByID = Dictionary(
-            rawDocuments.map { ($0.itemID, sanitizedDocument($0)) },
+            rawDocuments.map { document in
+                (document.itemID, normalizedDocumentIDs.contains(document.itemID) ? document : sanitizedDocument(document))
+            },
             uniquingKeysWith: { _, latest in latest }
         )
         let documents = documentsByID.values.sorted { lhs, rhs in
@@ -745,10 +786,11 @@ final class SQLiteSearchIndexStore: SearchIndexStoring, OrganizationGroupStoring
             let groupNames = (membershipByItemID[document.itemID] ?? [])
                 .compactMap { customGroupNameByID[$0] }
 
+            // `documentsByID` already holds sanitized text for every document.
             return SearchIndexDocument(
                 itemID: document.itemID,
-                normalizedPlainText: normalizedSearchText(document.normalizedPlainText),
-                noteMirror: sanitizedNoteMirror(document.noteMirror),
+                normalizedPlainText: document.normalizedPlainText,
+                noteMirror: document.noteMirror,
                 groupTerms: groupNames,
                 isPinned: document.isPinned
             )
