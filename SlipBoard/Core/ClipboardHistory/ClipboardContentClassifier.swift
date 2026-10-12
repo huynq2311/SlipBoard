@@ -64,20 +64,54 @@ struct ClipboardContentClassifier {
     }
 
     func normalizedText(for text: String) -> String? {
-        let standardizedNewlines = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
+        // One pass over the UTF-8 bytes: CR and CRLF become LF, and spaces or tabs
+        // at the end of each line are dropped. This used to split the text into
+        // lines and run a regex on each, which took about a second per 5 MB.
+        // The bytes touched are all ASCII, so the result is still valid UTF-8.
+        let input = Array(text.utf8)
+        var output: [UInt8] = []
+        output.reserveCapacity(input.count)
+        var lineStart = 0
+        var index = 0
 
-        let trimmedLines = standardizedNewlines
-            .components(separatedBy: "\n")
-            .map { line in
-                line.replacingOccurrences(
-                    of: #"[ \t]+$"#,
-                    with: "",
-                    options: .regularExpression
-                )
+        func trimLineEnd() {
+            // Like the regex `[ \t]+$` it replaces, also drop blanks that sit
+            // before a single trailing VT, FF, NEL, LS or PS.
+            let end = output.count
+            var terminatorLength = 0
+            if end - lineStart >= 1, output[end - 1] == 0x0B || output[end - 1] == 0x0C {
+                terminatorLength = 1
+            } else if end - lineStart >= 2, output[end - 2] == 0xC2, output[end - 1] == 0x85 {
+                terminatorLength = 2
+            } else if end - lineStart >= 3, output[end - 3] == 0xE2, output[end - 2] == 0x80,
+                      output[end - 1] == 0xA8 || output[end - 1] == 0xA9 {
+                terminatorLength = 3
             }
-            .joined(separator: "\n")
+            let blanksEnd = end - terminatorLength
+            var blanksStart = blanksEnd
+            while blanksStart > lineStart, output[blanksStart - 1] == 0x20 || output[blanksStart - 1] == 0x09 {
+                blanksStart -= 1
+            }
+            output.removeSubrange(blanksStart..<blanksEnd)
+        }
+
+        while index < input.count {
+            let byte = input[index]
+            if byte == 0x0D || byte == 0x0A {
+                trimLineEnd()
+                output.append(0x0A)
+                lineStart = output.count
+                if byte == 0x0D, index + 1 < input.count, input[index + 1] == 0x0A {
+                    index += 1
+                }
+            } else {
+                output.append(byte)
+            }
+            index += 1
+        }
+        trimLineEnd()
+
+        let trimmedLines = String(decoding: output, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .precomposedStringWithCanonicalMapping
 
