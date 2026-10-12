@@ -223,13 +223,11 @@ struct SBPasteTransformMenuShell: View {
                 width: 260,
                 highlightedActionID: highlightedActionID,
                 actions: actions,
+                // Hovering must not change the choice: the pointer crosses other
+                // rows on its way from the chosen one to the Paste button.
                 onSelectAction: { actionID in
                     guard let action = PasteActionID(rawValue: actionID) else { return }
                     onSelectAction(action)
-                },
-                onHoverAction: { actionID in
-                    guard let actionID, let action = PasteActionID(rawValue: actionID) else { return }
-                    onHighlightAction(action)
                 }
             ) {
                 VStack(alignment: .leading, spacing: theme.spacing.control8) {
