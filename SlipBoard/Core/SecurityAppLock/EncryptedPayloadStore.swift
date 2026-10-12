@@ -9,6 +9,7 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
     private let decoder = PropertyListDecoder()
 
     private var envelopesByItemID: [String: EncryptedPayloadEnvelope]
+    private var defersPersisting = false
 
     private(set) var latestMigrationState: SecurityMigrationState
 
@@ -175,6 +176,13 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
             )
         )
 
+        // Every saved payload used to rewrite the whole file; write it once.
+        defersPersisting = true
+        defer {
+            defersPersisting = false
+            persistEnvelopes()
+        }
+
         var completedCount = 0
         for payload in payloads {
             latestMigrationState = .migrating(
@@ -311,6 +319,7 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
     }
 
     private func persistEnvelopes() {
+        guard defersPersisting == false else { return }
         let records = latestEnvelopes.map(EncryptedPayloadEnvelopeRecord.init)
         guard let data = try? encoder.encode(records) else {
             return
