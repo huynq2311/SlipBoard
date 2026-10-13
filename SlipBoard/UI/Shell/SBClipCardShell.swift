@@ -766,6 +766,7 @@ private enum SBRichTextPreview {
             : source
         let normalized = NSMutableAttributedString(attributedString: previewSource)
         let range = NSRange(location: 0, length: normalized.length)
+        normalized.addAttribute(.foregroundColor, value: NSColor(theme.palette.textPrimary), range: range)
         normalized.enumerateAttribute(.font, in: range) { value, attributeRange, _ in
             let sourceFont = value as? NSFont
             let traits = sourceFont?.fontDescriptor.symbolicTraits ?? []
