@@ -27,6 +27,7 @@ protocol ClipboardHistoryStoreMutating: AnyObject {
 
     func setSearchQuery(_ query: String)
     func setActiveFilter(_ filter: ClipboardHistoryFilter)
+    func setActiveSource(_ sourceID: String?)
     func selectItem(id: String?)
     func moveSelection(by delta: Int)
     func setPinned(_ isPinned: Bool, for itemID: String)

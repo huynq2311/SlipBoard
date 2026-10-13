@@ -7,7 +7,6 @@ import SwiftUI
 enum SBHeaderMenuKind: Equatable {
     case overflow
     case source
-    case sort
     case collection
 }
 
@@ -67,6 +66,7 @@ struct SBPopupTopBar: View {
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
+    var onSelectSource: (String?) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
@@ -89,6 +89,7 @@ struct SBPopupTopBar: View {
         onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
+        onSelectSource: @escaping (String?) -> Void = { _ in },
         onSelectThemePreview: @escaping (PopupThemeSelection) -> Void = { _ in },
         onSelectOrganizationGroup: @escaping (OrganizationGroupID) -> Void = { _ in },
         onPauseCapture: @escaping () -> Void = {},
@@ -107,6 +108,7 @@ struct SBPopupTopBar: View {
         self.onToggleSearchPresented = onToggleSearchPresented
         self.onSearchQueryChange = onSearchQueryChange
         self.onSelectFilter = onSelectFilter
+        self.onSelectSource = onSelectSource
         self.onSelectThemePreview = onSelectThemePreview
         self.onSelectOrganizationGroup = onSelectOrganizationGroup
         self.onPauseCapture = onPauseCapture
@@ -188,26 +190,17 @@ struct SBPopupTopBar: View {
 
                 SBUtilityDropdown(
                     label: copy.text(.commonSource),
-                    selectionText: copy.text(.commonAll),
-                    options: [SBUtilityDropdownOption(id: "all", label: copy.text(.commonAll))],
+                    selectionText: sourceSelectionText,
+                    options: sourceMenuOptions,
                     theme: theme,
                     isEnabled: isSearchEnabled,
                     isOpen: activeMenu == .source,
                     optionLabel: { $0.label },
                     onToggle: { toggleMenu(.source) },
-                    action: { _ in activeMenu = nil }
-                )
-
-                SBUtilityDropdown(
-                    label: copy.text(.popupSort),
-                    selectionText: copy.text(.popupSortNewestFirst),
-                    options: [SBUtilityDropdownOption(id: "newest", label: copy.text(.popupSortNewestFirst))],
-                    theme: theme,
-                    isEnabled: isSearchEnabled,
-                    isOpen: activeMenu == .sort,
-                    optionLabel: { $0.label },
-                    onToggle: { toggleMenu(.sort) },
-                    action: { _ in activeMenu = nil }
+                    action: { option in
+                        onSelectSource(option.id.isEmpty ? nil : option.id)
+                        activeMenu = nil
+                    }
                 )
 
                 SBUtilityDropdown(
@@ -253,6 +246,21 @@ struct SBPopupTopBar: View {
                 searchText = newValue
             }
         }
+    }
+
+    /// "All" first, then each source app with how many clips it has. The "All"
+    /// row uses an empty id, which `onSelectSource` turns back into `nil`.
+    private var sourceMenuOptions: [SBUtilityDropdownOption] {
+        guard state.sourceOptions.isEmpty == false else { return [] }
+        let total = state.sourceOptions.reduce(0) { $0 + $1.count }
+        let all = SBUtilityDropdownOption(id: "", label: "\(copy.text(.commonAll)) (\(total))")
+        return [all] + state.sourceOptions.map {
+            SBUtilityDropdownOption(id: $0.id, label: "\($0.label) (\($0.count))")
+        }
+    }
+
+    private var sourceSelectionText: String {
+        state.sourceOptions.first(where: { $0.id == state.activeSourceID })?.label ?? copy.text(.commonAll)
     }
 
     private var collectionSelectionText: String {
@@ -404,6 +412,7 @@ struct SBPopupShell: View {
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
+    var onSelectSource: (String?) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
     var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
@@ -459,6 +468,7 @@ struct SBPopupShell: View {
                     onToggleSearchPresented: onToggleSearchPresented,
                     onSearchQueryChange: onSearchQueryChange,
                     onSelectFilter: onSelectFilter,
+                    onSelectSource: onSelectSource,
                     onSelectThemePreview: onSelectThemePreview,
                     onSelectOrganizationGroup: onSelectOrganizationGroup,
                     onPauseCapture: onPauseCapture,

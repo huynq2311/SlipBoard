@@ -69,13 +69,16 @@ final class SearchNotesRuntimeController: SearchNotesRuntimeProviding {
 
     func visibleItemIDs(
         in items: [ClipboardHistoryItem],
-        activeFilter: ClipboardHistoryFilter
+        activeFilter: ClipboardHistoryFilter,
+        activeSourceID: String?
     ) -> [String] {
         guard lockState.isSearchAvailable else {
             return []
         }
 
-        let filteredItems = items.filter { activeFilter.matches($0.kind) }
+        let filteredItems = items.filter {
+            activeFilter.matches($0.kind) && $0.matches(sourceID: activeSourceID)
+        }
         let matchingIDs: Set<String>
 
         if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {

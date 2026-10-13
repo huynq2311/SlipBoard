@@ -94,7 +94,8 @@ protocol SearchNotesRuntimeProviding: AnyObject {
     func removeItems(ids: [String])
     func visibleItemIDs(
         in items: [ClipboardHistoryItem],
-        activeFilter: ClipboardHistoryFilter
+        activeFilter: ClipboardHistoryFilter,
+        activeSourceID: String?
     ) -> [String]
     func noteText(for itemID: String) -> String?
     func protectedPayload(for itemID: String) -> ProtectedClipPayload?

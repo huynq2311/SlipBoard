@@ -29,7 +29,7 @@ struct LocalizationHarness {
             expect(store.text(.popupNoMatchingClips) == "Không có clip phù hợp", "Popup empty states resolve in Vietnamese")
             expect(store.text(.alertClearClipboardHistoryMessage).contains("vĩnh viễn"), "Alert copy resolves in Vietnamese")
             expect(store.text(.statusExcludedIn, ["app": "Safari"]) == "Đã loại trừ trong Safari", "Dynamic status templates preserve user app names")
-            expect(store.text(.popupSortNewestFirst) == "Mới nhất trước", "Popup sort labels resolve in Vietnamese")
+            expect(store.text(.commonSource) == "Nguồn", "Popup source label resolves in Vietnamese")
             expect(store.text(.overlayMarkdownDescription).contains("Markdown"), "Transform descriptions resolve in Vietnamese")
             expect(store.text(.securityLockDetailManual).contains("mở khóa"), "Security lock details resolve in Vietnamese")
             expect(store.text(.bridgeOneShotTTL, ["minutes": "10"]) == "TTL 10 phút", "Bridge TTL templates interpolate named values")

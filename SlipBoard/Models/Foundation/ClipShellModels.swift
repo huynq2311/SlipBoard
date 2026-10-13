@@ -92,6 +92,12 @@ struct ClipPreviewSummary: Identifiable, Hashable {
     }
 }
 
+struct PopupSourceOption: Identifiable, Hashable {
+    let id: String
+    var label: String
+    var count: Int
+}
+
 struct PopupFilterOption: Identifiable, Hashable {
     let id: String
     var label: String
@@ -185,6 +191,8 @@ struct PopupShellViewState: Hashable {
     var searchQuery: String
     var isSearchPresented: Bool
     var activeFilterID: String
+    var activeSourceID: String?
+    var sourceOptions: [PopupSourceOption]
     var themePreview: PopupThemeSelection
     var pinnedClips: [ClipPreviewSummary]
     var recentClips: [ClipPreviewSummary]
@@ -200,6 +208,8 @@ struct PopupShellViewState: Hashable {
         searchQuery: String = "",
         isSearchPresented: Bool = false,
         activeFilterID: String = "all",
+        activeSourceID: String? = nil,
+        sourceOptions: [PopupSourceOption] = [],
         themePreview: PopupThemeSelection = .fallback,
         pinnedClips: [ClipPreviewSummary] = [],
         recentClips: [ClipPreviewSummary] = [],
@@ -210,6 +220,8 @@ struct PopupShellViewState: Hashable {
         self.searchQuery = searchQuery
         self.isSearchPresented = isSearchPresented
         self.activeFilterID = activeFilterID
+        self.activeSourceID = activeSourceID
+        self.sourceOptions = sourceOptions
         self.themePreview = themePreview
         self.pinnedClips = pinnedClips
         self.recentClips = recentClips

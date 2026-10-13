@@ -573,6 +573,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         controller.updateActiveFilter(filter)
     }
 
+    func selectSource(id: String?) {
+        recordSecurityInteraction()
+        controller.updateActiveSource(id)
+    }
+
     func selectThemePreview(_ preview: PopupThemeSelection) {
         recordSecurityInteraction()
         themePreview = preview
@@ -2760,6 +2765,7 @@ private struct SBPopupRootView: View {
             onToggleSearchPresented: runtime.setSearchPresented,
             onSearchQueryChange: runtime.updateSearchQuery,
             onSelectFilter: runtime.selectFilter,
+            onSelectSource: runtime.selectSource,
             onSelectThemePreview: runtime.selectThemePreview,
             onSelectOrganizationGroup: runtime.selectOrganizationGroup,
             onPauseCapture: onPauseCapture,

@@ -388,8 +388,6 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case alertConfirmDestructive
     case accessibilityMoreActions
     case accessibilityClipFrom
-    case popupSort
-    case popupSortNewestFirst
     case settingsClearHistoryAfter
     case overlayOpenTransformPreview
     case overlayMarkdownDescription
@@ -863,8 +861,6 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .alertConfirmDestructive: "Confirm destructive changes inline."
         case .accessibilityMoreActions: "More actions"
         case .accessibilityClipFrom: "Clip from %{app}"
-        case .popupSort: "Sort"
-        case .popupSortNewestFirst: "Newest First"
         case .settingsClearHistoryAfter: "Clear history after"
         case .overlayOpenTransformPreview: "Open transform preview"
         case .overlayMarkdownDescription: "Map clipboard text into markdown-friendly output"
@@ -1379,8 +1375,6 @@ struct LocalizationCatalog: Sendable {
         .alertConfirmDestructive: "Xác nhận thay đổi có tính hủy trực tiếp.",
         .accessibilityMoreActions: "Thao tác khác",
         .accessibilityClipFrom: "Clip từ %{app}",
-        .popupSort: "Sắp xếp",
-        .popupSortNewestFirst: "Mới nhất trước",
         .settingsClearHistoryAfter: "Xóa lịch sử sau",
         .overlayOpenTransformPreview: "Mở xem trước chuyển đổi",
         .overlayMarkdownDescription: "Chuyển văn bản clipboard sang đầu ra thân thiện với Markdown",

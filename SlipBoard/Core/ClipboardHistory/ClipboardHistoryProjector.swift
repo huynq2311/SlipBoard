@@ -49,8 +49,11 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
         let searchQuery = searchRuntime?.latestProjectionState.searchQuery ?? snapshot.searchQuery
         let isLocked = searchRuntime?.latestProjectionState.lockState == .locked
         let visibleItemIDs = Set(
-            searchRuntime?.visibleItemIDs(in: snapshot.allItems, activeFilter: snapshot.activeFilter)
-                ?? snapshot.visibleItems.map(\.id)
+            searchRuntime?.visibleItemIDs(
+                in: snapshot.allItems,
+                activeFilter: snapshot.activeFilter,
+                activeSourceID: snapshot.activeSourceID
+            ) ?? snapshot.visibleItems.map(\.id)
         )
 
         return PopupShellViewState(
@@ -58,6 +61,8 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
             searchQuery: searchQuery,
             isSearchPresented: searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
             activeFilterID: snapshot.activeFilter.id,
+            activeSourceID: snapshot.activeSourceID,
+            sourceOptions: isLocked ? [] : projectSourceOptions(snapshot),
             themePreview: .fallback,
             pinnedClips: snapshot.pinnedItems
                 .filter { visibleItemIDs.contains($0.id) }
@@ -83,6 +88,30 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
                 exclusionsPauseSnapshot: exclusionsPauseSnapshot
             )
         )
+    }
+
+    /// The apps clips came from, most-used first. Capped so the dropdown stays
+    /// inside the popup; the selected app is always kept.
+    private func projectSourceOptions(_ snapshot: ClipboardHistorySnapshot) -> [PopupSourceOption] {
+        let maxOptions = 8
+        let groups = Dictionary(grouping: snapshot.allItems, by: \.sourceID)
+        let options = groups.compactMap { id, items -> PopupSourceOption? in
+            guard let name = items.first?.sourceApp.displayName else { return nil }
+            return PopupSourceOption(id: id, label: name, count: items.count)
+        }
+        .sorted { lhs, rhs in
+            lhs.count != rhs.count
+                ? lhs.count > rhs.count
+                : lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+        }
+
+        var shown = Array(options.prefix(maxOptions))
+        if let active = snapshot.activeSourceID,
+           shown.contains(where: { $0.id == active }) == false,
+           let selected = options.first(where: { $0.id == active }) {
+            shown[shown.count - 1] = selected
+        }
+        return shown
     }
 
     private func projectFilterOptions(_ snapshot: ClipboardHistorySnapshot) -> [PopupFilterOption] {
@@ -256,7 +285,8 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
 
         let visibleCount = searchRuntime?.visibleItemIDs(
             in: snapshot.allItems,
-            activeFilter: snapshot.activeFilter
+            activeFilter: snapshot.activeFilter,
+            activeSourceID: snapshot.activeSourceID
         ).count ?? snapshot.visibleItems.count
         let itemCountText = hasSearchOverlay
             ? (visibleCount == 1 ? "1 result" : "\(visibleCount) results")
