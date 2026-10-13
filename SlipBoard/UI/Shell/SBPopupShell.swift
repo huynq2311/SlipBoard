@@ -12,7 +12,7 @@ enum SBHeaderMenuKind: Equatable {
 enum SBPopupLayoutMetrics {
     /// Width of a clip card when the pinned rail is open.
     static let cardWidth: CGFloat = 216
-    static let expandedContentHeight: CGFloat = 420
+    static let expandedContentHeight: CGFloat = 424
     static let pinnedCollapsedHeightReduction: CGFloat = 93
     /// Transparent room around a glass shell so the borderless panel does not
     /// clip its shadow and rim into square corners. Bottom stays below the
@@ -176,7 +176,7 @@ struct SBPopupTopBar: View {
             overflowMenu
         }
         .padding(.horizontal, theme.spacing.popupPadding)
-        .padding(.vertical, theme.spacing.control10)
+        .padding(.vertical, theme.spacing.control12)
         .background(SBPopupToolbarBackground(theme: theme))
         .background {
             // The open menu sits above the clip list through this view's zIndex,
