@@ -70,8 +70,8 @@ vừa dùng.
 ### 2. Tìm, lọc và sắp xếp
 
 Popup chia làm hai hàng thẻ: **Đã ghim** (ở trên) và **Gần đây**. Phía trên là
-thanh lọc và ô tìm kiếm; ba thứ này dùng được **cùng lúc**: bộ lọc theo loại,
-nhóm trong bộ sưu tập và từ khóa tìm kiếm.
+thanh lọc và ô tìm kiếm; bốn thứ này dùng được **cùng lúc**: bộ lọc theo loại,
+nguồn, nhóm trong bộ sưu tập và từ khóa tìm kiếm.
 
 #### Bộ lọc theo loại
 
@@ -93,10 +93,15 @@ Mỗi nút lọc hiện kèm **số lượng** mục tương ứng.
 Mỗi thẻ cho biết nó đến từ **ứng dụng nào**: logo thật của ứng dụng cùng tên
 và thời gian sao chép. Để chỉ xem những gì đến từ một ứng dụng:
 
-- **Gõ tên ứng dụng vào ô tìm kiếm** (ví dụ `Safari`, `Xcode`, `Slack`). Tên
-  ứng dụng nguồn nằm trong chỉ mục tìm kiếm cùng với nội dung, nên danh sách
-  thu gọn lại còn đúng các mục từ ứng dụng đó. Kết hợp với bộ lọc loại để thu
-  hẹp thêm, ví dụ lọc **Hình ảnh** rồi gõ `Safari`.
+- Mở menu **Nguồn** trên thanh lọc. Menu liệt kê các ứng dụng đã sao chép nhiều
+  nhất (tối đa 8), kèm số mục của từng ứng dụng. Chọn một ứng dụng để popup chỉ
+  còn các mục từ ứng dụng đó, chọn **Tất cả** để bỏ lọc.
+- Bộ lọc nguồn dùng được **cùng lúc** với bộ lọc loại, tìm kiếm và bộ sưu tập,
+  ví dụ lọc **Hình ảnh** rồi chọn nguồn **Safari**. Nếu mọi mục của ứng dụng đó
+  bị xóa hoặc bị dọn, bộ lọc tự quay về **Tất cả**.
+- Ứng dụng không nằm trong 8 mục đầu vẫn tìm được: gõ tên ứng dụng (ví dụ
+  `Slack`) vào ô tìm kiếm, vì tên ứng dụng nguồn nằm trong chỉ mục tìm kiếm.
+- Khi App Lock đang khóa, menu Nguồn bị ẩn để không lộ tên ứng dụng.
 - Nội dung đến từ iPhone, iPad hoặc máy Mac khác qua **Universal Clipboard**
   (Handoff) được gắn nhãn riêng để phân biệt với thứ bạn copy trên máy này.
 - Muốn **không bao giờ ghi** nội dung từ một ứng dụng, thêm nó vào
@@ -336,11 +341,9 @@ design/                           tài liệu thiết kế
 
 ## Giới hạn đã biết
 
-- Chưa có nút lọc riêng theo ứng dụng nguồn: hiện lọc bằng cách gõ tên ứng
-  dụng vào ô tìm kiếm (xem mục 2).
 - Bộ sưu tập: popup có menu lọc theo nhóm, nhưng chưa có giao diện để tạo nhóm
   hay thêm mục vào nhóm.
-- Menu **Sắp xếp** hiện chỉ có một lựa chọn: mới nhất trước.
+- Danh sách luôn xếp mới nhất trước; chưa có tùy chọn sắp xếp khác.
 - Định dạng văn bản có định dạng chỉ được giữ khi ứng dụng đang chạy. Sau khi
   khởi động lại, mục đó vẫn còn trong lịch sử nhưng ở dạng văn bản thuần.
 - Dung lượng file và kích thước ảnh được đọc khi hiển thị thẻ: nếu file đã bị
