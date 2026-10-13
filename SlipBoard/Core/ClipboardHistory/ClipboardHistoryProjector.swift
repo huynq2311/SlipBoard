@@ -498,12 +498,9 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
         return "Hide popup is off"
     }
 
+    // Pinned cards already show a pin icon, so they get the time like the rest.
     private func createdLabel(for item: ClipboardHistoryItem) -> String {
-        if item.isPinned {
-            return "Pinned"
-        }
-
-        return Self.compactRelativeLabel(for: item.lastCopiedAt, relativeTo: Date())
+        Self.compactRelativeLabel(for: item.lastCopiedAt, relativeTo: Date())
     }
 
     // Compact, "ago"-free timestamp for card headers (15s / 4m / 2h / Yesterday).
