@@ -69,6 +69,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         self.searchNotesRuntime = searchNotesRuntime ?? SearchNotesRuntimeController()
         self.retentionRuntime.attachHistoryStore(store)
         self.retentionRuntime.onSnapshotChange = { [weak self] snapshot in
+            self?.beginPublishBatch(); defer { self?.endPublishBatch() }
             self?.onRetentionSnapshotDidChange?(snapshot)
             self?.synchronizeSearchNotesRuntime()
             self?.publishState()
@@ -186,6 +187,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
     }
 
     func setPinned(_ isPinned: Bool, for itemID: String) {
+        beginPublishBatch(); defer { endPublishBatch() }
         store.setPinned(isPinned, for: itemID)
         synchronizeSearchNotesRuntime()
         retentionRuntime.recordHistoryMutation()
@@ -194,6 +196,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
 
     /// Removes every item, including ones hidden by the current search or filter.
     func deleteAllItems() {
+        beginPublishBatch(); defer { endPublishBatch() }
         let ids = store.snapshot.allItems.map(\.id)
         guard ids.isEmpty == false else {
             return
@@ -208,6 +211,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
     }
 
     func deleteItem(id: String) {
+        beginPublishBatch(); defer { endPublishBatch() }
         guard store.item(for: id) != nil else {
             return
         }
@@ -326,6 +330,7 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
     private func bindMonitor() {
         monitor.onSample = { [weak self] sample in
             guard let self else { return }
+            self.beginPublishBatch(); defer { self.endPublishBatch() }
             if self.shouldSuppressProgrammaticCapture(for: sample) {
                 self.reconcileSuppressedCapture(with: sample)
                 self.publishState()
@@ -362,7 +367,29 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         }
     }
 
+    // One copy or one user action used to publish the full projection three
+    // or four times in a row (search sync, retention snapshot, the caller
+    // itself), and each publish rebuilt every card. Publishes between begin
+    // and end are collapsed into one when the outermost batch ends.
+    private var publishBatchDepth = 0
+    private var hasPendingPublish = false
+
+    private func beginPublishBatch() {
+        publishBatchDepth += 1
+    }
+
+    private func endPublishBatch() {
+        publishBatchDepth -= 1
+        guard publishBatchDepth == 0, hasPendingPublish else { return }
+        hasPendingPublish = false
+        publishState()
+    }
+
     private func publishState(visibleIDs: [String]? = nil) {
+        guard publishBatchDepth == 0 else {
+            hasPendingPublish = true
+            return
+        }
         normalizeSelectionIfNeeded(visibleIDs: visibleIDs)
         let snapshot = store.snapshot
         onSnapshotDidChange?(snapshot)
