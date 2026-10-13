@@ -43,7 +43,6 @@ struct SBClipCardShell: View {
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
 
-    @State private var isHovering = false
     @State private var loadedThumbnail: NSImage?
     @State private var loadedPixelSize: CGSize?
     @State private var loadedFileBytes: Int64?
@@ -64,11 +63,6 @@ struct SBClipCardShell: View {
                     .padding(.vertical, 3)
                     .frame(height: 34)
                     .background(typeHeaderBackground)
-                    .onHover { hovering in
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isHovering = hovering
-                        }
-                    }
 
                 bodyContent
                     .padding(12)
@@ -116,9 +110,8 @@ struct SBClipCardShell: View {
                 .modifiers(.control)
                 .onEnded(onOpenContextMenu)
         )
-        // Right-click now opens the same custom action surface as the card's
-        // ellipsis button, instead of a separate native NSMenu with a second
-        // action path.
+        // Right-click opens the card's action menu next to the card, instead
+        // of a separate native NSMenu with a second action path.
         .background(SBRightClickGesture(action: onOpenContextMenu))
         .anchorPreference(key: SBClipCardAnchorPreferenceKey.self, value: .bounds) {
             [clip.id: $0]
@@ -194,23 +187,11 @@ struct SBClipCardShell: View {
             .accessibilityLabel(copy.text(.accessibilityClipFrom, ["app": clip.sourceApp.displayName]))
             .help(clip.sourceApp.displayName)
 
-            if isHovering {
-                Button(action: onOpenContextMenu) {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(theme.palette.textSecondary)
-                        .frame(width: 18, height: 18)
-                        .background(theme.palette.raised)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(copy.text(.accessibilityMoreActions))
-                .transition(.opacity)
-            } else if clip.isPinned {
+            // Actions open with a right-click (or Control-click) on the card.
+            if clip.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(theme.accent(for: .danger))
-                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
