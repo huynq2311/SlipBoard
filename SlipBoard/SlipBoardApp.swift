@@ -2701,6 +2701,7 @@ private struct SlipBoardMenuBarLifecycleLabel: View {
 private struct SBMenuBarDropdownRuntimeView: View {
     @ObservedObject var runtime: ClipboardHistoryAppRuntime
     let onSelectCommand: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         SBMenuBarDropdownShell(
@@ -2708,7 +2709,12 @@ private struct SBMenuBarDropdownRuntimeView: View {
             summary: runtime.localizedMenuBarSummary,
             securitySnapshot: runtime.securitySnapshot,
             onSelectQuickRetention: runtime.selectQuickRetention,
-            onSelectCommand: onSelectCommand
+            onSelectCommand: { commandID in
+                // A `.window` menu bar extra stays open after a row is picked,
+                // so it sat on top of the Settings window or popup it opened.
+                dismiss()
+                onSelectCommand(commandID)
+            }
         )
         .padding(8)
         .background(runtime.popupTheme.palette.canvas)
