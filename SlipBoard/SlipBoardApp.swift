@@ -618,7 +618,9 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     }
 
     var isPinnedCollapsed: Bool {
-        manualPinnedCollapsed ?? popupState.pinnedClips.isEmpty
+        // Based on every pinned clip, not the filtered ones: a filter with no
+        // pinned matches must not fold the rail away.
+        manualPinnedCollapsed ?? controller.latestSnapshot.pinnedItems.isEmpty
     }
 
     func togglePinnedCollapsed() {
