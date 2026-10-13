@@ -20,7 +20,6 @@ struct ClipboardHistoryPopupView: View {
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectSource: (String?) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
-    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}
     var onOpenSettings: () -> Void = {}
@@ -60,7 +59,6 @@ struct ClipboardHistoryPopupView: View {
             onSelectFilter: onSelectFilter,
             onSelectSource: onSelectSource,
             onSelectThemePreview: onSelectThemePreview,
-            onSelectOrganizationGroup: onSelectOrganizationGroup,
             onPauseCapture: onPauseCapture,
             onClearHistory: onClearHistory,
             onOpenSettings: onOpenSettings,

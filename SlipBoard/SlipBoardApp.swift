@@ -1386,7 +1386,6 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         groups: [OrganizationGroupSummary],
         isLaunchAtLoginEnabled: Bool
     ) -> SettingsPaneModel {
-        let customGroups = groups.filter { $0.isSystem == false }
         let lockLabel = searchProjection.lockState == .locked ? "Locked" : "Unlocked"
 
         return SettingsPaneModel(
@@ -1431,33 +1430,6 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
                             )
                         )
                     ]
-                ),
-                SettingsPaneSection(
-                    id: "organization.collections",
-                    title: "Collections",
-                    descriptionText: "Custom groups remain local-only and feed the popup chip strip plus the shared search filter path.",
-                    rows: customGroups.map { group in
-                        .listEntry(
-                            SettingsListEntry(
-                                id: "organization.group.\(group.id)",
-                                title: group.name,
-                                detailText: group.groupID == searchProjection.activeGroupID
-                                    ? "Active group filter in the shared popup runtime."
-                                    : "Available in the popup organization strip.",
-                                accessoryText: group.groupID == searchProjection.activeGroupID ? "Selected" : nil,
-                                badgeText: "\(group.itemCount)",
-                                symbolName: "folder"
-                            )
-                        )
-                    },
-                    placeholder: customGroups.isEmpty
-                        ? SettingsPanePlaceholder(
-                            id: "organization.collections.empty",
-                            title: "Create first group",
-                            detailText: "Add collections from the runtime host, then use this pane and the popup chips to inspect the shared organization state.",
-                            kind: .emptyState
-                        )
-                        : nil
                 ),
                 SettingsPaneSection(
                     id: "organization.locked",
@@ -2767,7 +2739,6 @@ private struct SBPopupRootView: View {
             onSelectFilter: runtime.selectFilter,
             onSelectSource: runtime.selectSource,
             onSelectThemePreview: runtime.selectThemePreview,
-            onSelectOrganizationGroup: runtime.selectOrganizationGroup,
             onPauseCapture: onPauseCapture,
             onClearHistory: onClearHistory,
             onOpenSettings: onOpenSettings,

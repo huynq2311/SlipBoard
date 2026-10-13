@@ -43,7 +43,6 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case sidebarSecurity
     case popupPinned
     case popupRecent
-    case popupCollections
     case popupNoItems
     case actionCopy
     case actionPaste
@@ -244,16 +243,9 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case settingsSearchDescription
     case settingsSearchVisibility
     case settingsNoteSource
-    case settingsCollectionsHeading
-    case settingsCollectionsDescription
-    case settingsCreateFirstGroup
     case settingsLockedStateHeading
     case settingsSearchUnlockedDetail
     case settingsNoteSourceDetail
-    case settingsGroupActiveDetail
-    case settingsGroupAvailableDetail
-    case settingsSelected
-    case settingsCollectionsEmptyDetail
     case settingsSearchDisabledTitle
     case settingsAppLockLiveTitle
     case settingsSearchLockedDetail
@@ -516,7 +508,6 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .sidebarSecurity: "Security"
         case .popupPinned: "Pinned"
         case .popupRecent: "Recent"
-        case .popupCollections: "Collections"
         case .popupNoItems: "No clipboard items"
         case .actionCopy: "Copy"
         case .actionPaste: "Paste"
@@ -717,16 +708,9 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .settingsSearchDescription: "FTS5 queries, note mirrors, and collection terms stay local. The runtime disables search entirely whenever App Lock is holding protected content."
         case .settingsSearchVisibility: "Search visibility"
         case .settingsNoteSource: "Note source of truth"
-        case .settingsCollectionsHeading: "Collections"
-        case .settingsCollectionsDescription: "Custom groups remain local-only and feed the popup chip strip plus the shared search filter path."
-        case .settingsCreateFirstGroup: "Create first group"
         case .settingsLockedStateHeading: "Locked state"
         case .settingsSearchUnlockedDetail: "Clipboard content, notes, and collections are searchable while the runtime is unlocked."
         case .settingsNoteSourceDetail: "Note bodies stay behind the protected payload seam; this pane only reflects the unlocked mirror used for local search."
-        case .settingsGroupActiveDetail: "Active group filter in the shared popup runtime."
-        case .settingsGroupAvailableDetail: "Available in the popup organization strip."
-        case .settingsSelected: "Selected"
-        case .settingsCollectionsEmptyDetail: "Add collections from the runtime host, then use this pane and the popup chips to inspect the shared organization state."
         case .settingsSearchDisabledTitle: "Search is currently disabled"
         case .settingsAppLockLiveTitle: "Live App Lock integration"
         case .settingsSearchLockedDetail: "Search results, note drafts, and unlocked mirrors are cleared while locked. The popup, menu bar, and Security pane all route through the same local lock state."
@@ -1030,7 +1014,6 @@ struct LocalizationCatalog: Sendable {
         .sidebarSecurity: "Bảo mật",
         .popupPinned: "Đã ghim",
         .popupRecent: "Gần đây",
-        .popupCollections: "Bộ sưu tập",
         .popupNoItems: "Không có mục clipboard",
         .actionCopy: "Sao chép",
         .actionPaste: "Dán",
@@ -1231,16 +1214,9 @@ struct LocalizationCatalog: Sendable {
         .settingsSearchDescription: "Truy vấn FTS5, bản sao ghi chú và thuật ngữ bộ sưu tập luôn cục bộ. Runtime tắt hoàn toàn tìm kiếm khi App Lock giữ nội dung được bảo vệ.",
         .settingsSearchVisibility: "Hiển thị tìm kiếm",
         .settingsNoteSource: "Nguồn dữ liệu ghi chú",
-        .settingsCollectionsHeading: "Bộ sưu tập",
-        .settingsCollectionsDescription: "Nhóm tùy chỉnh chỉ lưu cục bộ và cấp dữ liệu cho dải chip popup cùng bộ lọc tìm kiếm chung.",
-        .settingsCreateFirstGroup: "Tạo nhóm đầu tiên",
         .settingsLockedStateHeading: "Trạng thái khóa",
         .settingsSearchUnlockedDetail: "Có thể tìm kiếm nội dung clipboard, ghi chú và bộ sưu tập khi runtime đã mở khóa.",
         .settingsNoteSourceDetail: "Nội dung ghi chú nằm sau lớp dữ liệu được bảo vệ; khung này chỉ phản ánh bản sao đã mở khóa dùng cho tìm kiếm cục bộ.",
-        .settingsGroupActiveDetail: "Bộ lọc nhóm đang hoạt động trong runtime popup dùng chung.",
-        .settingsGroupAvailableDetail: "Có trong dải tổ chức của popup.",
-        .settingsSelected: "Đã chọn",
-        .settingsCollectionsEmptyDetail: "Thêm bộ sưu tập từ runtime host, rồi dùng khung này và các chip popup để xem trạng thái tổ chức dùng chung.",
         .settingsSearchDisabledTitle: "Tìm kiếm hiện đang bị tắt",
         .settingsAppLockLiveTitle: "Tích hợp Khóa ứng dụng trực tiếp",
         .settingsSearchLockedDetail: "Kết quả tìm kiếm, bản nháp ghi chú và bản sao đã mở khóa sẽ bị xóa khi khóa. Popup, menu bar và khung Bảo mật đều dùng chung trạng thái khóa cục bộ.",

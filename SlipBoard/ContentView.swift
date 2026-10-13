@@ -158,7 +158,6 @@ struct ContentView: View {
                 onSearchQueryChange: runtime.updateSearchQuery,
                 onSelectFilter: runtime.selectFilter,
                 onSelectThemePreview: runtime.selectThemePreview,
-                onSelectOrganizationGroup: runtime.selectOrganizationGroup,
                 onSelectClipID: runtime.selectClip,
                 onMoveSelection: runtime.moveSelection,
                 onToggleNoteEditor: runtime.toggleNoteEditor,
