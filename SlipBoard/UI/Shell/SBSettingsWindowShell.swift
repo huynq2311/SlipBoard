@@ -1827,7 +1827,7 @@ private struct RetentionPeriodRow: View {
         item.options
             .first(where: { $0.id == RetentionTTLPolicy.customOptionID })?
             .detailText
-            .flatMap(RetentionTTLPolicy.init(rawValue:))
+            .flatMap { RetentionTTLPolicy(rawValue: $0) }
     }
 
     private var enteredPolicy: RetentionTTLPolicy? {
