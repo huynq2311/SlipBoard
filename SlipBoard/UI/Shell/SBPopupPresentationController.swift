@@ -27,7 +27,6 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         static let presentationOffset: CGFloat = 18
         static let presentationDuration: TimeInterval = 0.16
         static let dismissalDuration: TimeInterval = 0.16
-        static let resizeDuration: TimeInterval = 0.22
     }
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -110,16 +109,11 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
                     isDismissing = false
                     panel.alphaValue = 1
                     let newFrame = targetFrame(for: panel.screen ?? presentationScreen())
-                    if panel.frame.size != newFrame.size {
-                        NSAnimationContext.runAnimationGroup { context in
-                            context.duration = Layout.resizeDuration
-                            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                            context.allowsImplicitAnimation = true
-                            panel.animator().setFrame(newFrame, display: true)
-                        }
-                    } else {
-                        panel.setFrame(newFrame, display: true)
-                    }
+                    // Resized in one step: SwiftUI animates the content itself,
+                    // and driving the window frame through an animation as well
+                    // made the hosting view request another constraints pass on
+                    // every frame until AppKit aborted with an exception.
+                    panel.setFrame(newFrame, display: true)
                     panel.makeKeyAndOrderFront(nil)
                 } else {
                     presentPanel(panel, on: presentationScreen())
