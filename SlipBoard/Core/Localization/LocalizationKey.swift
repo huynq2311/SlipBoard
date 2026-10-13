@@ -85,6 +85,13 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case retentionOneMonth
     case retentionThreeMonths
     case retentionForever
+    case retentionCustom
+    case retentionCustomApply
+    case retentionCustomHint
+    case retentionUnitHours
+    case retentionUnitDays
+    case retentionUnitWeeks
+    case retentionUnitMonths
     case alertClearHistoryTitle
     case alertClearHistoryMessage
     case alertConfirm
@@ -549,6 +556,13 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .retentionOneMonth: "1mo"
         case .retentionThreeMonths: "3mo"
         case .retentionForever: "∞"
+        case .retentionCustom: "Custom"
+        case .retentionCustomApply: "Apply"
+        case .retentionCustomHint: "Keep clips for"
+        case .retentionUnitHours: "hours"
+        case .retentionUnitDays: "days"
+        case .retentionUnitWeeks: "weeks"
+        case .retentionUnitMonths: "months"
         case .alertClearHistoryTitle: "Clear History?"
         case .alertClearHistoryMessage: "This permanently removes all clipboard history."
         case .alertConfirm: "Confirm"
@@ -1054,6 +1068,13 @@ struct LocalizationCatalog: Sendable {
         .retentionOneMonth: "1 tháng",
         .retentionThreeMonths: "3 tháng",
         .retentionForever: "∞",
+        .retentionCustom: "Tùy chỉnh",
+        .retentionCustomApply: "Áp dụng",
+        .retentionCustomHint: "Giữ clip trong",
+        .retentionUnitHours: "giờ",
+        .retentionUnitDays: "ngày",
+        .retentionUnitWeeks: "tuần",
+        .retentionUnitMonths: "tháng",
         .alertClearHistoryTitle: "Xóa lịch sử?",
         .alertClearHistoryMessage: "Thao tác này sẽ xóa vĩnh viễn toàn bộ lịch sử clipboard.",
         .alertConfirm: "Xác nhận",

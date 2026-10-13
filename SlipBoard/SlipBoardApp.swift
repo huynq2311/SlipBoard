@@ -1526,14 +1526,29 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
                                 id: "ttl",
                                 title: "Retention period",
                                 detailText: "Quick retention in the menu bar mirrors this setting immediately.",
-                                selectedOptionID: retentionSettings.ttlPolicy.rawValue,
-                                options: RetentionTTLPolicy.allCases.map { policy in
+                                selectedOptionID: retentionSettings.ttlPolicy.isCustom
+                                    ? RetentionTTLPolicy.customOptionID
+                                    : retentionSettings.ttlPolicy.rawValue,
+                                options: RetentionTTLPolicy.presets.map { policy in
                                     SettingsChoiceOption(
                                         id: policy.rawValue,
                                         label: policy.settingsLabel,
                                         isSelected: policy == retentionSettings.ttlPolicy
                                     )
-                                }
+                                } + [
+                                    // The detail carries the stored custom value so
+                                    // the editor can start from it.
+                                    SettingsChoiceOption(
+                                        id: RetentionTTLPolicy.customOptionID,
+                                        label: retentionSettings.ttlPolicy.isCustom
+                                            ? retentionSettings.ttlPolicy.settingsLabel
+                                            : "Custom",
+                                        detailText: retentionSettings.ttlPolicy.isCustom
+                                            ? retentionSettings.ttlPolicy.rawValue
+                                            : nil,
+                                        isSelected: retentionSettings.ttlPolicy.isCustom
+                                    )
+                                ]
                             )
                         ),
                         .toggle(

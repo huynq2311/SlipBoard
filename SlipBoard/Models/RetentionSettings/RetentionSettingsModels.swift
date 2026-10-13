@@ -12,27 +12,89 @@ enum RetentionSettingBounds {
     static let defaultCacheSizeMB = 500
 }
 
-enum RetentionTTLPolicy: String, CaseIterable, Identifiable, Hashable {
-    case oneWeek = "1w"
-    case twoWeeks = "2w"
-    case oneMonth = "1mo"
-    case threeMonths = "3mo"
-    case never = "never"
+enum RetentionTTLUnit: String, CaseIterable, Identifiable, Hashable {
+    case hours = "h"
+    case days = "d"
+    case weeks = "w"
+    case months = "mo"
 
     var id: String { rawValue }
 
+    var seconds: TimeInterval {
+        switch self {
+        case .hours: return 60 * 60
+        case .days: return 24 * 60 * 60
+        case .weeks: return 7 * 24 * 60 * 60
+        case .months: return 30 * 24 * 60 * 60
+        }
+    }
+}
+
+/// How long history is kept. The raw value is what Core Data stores, so the
+/// presets keep their old strings; a custom period is stored as
+/// `custom:<amount><unit>`, for example `custom:3d`.
+enum RetentionTTLPolicy: Identifiable, Hashable {
+    case oneWeek
+    case twoWeeks
+    case oneMonth
+    case threeMonths
+    case never
+    case custom(amount: Int, unit: RetentionTTLUnit)
+
+    static let customAmountRange = 1...999
+    static let customOptionID = "custom"
+
+    /// The fixed choices shown as chips, in order.
+    static let presets: [RetentionTTLPolicy] = [.oneWeek, .twoWeeks, .oneMonth, .threeMonths, .never]
+
+    init?(rawValue: String) {
+        switch rawValue {
+        case "1w": self = .oneWeek
+        case "2w": self = .twoWeeks
+        case "1mo": self = .oneMonth
+        case "3mo": self = .threeMonths
+        case "never": self = .never
+        default:
+            guard rawValue.hasPrefix("custom:") else { return nil }
+            let value = rawValue.dropFirst("custom:".count)
+            guard let unit = RetentionTTLUnit.allCases
+                    .sorted(by: { $0.rawValue.count > $1.rawValue.count })
+                    .first(where: { value.hasSuffix($0.rawValue) }),
+                  let amount = Int(value.dropLast(unit.rawValue.count)),
+                  Self.customAmountRange.contains(amount)
+            else {
+                return nil
+            }
+            self = .custom(amount: amount, unit: unit)
+        }
+    }
+
+    var rawValue: String {
+        switch self {
+        case .oneWeek: return "1w"
+        case .twoWeeks: return "2w"
+        case .oneMonth: return "1mo"
+        case .threeMonths: return "3mo"
+        case .never: return "never"
+        case let .custom(amount, unit): return "custom:\(amount)\(unit.rawValue)"
+        }
+    }
+
+    var id: String { rawValue }
+
+    var isCustom: Bool {
+        if case .custom = self { return true }
+        return false
+    }
+
     var settingsLabel: String {
         switch self {
-        case .oneWeek:
-            return "1w"
-        case .twoWeeks:
-            return "2w"
-        case .oneMonth:
-            return "1mo"
-        case .threeMonths:
-            return "3mo"
         case .never:
             return "Never"
+        case let .custom(amount, unit):
+            return "\(amount)\(unit.rawValue)"
+        default:
+            return rawValue
         }
     }
 
@@ -57,6 +119,8 @@ enum RetentionTTLPolicy: String, CaseIterable, Identifiable, Hashable {
             return 90 * 24 * 60 * 60
         case .never:
             return nil
+        case let .custom(amount, unit):
+            return TimeInterval(amount) * unit.seconds
         }
     }
 

@@ -168,7 +168,7 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
                 exclusionsPauseSnapshot: exclusionsPauseSnapshot
             ),
             quickRetentionSelectionID: selectedPolicy.rawValue,
-            quickRetentionOptions: RetentionTTLPolicy.allCases.map { policy in
+            quickRetentionOptions: (RetentionTTLPolicy.presets + (selectedPolicy.isCustom ? [selectedPolicy] : [])).map { policy in
                 MenuBarRetentionOption(
                     id: policy.rawValue,
                     label: policy.menuBarLabel,
