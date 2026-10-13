@@ -40,9 +40,14 @@ your Mac is off or locked out.
 **App Lock is not disk encryption.** It locks the SlipBoard window and
 hides previews until you unlock with Touch ID or your system password,
 and it clears clip text from the search index while locked. It also
-keeps an encrypted copy of clip content and notes, with a key protected
-by the Secure Enclave, but the unencrypted copies described above stay
+keeps an encrypted copy of clip content and notes, with a key held by
+the Secure Enclave, but the unencrypted copies described above stay
 on disk.
+
+**App Lock only locks within a session.** SlipBoard opens unlocked when
+it launches, including after a restart or reinstall, and locks when you
+choose Lock or after the auto-lock timeout. Anyone who can use your
+logged-in Mac can quit and reopen SlipBoard to see your history.
 
 iPhone ↔ Mac clipboard sharing, if you use it, goes through Apple's own
 Universal Clipboard (Handoff) feature — SlipBoard does not operate or

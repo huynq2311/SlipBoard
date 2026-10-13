@@ -95,6 +95,8 @@ vừa dùng.
 
 ### 5. Khóa ứng dụng (App Lock)
 
+- Chỉ khóa trong phiên dùng: SlipBoard mở sẵn sau khi khởi động hoặc cài lại,
+  rồi khóa khi bạn bấm Khóa hoặc khi hết thời gian tự khóa.
 - Mở khóa bằng **Touch ID** hoặc mật khẩu hệ thống.
 - Tự khóa sau 1 phút, 5 phút, 15 phút hoặc 1 giờ không hoạt động.
 - Khi khóa, nội dung bị ẩn trong popup, kể cả độ dài và kích thước của từng
