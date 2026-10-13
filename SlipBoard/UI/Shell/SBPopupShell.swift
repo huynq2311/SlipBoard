@@ -128,6 +128,9 @@ struct SBPopupTopBar: View {
                 isOpen: activeMenu == .source,
                 optionLabel: { $0.label },
                 optionIcon: { AnyView(sourceMenuIcon($0)) },
+                isOptionSelected: { $0.id == (state.activeSourceID ?? "") },
+                buttonWidth: 170,
+                maxVisibleRows: 6,
                 onToggle: { toggleMenu(.source) },
                 action: { option in
                     onSelectSource(option.id.isEmpty ? nil : option.id)
@@ -208,7 +211,10 @@ struct SBPopupTopBar: View {
         // The list is capped, so the total comes from the "All" type filter.
         let total = filters.first(where: { $0.id == "all" })?.count ?? 0
         let all = SBUtilityDropdownOption(id: "", label: "\(copy.text(.commonAll)) (\(total))")
-        return [all] + state.sourceOptions.map {
+        // The selected app goes right under "All" so it is always in view.
+        let ordered = state.sourceOptions.filter { $0.id == state.activeSourceID }
+            + state.sourceOptions.filter { $0.id != state.activeSourceID }
+        return [all] + ordered.map {
             SBUtilityDropdownOption(id: $0.id, label: "\($0.label) (\($0.count))")
         }
     }

@@ -46,11 +46,22 @@ struct SBSearchFieldShell: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(theme.palette.textTertiary)
 
-            TextField(placeholder, text: $text)
+            // The system placeholder draws almost invisibly in the non-key
+            // popup panel, so the placeholder is drawn here instead.
+            TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(theme.typography.rowPrimary)
                 .foregroundStyle(theme.palette.textPrimary)
                 .focused($isFocused)
+                .overlay(alignment: .leading) {
+                    if text.isEmpty {
+                        Text(placeholder)
+                            .font(theme.typography.rowPrimary)
+                            .foregroundStyle(theme.palette.textTertiary)
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
+                    }
+                }
 
             if let trailingHint, isPresented {
                 SBKeyboardHint(text: trailingHint, theme: theme)
@@ -174,8 +185,17 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
     var optionLabel: (Option) -> String
     /// Optional leading icon for each row.
     var optionIcon: ((Option) -> AnyView)? = nil
+    var isOptionSelected: (Option) -> Bool = { _ in false }
+    /// Fixed button width, so a longer selection does not shift what follows.
+    var buttonWidth: CGFloat? = nil
+    /// Rows shown before the list scrolls.
+    var maxVisibleRows: Int? = nil
     var onToggle: () -> Void = {}
     var action: (Option) -> Void = { _ in }
+
+    @State private var hoveredOptionID: Option.ID?
+
+    private static var rowHeight: CGFloat { 28 }
 
     var body: some View {
         Button(action: onToggle) {
@@ -186,6 +206,11 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
                 Text(selectionText)
                     .foregroundStyle(theme.palette.textSecondary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if buttonWidth != nil {
+                    Spacer(minLength: 0)
+                }
 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
@@ -193,7 +218,7 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
             }
             .font(theme.typography.chip)
             .padding(.horizontal, theme.spacing.control10)
-            .frame(height: 32)
+            .frame(width: buttonWidth, height: 32)
             .background(theme.palette.subpanel)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
@@ -214,31 +239,67 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
     }
 
     private var dropdownList: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let rows = VStack(alignment: .leading, spacing: 0) {
             ForEach(options, id: \.id) { option in
-                Button {
-                    action(option)
-                } label: {
-                    HStack(spacing: theme.spacing.control8) {
-                        optionIcon?(option)
-
-                        Text(optionLabel(option))
-                            .font(theme.typography.chip)
-                            .foregroundStyle(theme.palette.textPrimary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, theme.spacing.control10)
-                    .padding(.vertical, theme.spacing.control6)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                optionRow(option)
             }
         }
         .padding(.vertical, 4)
-        .frame(minWidth: 160, alignment: .leading)
+
+        return Group {
+            if let maxVisibleRows, options.count > maxVisibleRows {
+                ScrollView(.vertical, showsIndicators: true) { rows }
+                    .frame(height: CGFloat(maxVisibleRows) * Self.rowHeight + 8)
+            } else {
+                rows
+            }
+        }
+        .frame(minWidth: max(160, buttonWidth ?? 0), alignment: .leading)
         .fixedSize(horizontal: true, vertical: false)
         .sbSurface(.overlay, theme: theme)
+    }
+
+    private func optionRow(_ option: Option) -> some View {
+        let isSelected = isOptionSelected(option)
+        let isHovered = hoveredOptionID == option.id
+
+        return Button {
+            action(option)
+        } label: {
+            HStack(spacing: theme.spacing.control8) {
+                optionIcon?(option)
+
+                Text(optionLabel(option))
+                    .font(theme.typography.chip)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                    .foregroundStyle(isSelected ? theme.accent(for: .primary) : theme.palette.textPrimary)
+                    .lineLimit(1)
+
+                Spacer(minLength: theme.spacing.control8)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(theme.accent(for: .primary))
+                }
+            }
+            .padding(.horizontal, theme.spacing.control10)
+            .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? theme.accentBackground(for: .primary) : (isHovered ? theme.palette.subpanel : Color.clear))
+                    .padding(.horizontal, 4)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering in
+            if isHovering {
+                hoveredOptionID = option.id
+            } else if hoveredOptionID == option.id {
+                hoveredOptionID = nil
+            }
+        }
     }
 }
 
