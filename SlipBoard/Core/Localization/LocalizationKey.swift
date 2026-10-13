@@ -59,6 +59,10 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case statusAutoResumes
     case settingsLanguageTitle
     case settingsLanguageDescription
+    case settingsQuickPasteTitle
+    case settingsQuickPasteDescription
+    case settingsQuickPasteModifier
+    case settingsQuickPasteOff
     case settingsAppearance
     case settingsTheme
     case settingsGeneral
@@ -530,6 +534,10 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .statusAutoResumes: "Auto-resumes %{value}"
         case .settingsLanguageTitle: "Display Language"
         case .settingsLanguageDescription: "Choose the language used across SlipBoard."
+        case .settingsQuickPasteTitle: "Quick paste"
+        case .settingsQuickPasteDescription: "Hold this key and click a clip card to paste it right away."
+        case .settingsQuickPasteModifier: "Key to hold"
+        case .settingsQuickPasteOff: "Off"
         case .settingsAppearance: "Appearance"
         case .settingsTheme: "Theme"
         case .settingsGeneral: "General"
@@ -1042,6 +1050,10 @@ struct LocalizationCatalog: Sendable {
         .statusAutoResumes: "Tự tiếp tục %{value}",
         .settingsLanguageTitle: "Ngôn ngữ hiển thị",
         .settingsLanguageDescription: "Chọn ngôn ngữ dùng trong SlipBoard.",
+        .settingsQuickPasteTitle: "Dán nhanh",
+        .settingsQuickPasteDescription: "Giữ phím này và click vào thẻ để dán ngay.",
+        .settingsQuickPasteModifier: "Phím giữ",
+        .settingsQuickPasteOff: "Tắt",
         .settingsAppearance: "Giao diện",
         .settingsTheme: "Chủ đề",
         .settingsGeneral: "Chung",

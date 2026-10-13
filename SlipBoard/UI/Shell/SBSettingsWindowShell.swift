@@ -5,6 +5,7 @@ struct SBSettingsWindowShell: View {
     let state: SettingsShellState
     @SBLocalizedCopy private var copy
     @Environment(\.sbLocalizationLanguage) private var localizationLanguage
+    @AppStorage(QuickPasteModifier.storageKey) private var quickPasteModifier = QuickPasteModifier.command.rawValue
     var securitySnapshot: Any? = nil
     var bridgeSnapshot: BridgeRuntimeSnapshot? = nil
     var exclusionsPauseSnapshot: ExclusionsPauseSnapshot? = nil
@@ -934,6 +935,30 @@ struct SBSettingsWindowShell: View {
                 ),
                 theme: theme,
                 onSelect: { onSelectChoice("app-language", $0) }
+            )
+        }
+
+        SBPaneSection(
+            title: copy.text(.settingsQuickPasteTitle),
+            descriptionText: copy.text(.settingsQuickPasteDescription),
+            theme: theme
+        ) {
+            InteractiveChoiceRow(
+                item: SettingsChoiceItem(
+                    id: "quick-paste-modifier",
+                    title: copy.text(.settingsQuickPasteModifier),
+                    selectedOptionID: quickPasteModifier,
+                    options: QuickPasteModifier.allCases.map { modifier in
+                        SettingsChoiceOption(
+                            id: modifier.rawValue,
+                            label: modifier == .off ? copy.text(.settingsQuickPasteOff) : modifier.symbolLabel,
+                            isSelected: modifier.rawValue == quickPasteModifier
+                        )
+                    },
+                    style: .segmented
+                ),
+                theme: theme,
+                onSelect: { quickPasteModifier = $0 }
             )
         }
 

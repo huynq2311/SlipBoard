@@ -43,6 +43,10 @@ struct SBClipCardShell: View {
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
 
+    @AppStorage(QuickPasteModifier.storageKey) private var quickPasteModifierRawValue = QuickPasteModifier.command.rawValue
+    private var quickPasteModifier: QuickPasteModifier {
+        QuickPasteModifier(rawValue: quickPasteModifierRawValue) ?? .command
+    }
     @State private var loadedThumbnail: NSImage?
     @State private var loadedPixelSize: CGSize?
     @State private var loadedFileBytes: Int64?
@@ -109,6 +113,15 @@ struct SBClipCardShell: View {
             TapGesture(count: 1)
                 .modifiers(.control)
                 .onEnded(onOpenContextMenu)
+        )
+        .simultaneousGesture(
+            TapGesture(count: 1)
+                .modifiers(quickPasteModifier.eventModifiers ?? [])
+                .onEnded {
+                    guard quickPasteModifier.eventModifiers != nil else { return }
+                    onSelect()
+                    onPrimaryAction()
+                }
         )
         // Right-click opens the card's action menu next to the card, instead
         // of a separate native NSMenu with a second action path. It has to sit
