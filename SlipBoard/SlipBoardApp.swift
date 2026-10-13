@@ -634,8 +634,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func deleteSelectedClip() {
         recordSecurityInteraction()
+        // The controller's selection, not `popupState`: the published state
+        // trails it by one main-queue turn, so right after a selection change
+        // it still names the previous clip.
         guard securitySnapshot.lockState.revealsProtectedContent,
-              let selectedClipID = popupState.selectedClipID else {
+              let selectedClipID = controller.latestSnapshot.selectedItemID else {
             return
         }
 
