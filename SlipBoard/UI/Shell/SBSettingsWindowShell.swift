@@ -311,8 +311,14 @@ struct SBSettingsWindowShell: View {
 
     private func retentionSettingsLabel(for id: String, fallback: String) -> String {
         switch id {
-        case "1w", "2w", "1mo", "3mo":
-            return id
+        case "1w":
+            return copy.text(.retentionOneWeek)
+        case "2w":
+            return copy.text(.retentionTwoWeeks)
+        case "1mo":
+            return copy.text(.retentionOneMonth)
+        case "3mo":
+            return copy.text(.retentionThreeMonths)
         case "never":
             return copy.text(.retentionNever)
         case RetentionTTLPolicy.customOptionID:
@@ -472,6 +478,9 @@ struct SBSettingsWindowShell: View {
             } else if placeholder.id == "retention.pinned-callout.note" {
                 placeholder.title = copy.text(.settingsPinnedPreserved)
                 placeholder.detailText = copy.text(.settingsPinnedPreservedDetail)
+                if let count = placeholder.badgeText {
+                    placeholder.badgeText = "\(count) \(localizedUppercase(copy.text(.settingsPinnedBadge)))"
+                }
             } else if placeholder.id == "hotkeys.snippets.empty" {
                 placeholder.title = copy.text(.settingsNoSnippetShortcuts)
                 placeholder.detailText = copy.text(.settingsNoSnippetShortcutsDetail)

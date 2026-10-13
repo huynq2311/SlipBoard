@@ -1453,9 +1453,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
     private static func retentionPane(from snapshot: RetentionRuntimeSnapshot) -> SettingsPaneModel {
         let retentionSettings = snapshot.retentionSettings
         let assetCacheSettings = snapshot.assetCacheSettings
-        let pinnedBadgeText = snapshot.pinnedClipCount == 1
-            ? "1 pinned"
-            : "\(formattedInteger(snapshot.pinnedClipCount)) pinned"
+        // The settings shell appends the localized "pinned" label.
+        let pinnedBadgeText = formattedInteger(snapshot.pinnedClipCount)
 
         return SettingsPaneModel(
             id: .retention,
