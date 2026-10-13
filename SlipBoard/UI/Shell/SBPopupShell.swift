@@ -247,7 +247,7 @@ struct SBPopupTopBar: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(theme.palette.textSecondary)
                 .frame(width: 32, height: 32)
-                .background(theme.palette.subpanel)
+                .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
                 .clipShape(Circle())
                 .overlay(
                     Circle().stroke(theme.palette.borderStrong, lineWidth: theme.border.hairline)

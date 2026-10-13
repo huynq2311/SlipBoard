@@ -125,6 +125,12 @@ struct SBTheme {
     /// Present only for glass themes.
     var glassRim: SBGlassRim? = nil
 
+    /// Fill opacity of the search field, Source menu and overflow button in
+    /// the popup header: see-through on Liquid Glass, solid otherwise.
+    var headerControlFillOpacity: Double {
+        treatment == .liquidGlass ? 0.4 : 1
+    }
+
     var treatment: SBSurfaceTreatment {
         glassRim == nil ? .solid : .liquidGlass
     }
