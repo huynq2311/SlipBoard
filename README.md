@@ -48,6 +48,65 @@ vừa dùng.
 
 ---
 
+## Điểm nổi bật
+
+### Tất cả trên một hàng
+
+Ô tìm kiếm, menu **Nguồn** và các bộ lọc theo loại nằm chung một hàng phía trên
+hai hàng thẻ **Đã ghim** và **Gần đây**. Mỗi thẻ cho biết loại nội dung, ứng dụng
+nguồn (kèm logo thật), thời gian sao chép và kích thước.
+
+### Lọc theo ứng dụng nguồn
+
+Mở menu **Nguồn** để chỉ xem các mục đến từ một ứng dụng. Menu liệt kê các ứng
+dụng bạn sao chép nhiều nhất kèm số lượng; ứng dụng đang chọn được tô nổi và
+đưa lên ngay dưới **Tất cả**.
+
+<p align="center">
+  <img src="docs/images/source-menu-vi.png" alt="Menu Nguồn liệt kê các ứng dụng kèm logo và số lượng" width="560">
+  <img src="docs/images/source-filter-vi.png" alt="Popup chỉ còn các mục từ Safari" width="660">
+</p>
+
+### Menu thao tác ngay trên thẻ
+
+Chuột phải (hoặc `⌃` + click) vào một thẻ để dán, dán dưới dạng khác, sao chép,
+ghim, thêm ghi chú hoặc xóa. Giữ `⌘` và click để dán ngay.
+
+<p align="center">
+  <img src="docs/images/card-menu-vi.png" alt="Menu thao tác của một thẻ" width="560">
+</p>
+
+### Dán dưới dạng khác
+
+Nhấn `⌘↩` để xem trước và chọn cách dán: văn bản thuần, Markdown, bỏ dấu, CHỮ
+HOA hoặc chữ thường.
+
+<p align="center">
+  <img src="docs/images/paste-as-vi.png" alt="Menu Dán dưới dạng với bản xem trước" width="820">
+</p>
+
+### Tự quyết định lưu bao lâu
+
+Giới hạn số mục, chọn thời gian lưu (1 tuần đến mãi mãi, hoặc tùy chọn theo giờ,
+ngày, tuần, tháng) và xóa lịch sử khi thoát. Mục đã ghim không bao giờ bị dọn.
+
+<p align="center">
+  <img src="docs/images/settings-retention-vi.png" alt="Cài đặt Lưu giữ" width="720">
+</p>
+
+### Cài đặt gọn trong một nơi
+
+Mở cùng máy, đổi ngôn ngữ (Tiếng Việt / English), chọn phím giữ để dán nhanh,
+loại trừ ứng dụng, phím tắt, snippet và App Lock.
+
+<p align="center">
+  <img src="docs/images/settings-general-vi.png" alt="Cài đặt Tổ chức: khởi động, ngôn ngữ, dán nhanh" width="720">
+</p>
+
+> Ảnh chụp dùng dữ liệu mẫu.
+
+---
+
 ## Tính năng chính
 
 ### 1. Ghi lại mọi thứ bạn sao chép

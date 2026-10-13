@@ -47,6 +47,66 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 
 ---
 
+## Highlights
+
+### Everything on one row
+
+The search field, the **Source** menu and the type filters share a single row
+above the **Pinned** and **Recent** rails. Each card shows the kind of content,
+the app it came from (with its real icon), when you copied it and how big it is.
+
+### Filter by source app
+
+Open the **Source** menu to see only what came from one app. It lists the apps
+you copy from most with their counts; the selected app is highlighted and moved
+right under **All**.
+
+<p align="center">
+  <img src="docs/images/source-menu-en.png" alt="Source menu listing apps with icons and counts" width="560">
+  <img src="docs/images/source-filter-en.png" alt="The popup showing only items from Safari" width="660">
+</p>
+
+### Actions right on the card
+
+Right-click (or `⌃`-click) a card to paste it, paste it as something else, copy,
+pin, add a note or delete it. Hold `⌘` and click to paste right away.
+
+<p align="center">
+  <img src="docs/images/card-menu-en.png" alt="A card's action menu" width="560">
+</p>
+
+### Paste as something else
+
+Press `⌘↩` to preview and pick how to paste: plain text, Markdown, without
+accents, UPPERCASE or lowercase.
+
+<p align="center">
+  <img src="docs/images/paste-as-en.png" alt="The Paste As menu with a preview" width="820">
+</p>
+
+### You decide how long to keep things
+
+Cap the number of items, choose how long to keep them (1 week to forever, or a
+custom number of hours, days, weeks or months) and clear history on quit.
+Pinned items are never cleaned up.
+
+<p align="center">
+  <img src="docs/images/settings-retention-en.png" alt="Retention settings" width="720">
+</p>
+
+### Settings in one place
+
+Launch at login, switch the language (English / Tiếng Việt), pick the quick
+paste key, exclude apps, set hotkeys, snippets and App Lock.
+
+<p align="center">
+  <img src="docs/images/settings-general-en.png" alt="Organization settings: startup, language, quick paste" width="720">
+</p>
+
+> Screenshots use sample data.
+
+---
+
 ## Features
 
 ### 1. Capture everything you copy
