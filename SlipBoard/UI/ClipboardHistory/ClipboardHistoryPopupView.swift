@@ -15,6 +15,7 @@ struct ClipboardHistoryPopupView: View {
     var pasteOverlayState: PasteActionOverlayState = .hidden
     var supportedTransformActionIDs: Set<PasteActionID> = Set(PasteActionID.transformMenuOrder)
     var searchFocusRequestToken: Int = 0
+    var isPresented: Bool = true
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
@@ -54,7 +55,7 @@ struct ClipboardHistoryPopupView: View {
             pasteOverlayState: pasteOverlayState,
             supportedTransformActionIDs: supportedTransformActionIDs,
             searchFocusRequestToken: searchFocusRequestToken,
-            onToggleSearchPresented: onToggleSearchPresented,
+            isPresented: isPresented,
             onSearchQueryChange: onSearchQueryChange,
             onSelectFilter: onSelectFilter,
             onSelectSource: onSelectSource,

@@ -34,6 +34,9 @@ struct SBSearchFieldShell: View {
     var placeholder: String = "Search clipboard..."
     var trailingHint: String? = nil
     var focusRequestToken: Int = 0
+    /// When false the field stays visible at full width; `isPresented` then
+    /// only controls the trailing hint.
+    var collapsesWhenHidden: Bool = true
 
     @FocusState private var isFocused: Bool
 
@@ -61,16 +64,20 @@ struct SBSearchFieldShell: View {
             }
         }
         .padding(.horizontal, theme.spacing.control8)
-        .frame(width: isPresented ? 240 : 0, height: 34, alignment: .leading)
-        .background(theme.palette.subpanel.opacity(isPresented ? 1 : 0.001))
+        .frame(width: isVisible ? (collapsesWhenHidden ? 240 : 220) : 0, height: 34, alignment: .leading)
+        .background(theme.palette.subpanel.opacity(isVisible ? 1 : 0.001))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(theme.palette.border, lineWidth: theme.border.hairline)
-                .opacity(isPresented ? 1 : 0)
+                .opacity(isVisible ? 1 : 0)
         )
-        .opacity(isPresented ? 1 : 0)
+        .opacity(isVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isPresented)
+    }
+
+    private var isVisible: Bool {
+        isPresented || collapsesWhenHidden == false
     }
 }
 
@@ -165,6 +172,8 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
     var isEnabled: Bool = true
     var isOpen: Bool = false
     var optionLabel: (Option) -> String
+    /// Optional leading icon for each row.
+    var optionIcon: ((Option) -> AnyView)? = nil
     var onToggle: () -> Void = {}
     var action: (Option) -> Void = { _ in }
 
@@ -196,7 +205,7 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
         .fixedSize()
         .disabled(isEnabled == false || options.isEmpty)
         .opacity(isEnabled == false || options.isEmpty ? 0.5 : 1)
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .topLeading) {
             if isOpen {
                 dropdownList
                     .offset(y: 34)
@@ -210,14 +219,18 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
                 Button {
                     action(option)
                 } label: {
-                    Text(optionLabel(option))
-                        .font(theme.typography.rowPrimary)
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, theme.spacing.control12)
-                        .padding(.vertical, theme.spacing.control8)
-                        .contentShape(Rectangle())
+                    HStack(spacing: theme.spacing.control8) {
+                        optionIcon?(option)
+
+                        Text(optionLabel(option))
+                            .font(theme.typography.chip)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, theme.spacing.control10)
+                    .padding(.vertical, theme.spacing.control6)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
