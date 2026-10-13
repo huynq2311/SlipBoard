@@ -111,8 +111,9 @@ struct SBClipCardShell: View {
                 .onEnded(onOpenContextMenu)
         )
         // Right-click opens the card's action menu next to the card, instead
-        // of a separate native NSMenu with a second action path.
-        .background(SBRightClickGesture(action: onOpenContextMenu))
+        // of a separate native NSMenu with a second action path. It has to sit
+        // above the card: as a background it never received the click.
+        .overlay(SBRightClickGesture(action: onOpenContextMenu))
         .anchorPreference(key: SBClipCardAnchorPreferenceKey.self, value: .bounds) {
             [clip.id: $0]
         }
@@ -694,35 +695,27 @@ struct SBClipCardShell: View {
 private struct SBRightClickGesture: NSViewRepresentable {
     let action: () -> Void
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(action: action)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        view.wantsLayer = false
-        view.addGestureRecognizer(context.coordinator.recognizer)
+    func makeNSView(context: Context) -> RightClickView {
+        let view = RightClickView()
+        view.action = action
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.action = action
+    func updateNSView(_ nsView: RightClickView, context: Context) {
+        nsView.action = action
     }
 
-    final class Coordinator: NSObject {
-        var action: () -> Void
-        let recognizer: NSClickGestureRecognizer
+    /// Takes part in hit testing only for a right mouse down, so every other
+    /// click and hover still reaches the SwiftUI card underneath.
+    final class RightClickView: NSView {
+        var action: () -> Void = {}
 
-        init(action: @escaping () -> Void) {
-            self.action = action
-            recognizer = NSClickGestureRecognizer()
-            super.init()
-            recognizer.target = self
-            recognizer.action = #selector(handleRightClick)
-            recognizer.buttonMask = 0x2
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard NSApp.currentEvent?.type == .rightMouseDown else { return nil }
+            return super.hitTest(point)
         }
 
-        @objc private func handleRightClick() {
+        override func rightMouseDown(with event: NSEvent) {
             action()
         }
     }
