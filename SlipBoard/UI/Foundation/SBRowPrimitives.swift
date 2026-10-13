@@ -7,21 +7,6 @@ enum SBShortcutAssignmentVisualState: Hashable {
     case conflictWarning
     case disabledUnavailable
 
-    var actionTitle: String {
-        switch self {
-        case .idleAssigned:
-            return "Edit"
-        case .idleUnassigned:
-            return "Record"
-        case .recording:
-            return "Recording"
-        case .conflictWarning:
-            return "Retry"
-        case .disabledUnavailable:
-            return "Unavailable"
-        }
-    }
-
     var pillTone: SBAccentTone {
         switch self {
         case .idleAssigned:
@@ -459,6 +444,18 @@ struct SBShortcutAssignmentRow: View {
     var onRecord: () -> Void = {}
     var onClear: () -> Void = {}
 
+    @SBLocalizedCopy private var copy
+
+    private var actionTitle: String {
+        switch state {
+        case .idleAssigned: copy.text(.hotkeyActionEdit)
+        case .idleUnassigned: copy.text(.hotkeyActionRecord)
+        case .recording: copy.text(.hotkeyActionRecording)
+        case .conflictWarning: copy.text(.hotkeyActionRetry)
+        case .disabledUnavailable: copy.text(.hotkeyActionUnavailable)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.control8) {
             HStack(alignment: .center, spacing: theme.spacing.control12) {
@@ -491,14 +488,15 @@ struct SBShortcutAssignmentRow: View {
 
                 HStack(spacing: theme.spacing.control8) {
                     SBKeyboardShortcutPill(
-                        text: shortcutLabel,
+                        // The runtime's placeholder label is English.
+                        text: shortcutLabel == "No hotkey" ? copy.text(.hotkeyNoShortcut) : shortcutLabel,
                         theme: theme,
                         tone: state.pillTone,
                         isEmphasized: state.showsEmphasizedPill
                     )
 
                     SBControlPillButton(
-                        title: state.actionTitle,
+                        title: actionTitle,
                         theme: theme,
                         tone: state.pillTone,
                         isEnabled: state.isInteractive,
@@ -507,7 +505,7 @@ struct SBShortcutAssignmentRow: View {
 
                     if showsClearAction && state != .disabledUnavailable {
                         SBControlPillButton(
-                            title: "Clear",
+                            title: copy.text(.hotkeyActionClear),
                             theme: theme,
                             tone: .neutral,
                             isEnabled: shortcutLabel != "No hotkey",
@@ -519,7 +517,7 @@ struct SBShortcutAssignmentRow: View {
 
             if let helperText, helperText.isEmpty == false {
                 SBSettingsConflictCallout(
-                    title: state == .conflictWarning ? "Shortcut conflict" : "Shortcut info",
+                    title: state == .conflictWarning ? copy.text(.hotkeyConflictTitle) : copy.text(.hotkeyInfo),
                     detailText: helperText,
                     theme: theme,
                     tone: state == .conflictWarning ? .warning : .info

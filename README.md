@@ -204,7 +204,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 | CHỮ HOA / chữ thường | Đổi kiểu chữ |
 
 - Dán và đóng popup, hoặc dán và **giữ popup mở** để dán nhiều mục liên tiếp.
-- **Snippet:** đoạn văn bản dùng lại, mỗi đoạn có phím tắt toàn cục riêng.
+- **Snippet:** đoạn văn bản dùng lại, tạo và sửa trong **Cài đặt → Đoạn mã**. Gán cho mỗi snippet một phím tắt toàn cục; nhấn phím đó trong bất kỳ ứng dụng nào để dán nội dung snippet vào đó.
 
 ### 4. Kiểm soát những gì được ghi
 

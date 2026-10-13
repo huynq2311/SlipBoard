@@ -313,6 +313,25 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case settingsNoSnippetShortcutsDetail
     case settingsHotkeyConflictTiming
     case settingsLibrary
+    case snippetsNew
+    case hotkeyActionEdit
+    case hotkeyNoShortcut
+    case hotkeyActionRecord
+    case hotkeyActionRecording
+    case hotkeyActionRetry
+    case hotkeyActionUnavailable
+    case hotkeyActionClear
+    case hotkeyConflictTitle
+    case snippetsEditorHeading
+    case snippetsTitleField
+    case snippetsContentField
+    case snippetsSave
+    case snippetsConfirmDelete
+    case snippetsShortcutHeading
+    case snippetsShortcutAfterSave
+    case snippetsHowTo
+    case snippetsUntitled
+    case snippetsMissingContent
     case settingsEditorState
     case settingsNoSnippets
     case settingsNoSnippetsDetail
@@ -787,6 +806,25 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .settingsNoSnippetShortcutsDetail: "Create snippets, then assign per-snippet hotkeys without leaving the live settings path."
         case .settingsHotkeyConflictTiming: "Conflicts are validated when a shortcut is assigned, not when it fires."
         case .settingsLibrary: "Library"
+        case .snippetsNew: "New snippet"
+        case .hotkeyActionEdit: "Edit"
+        case .hotkeyNoShortcut: "No hotkey"
+        case .hotkeyActionRecord: "Record"
+        case .hotkeyActionRecording: "Recording"
+        case .hotkeyActionRetry: "Retry"
+        case .hotkeyActionUnavailable: "Unavailable"
+        case .hotkeyActionClear: "Clear"
+        case .hotkeyConflictTitle: "Shortcut conflict"
+        case .snippetsEditorHeading: "Editor"
+        case .snippetsTitleField: "Title"
+        case .snippetsContentField: "Content"
+        case .snippetsSave: "Save"
+        case .snippetsConfirmDelete: "Click again to delete"
+        case .snippetsShortcutHeading: "Shortcut"
+        case .snippetsShortcutAfterSave: "Save the snippet first, then assign a shortcut."
+        case .snippetsHowTo: "Press a snippet's shortcut in any app to paste its text there."
+        case .snippetsUntitled: "Untitled snippet"
+        case .snippetsMissingContent: "Add some content before saving."
         case .settingsEditorState: "Editor state"
         case .settingsNoSnippets: "No snippets yet"
         case .settingsNoSnippetsDetail: "Create your first saved snippet to keep reusable text local to this Mac."
@@ -1302,6 +1340,25 @@ struct LocalizationCatalog: Sendable {
         .settingsNoSnippetShortcutsDetail: "Tạo snippet rồi gán phím tắt riêng mà không rời luồng cài đặt trực tiếp.",
         .settingsHotkeyConflictTiming: "Xung đột được kiểm tra khi gán phím tắt, không phải lúc kích hoạt.",
         .settingsLibrary: "Thư viện",
+        .snippetsNew: "Snippet mới",
+        .hotkeyActionEdit: "Sửa",
+        .hotkeyNoShortcut: "Chưa gán",
+        .hotkeyActionRecord: "Ghi phím",
+        .hotkeyActionRecording: "Đang ghi…",
+        .hotkeyActionRetry: "Thử lại",
+        .hotkeyActionUnavailable: "Không khả dụng",
+        .hotkeyActionClear: "Xóa",
+        .hotkeyConflictTitle: "Trùng phím tắt",
+        .snippetsEditorHeading: "Soạn thảo",
+        .snippetsTitleField: "Tiêu đề",
+        .snippetsContentField: "Nội dung",
+        .snippetsSave: "Lưu",
+        .snippetsConfirmDelete: "Bấm lần nữa để xóa",
+        .snippetsShortcutHeading: "Phím tắt",
+        .snippetsShortcutAfterSave: "Lưu snippet trước, rồi gán phím tắt.",
+        .snippetsHowTo: "Nhấn phím tắt của snippet trong bất kỳ ứng dụng nào để dán nội dung vào đó.",
+        .snippetsUntitled: "Snippet chưa đặt tên",
+        .snippetsMissingContent: "Thêm nội dung trước khi lưu.",
         .settingsEditorState: "Trạng thái trình soạn thảo",
         .settingsNoSnippets: "Chưa có snippet",
         .settingsNoSnippetsDetail: "Tạo snippet đầu tiên để giữ văn bản tái sử dụng cục bộ trên máy Mac này.",
