@@ -56,7 +56,7 @@ struct SBSearchFieldShell: View {
                 .overlay(alignment: .leading) {
                     if text.isEmpty {
                         Text(placeholder)
-                            .font(theme.typography.rowPrimary)
+                            .font(theme.typography.chip)
                             .foregroundStyle(theme.palette.textTertiary)
                             .lineLimit(1)
                             .allowsHitTesting(false)
@@ -75,7 +75,7 @@ struct SBSearchFieldShell: View {
             }
         }
         .padding(.horizontal, theme.spacing.control8)
-        .frame(width: isVisible ? (collapsesWhenHidden ? 240 : 220) : 0, height: 34, alignment: .leading)
+        .frame(width: isVisible ? (collapsesWhenHidden ? 240 : 220) : 0, height: 32, alignment: .leading)
         .background(theme.palette.subpanel.opacity(isVisible ? 1 : 0.001))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
