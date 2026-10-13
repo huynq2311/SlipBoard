@@ -27,6 +27,10 @@ enum SBSurfaceTreatment: Hashable {
 /// `SBThemeRegistry`; typography, spacing and radii stay in code so no theme
 /// file can change layout.
 struct SBTheme {
+    /// Search field, Source menu and overflow button in the popup header sit
+    /// on the toolbar background, so their fill is kept see-through.
+    static let headerControlFillOpacity: Double = 0.4
+
     struct Palette {
         var canvas: Color
         var panel: Color
