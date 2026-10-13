@@ -74,6 +74,7 @@ struct SBMenuBarDropdownShell: View {
         }
         .frame(width: 232, alignment: .topLeading)
         .sbSurface(.dropdown, theme: theme)
+        .environment(\.controlActiveState, .key)
     }
 
     private var header: some View {
