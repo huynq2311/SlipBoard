@@ -70,8 +70,8 @@ vừa dùng.
 ### 2. Tìm, lọc và sắp xếp
 
 Popup chia làm hai hàng thẻ: **Đã ghim** (ở trên) và **Gần đây**. Phía trên là
-thanh lọc và ô tìm kiếm; bốn thứ này dùng được **cùng lúc**: bộ lọc theo loại,
-nguồn, nhóm trong bộ sưu tập và từ khóa tìm kiếm.
+thanh lọc và ô tìm kiếm; ba thứ này dùng được **cùng lúc**: bộ lọc theo loại,
+bộ lọc theo nguồn và từ khóa tìm kiếm.
 
 #### Bộ lọc theo loại
 
@@ -96,7 +96,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 - Mở menu **Nguồn** trên thanh lọc. Menu liệt kê các ứng dụng đã sao chép nhiều
   nhất (tối đa 8), kèm số mục của từng ứng dụng. Chọn một ứng dụng để popup chỉ
   còn các mục từ ứng dụng đó, chọn **Tất cả** để bỏ lọc.
-- Bộ lọc nguồn dùng được **cùng lúc** với bộ lọc loại, tìm kiếm và bộ sưu tập,
+- Bộ lọc nguồn dùng được **cùng lúc** với bộ lọc loại và tìm kiếm,
   ví dụ lọc **Hình ảnh** rồi chọn nguồn **Safari**. Nếu mọi mục của ứng dụng đó
   bị xóa hoặc bị dọn, bộ lọc tự quay về **Tất cả**.
 - Ứng dụng không nằm trong 8 mục đầu vẫn tìm được: gõ tên ứng dụng (ví dụ
@@ -118,14 +118,12 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
   và sao chép luôn nhanh.
 - Khi App Lock đang khóa, tìm kiếm bị tắt cho đến khi bạn mở khóa.
 
-#### Ghim, ghi chú và bộ sưu tập
+#### Ghim và ghi chú
 
 - **Ghim** một mục để nó luôn nằm ở hàng **Đã ghim** và không bao giờ bị dọn
   theo giới hạn số lượng hay thời gian. Nút **Ẩn/Hiện đã ghim** thu gọn hàng
   này để hàng Gần đây có thêm chỗ.
 - Gắn **ghi chú** cho một mục để nhớ vì sao bạn giữ nó; ghi chú cũng tìm được.
-- Menu **Bộ sưu tập** trên thanh lọc cho phép chỉ xem các mục thuộc một nhóm.
-  Giao diện tạo nhóm và thêm mục vào nhóm chưa có (xem Giới hạn đã biết).
 
 #### Thao tác trên thẻ
 
@@ -341,8 +339,6 @@ design/                           tài liệu thiết kế
 
 ## Giới hạn đã biết
 
-- Bộ sưu tập: popup có menu lọc theo nhóm, nhưng chưa có giao diện để tạo nhóm
-  hay thêm mục vào nhóm.
 - Danh sách luôn xếp mới nhất trước; chưa có tùy chọn sắp xếp khác.
 - Định dạng văn bản có định dạng chỉ được giữ khi ứng dụng đang chạy. Sau khi
   khởi động lại, mục đó vẫn còn trong lịch sử nhưng ở dạng văn bản thuần.

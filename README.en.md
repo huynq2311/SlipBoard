@@ -71,8 +71,8 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 ### 2. Find, filter and organize
 
 The popup has two rails of cards: **Pinned** (top) and **Recent**. Above them
-sit the filter bar and the search box. The type filter, the source, the
-collection and the search query all work **together**.
+sit the filter bar and the search box. The type filter, the source filter
+and the search query all work **together**.
 
 #### Filter by type
 
@@ -97,8 +97,8 @@ how long ago you copied it. To see only what came from one app:
 - Open the **Source** menu in the filter bar. It lists the apps you copy from
   most (up to 8) with the number of items from each. Pick an app and the popup
   shows only its items; pick **All** to clear the filter.
-- The source filter works **together** with the type filter, search and
-  collections, for example pick **Image** and then the source **Safari**. If
+- The source filter works **together** with the type filter and search, for
+  example pick **Image** and then the source **Safari**. If
   every item from that app is deleted or cleaned up, the filter returns to
   **All** by itself.
 - An app outside the top 8 can still be found: type its name (for example
@@ -123,16 +123,13 @@ how long ago you copied it. To see only what came from one app:
   unlocking and copying fast.
 - While App Lock is locked, search is disabled until you unlock.
 
-#### Pins, notes and collections
+#### Pins and notes
 
 - **Pin** an item to keep it in the **Pinned** rail. Pinned items are never
   cleaned up by the item limit or by age. **Hide/Show pinned** collapses the
   rail to give Recent more room.
 - Attach a **note** to an item to remember why you kept it; notes are
   searchable too.
-- The **Collections** menu in the filter bar shows only the items that belong
-  to a group. There is no interface yet to create groups or add items to them
-  (see Known limitations).
 
 #### Card actions
 
@@ -355,8 +352,6 @@ design/                           design docs and UI contracts
 
 ## Known limitations
 
-- Collections: the popup has a filter menu for groups, but there is no
-  interface yet to create a group or add items to it.
 - Items are always listed newest first; there is no other sort order yet.
 - Rich-text formatting is kept only while the app is running. After a restart
   the item is still in your history as plain text.
