@@ -176,7 +176,7 @@ struct SBClipCardShell: View {
                 .truncationMode(.tail)
                 .layoutPriority(0)
 
-            Text(clip.createdLabel)
+            Text(clip.isPinned ? copy.text(.popupPinned) : clip.createdLabel)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)

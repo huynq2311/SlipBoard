@@ -200,6 +200,15 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case overlayUppercase
     case overlayLowercase
     case overlayRemoveRichFormatting
+    case overlayPreviewHeading
+    case overlayStatusOriginal
+    case overlayStatusPlainText
+    case overlayStatusMarkdown
+    case overlayStatusStripUnicode
+    case overlayStatusUppercase
+    case overlayStatusLowercase
+    case overlayStatusUnsupported
+    case overlayEmptyResult
     case statusCaptureActive
     case statusWaitingForCopy
     case statusUnsupportedIgnored
@@ -665,6 +674,15 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .overlayUppercase: "UPPERCASE"
         case .overlayLowercase: "lowercase"
         case .overlayRemoveRichFormatting: "Remove rich formatting"
+        case .overlayPreviewHeading: "Preview"
+        case .overlayStatusOriginal: "Pasted exactly as copied."
+        case .overlayStatusPlainText: "Rich formatting is removed when there is any."
+        case .overlayStatusMarkdown: "Converted to Markdown on this Mac, best effort."
+        case .overlayStatusStripUnicode: "Accents and non-ASCII characters are removed."
+        case .overlayStatusUppercase: "Pasted in UPPERCASE."
+        case .overlayStatusLowercase: "Pasted in lowercase."
+        case .overlayStatusUnsupported: "Original paste is still available."
+        case .overlayEmptyResult: "This transform produced an empty result."
         case .statusCaptureActive: "Capture Active"
         case .statusWaitingForCopy: "Waiting for Copy"
         case .statusUnsupportedIgnored: "Unsupported Ignored"
@@ -1171,6 +1189,15 @@ struct LocalizationCatalog: Sendable {
         .overlayUppercase: "CHỮ HOA",
         .overlayLowercase: "chữ thường",
         .overlayRemoveRichFormatting: "Xóa định dạng phong phú",
+        .overlayPreviewHeading: "Xem trước",
+        .overlayStatusOriginal: "Dán đúng như đã sao chép.",
+        .overlayStatusPlainText: "Bỏ định dạng nếu có.",
+        .overlayStatusMarkdown: "Chuyển sang Markdown ngay trên máy, ở mức tốt nhất có thể.",
+        .overlayStatusStripUnicode: "Bỏ dấu và các ký tự ngoài ASCII.",
+        .overlayStatusUppercase: "Dán thành CHỮ HOA.",
+        .overlayStatusLowercase: "Dán thành chữ thường.",
+        .overlayStatusUnsupported: "Vẫn dán nguyên bản được.",
+        .overlayEmptyResult: "Cách chuyển đổi này cho kết quả rỗng.",
         .statusCaptureActive: "Đang ghi clipboard",
         .statusWaitingForCopy: "Đang chờ sao chép",
         .statusUnsupportedIgnored: "Đã bỏ qua nội dung không hỗ trợ",

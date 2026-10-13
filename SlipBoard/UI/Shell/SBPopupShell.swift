@@ -164,8 +164,11 @@ struct SBPopupTopBar: View {
             Spacer(minLength: theme.spacing.control8)
 
             HStack(spacing: 4) {
-                Image(systemName: "menubar.rectangle")
-                    .font(.system(size: 11, weight: .medium))
+                Image("MenuBarIcon")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
 
                 Text(copy.text(.appName))
                     .font(theme.typography.chip)

@@ -303,7 +303,7 @@ struct SBPasteTransformMenuShell: View {
         let usesMono = previewState.kind == .text
 
         VStack(alignment: .leading, spacing: theme.spacing.control6) {
-            Text(previewState.titleText)
+            Text(copy.text(.overlayPreviewHeading))
                 .font(theme.typography.meta)
                 .foregroundStyle(theme.palette.textSecondary)
                 .lineLimit(1)
@@ -322,8 +322,8 @@ struct SBPasteTransformMenuShell: View {
                         .stroke(theme.palette.border, lineWidth: theme.border.hairline)
                 )
 
-            if let statusText = previewState.statusText, statusText.isEmpty == false {
-                Text(statusText)
+            if previewState.statusText?.isEmpty == false {
+                Text(localizedStatusText)
                     .font(theme.typography.meta)
                     .foregroundStyle(previewState.kind == .unsupported ? theme.accent(for: .warning) : theme.palette.textTertiary)
             }
@@ -338,12 +338,35 @@ struct SBPasteTransformMenuShell: View {
         return supportedActionIDs.contains(actionID) && isExecuting == false
     }
 
+    /// The transformer's status lines are English; this picks the localized
+    /// line for the highlighted action instead.
+    private var localizedStatusText: String {
+        guard previewState.kind != .unsupported else {
+            return copy.text(.overlayStatusUnsupported)
+        }
+        let actionID = highlightedActionID.flatMap(PasteActionID.init(rawValue:))?.resolvedTransformID ?? .original
+        switch actionID {
+        case .original, .pasteAndClose, .pasteAndKeepOpen:
+            return copy.text(.overlayStatusOriginal)
+        case .plainText:
+            return copy.text(.overlayStatusPlainText)
+        case .markdown:
+            return copy.text(.overlayStatusMarkdown)
+        case .stripUnicodeAccent:
+            return copy.text(.overlayStatusStripUnicode)
+        case .uppercase:
+            return copy.text(.overlayStatusUppercase)
+        case .lowercase:
+            return copy.text(.overlayStatusLowercase)
+        }
+    }
+
     private var resolvedPreviewText: String {
         let previewText: String
         if previewState.previewText.isEmpty == false {
             previewText = previewState.previewText
-        } else if let placeholderText = previewState.placeholderText, placeholderText.isEmpty == false {
-            previewText = placeholderText
+        } else if previewState.kind == .empty {
+            previewText = copy.text(.overlayEmptyResult)
         } else {
             previewText = copy.text(.popupTransformUnavailable)
         }
