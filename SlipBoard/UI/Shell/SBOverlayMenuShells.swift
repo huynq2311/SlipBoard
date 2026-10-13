@@ -394,13 +394,13 @@ struct SBPasteTransformMenuShell: View {
         case .plainText:
             return copy.text(.overlayPlainText)
         case .markdown:
-            return copy.text(.overlayMarkdownDescription)
+            return copy.text(.overlayConvertMarkdown)
         case .stripUnicodeAccent:
-            return copy.text(.overlayStripUnicodeDescription)
+            return copy.text(.overlayStripUnicode)
         case .uppercase:
-            return copy.text(.overlayUppercaseDescription)
+            return copy.text(.overlayUppercase)
         case .lowercase:
-            return copy.text(.overlayLowercaseDescription)
+            return copy.text(.overlayLowercase)
         case .original, .pasteAndClose, .pasteAndKeepOpen:
             return actionID.rawValue
         }
@@ -411,13 +411,13 @@ struct SBPasteTransformMenuShell: View {
         case .plainText:
             return copy.text(.overlayRemoveRichFormatting)
         case .markdown:
-            return copy.text(.overlayConvertMarkdown)
+            return copy.text(.overlayMarkdownDescription)
         case .stripUnicodeAccent:
-            return copy.text(.overlayStripUnicode)
+            return copy.text(.overlayStripUnicodeDescription)
         case .uppercase:
-            return copy.text(.overlayUppercase)
+            return copy.text(.overlayUppercaseDescription)
         case .lowercase:
-            return copy.text(.overlayLowercase)
+            return copy.text(.overlayLowercaseDescription)
         case .original, .pasteAndClose, .pasteAndKeepOpen:
             return ""
         }
