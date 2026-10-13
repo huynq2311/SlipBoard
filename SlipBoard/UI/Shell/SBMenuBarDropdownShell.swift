@@ -8,8 +8,11 @@ struct SBMenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "menubar.rectangle")
-                .font(.system(size: 12, weight: .medium))
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
                 .foregroundStyle(theme.palette.textSecondary)
 
             Text(title)

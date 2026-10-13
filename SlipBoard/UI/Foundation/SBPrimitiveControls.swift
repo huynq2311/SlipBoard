@@ -252,14 +252,18 @@ struct SBSegmentedControl<Option: Identifiable & Hashable>: View {
 
                         Text(label(option))
                             .font(theme.typography.meta)
+                            .fontWeight(isSelected ? .semibold : .regular)
                             .lineLimit(1)
                     }
-                    .foregroundStyle(isSelected ? theme.palette.textPrimary : theme.palette.textTertiary)
+                    .foregroundStyle(isSelected ? theme.accent(for: .primary) : theme.palette.textTertiary)
                     .padding(.horizontal, theme.spacing.control8)
                     .padding(.vertical, 3)
                     .frame(maxWidth: .infinity)
-                    .background(isSelected ? theme.palette.canvas : Color.clear)
+                    .background(isSelected ? theme.accentBackground(for: .primary) : Color.clear)
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(isSelected ? theme.accent(for: .primary).opacity(0.4) : Color.clear, lineWidth: theme.border.hairline)
+                    )
                 }
                 .buttonStyle(.plain)
             }
