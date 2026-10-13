@@ -138,6 +138,11 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         publishState()
     }
 
+    func updateActiveSource(_ sourceID: String?) {
+        store.setActiveSource(sourceID)
+        publishState()
+    }
+
     func selectItem(id: String?) {
         guard store.snapshot.selectedItemID != id else {
             return
@@ -411,7 +416,8 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         let snapshot = store.snapshot
         let visibleIDs = searchNotesRuntime.visibleItemIDs(
             in: snapshot.allItems,
-            activeFilter: snapshot.activeFilter
+            activeFilter: snapshot.activeFilter,
+            activeSourceID: snapshot.activeSourceID
         )
         // Two SlipBoard instances capturing at the same moment can mint the
         // same clip id, and a stored duplicate must not take the app down.

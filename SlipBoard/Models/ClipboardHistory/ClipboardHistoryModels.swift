@@ -185,6 +185,15 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
         filter.matches(kind)
     }
 
+    /// Identifies the app a clip came from; `nil` means no source filter.
+    var sourceID: String {
+        sourceApp.bundleID ?? sourceApp.displayName
+    }
+
+    func matches(sourceID activeSourceID: String?) -> Bool {
+        activeSourceID == nil || activeSourceID == sourceID
+    }
+
     func matches(searchQuery: String) -> Bool {
         let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedQuery.isEmpty == false else { return true }
@@ -233,6 +242,7 @@ struct ClipboardHistorySnapshot: Hashable {
     var selectedItemID: String?
     var searchQuery: String
     var activeFilter: ClipboardHistoryFilter
+    var activeSourceID: String?
     var captureStatus: ClipboardCaptureStatus
     var pinnedItems: [ClipboardHistoryItem]
     var recentItems: [ClipboardHistoryItem]
@@ -241,6 +251,7 @@ struct ClipboardHistorySnapshot: Hashable {
         selectedItemID: String? = nil,
         searchQuery: String = "",
         activeFilter: ClipboardHistoryFilter = .all,
+        activeSourceID: String? = nil,
         captureStatus: ClipboardCaptureStatus = .idleEmpty,
         pinnedItems: [ClipboardHistoryItem] = [],
         recentItems: [ClipboardHistoryItem] = []
@@ -248,6 +259,7 @@ struct ClipboardHistorySnapshot: Hashable {
         self.selectedItemID = selectedItemID
         self.searchQuery = searchQuery
         self.activeFilter = activeFilter
+        self.activeSourceID = activeSourceID
         self.captureStatus = captureStatus
         self.pinnedItems = pinnedItems
         self.recentItems = recentItems
@@ -270,13 +282,17 @@ struct ClipboardHistorySnapshot: Hashable {
 
     var visiblePinnedItems: [ClipboardHistoryItem] {
         pinnedItems.filter {
-            $0.matches(filter: activeFilter) && $0.matches(searchQuery: searchQuery)
+            $0.matches(filter: activeFilter)
+                && $0.matches(sourceID: activeSourceID)
+                && $0.matches(searchQuery: searchQuery)
         }
     }
 
     var visibleRecentItems: [ClipboardHistoryItem] {
         recentItems.filter {
-            $0.matches(filter: activeFilter) && $0.matches(searchQuery: searchQuery)
+            $0.matches(filter: activeFilter)
+                && $0.matches(sourceID: activeSourceID)
+                && $0.matches(searchQuery: searchQuery)
         }
     }
 

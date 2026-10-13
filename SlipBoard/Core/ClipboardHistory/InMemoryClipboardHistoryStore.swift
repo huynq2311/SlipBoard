@@ -106,6 +106,11 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
         snapshot = normalizedSnapshot(from: snapshot)
     }
 
+    func setActiveSource(_ sourceID: String?) {
+        snapshot.activeSourceID = sourceID
+        snapshot = normalizedSnapshot(from: snapshot)
+    }
+
     func selectItem(id: String?) {
         guard let id else {
             snapshot.selectedItemID = nil
@@ -204,6 +209,12 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
 
     private func normalizedSnapshot(from snapshot: ClipboardHistorySnapshot) -> ClipboardHistorySnapshot {
         var normalized = snapshot
+        // A source whose clips were all deleted or pruned must not leave the
+        // popup filtered down to nothing.
+        if let activeSourceID = normalized.activeSourceID,
+           normalized.allItems.contains(where: { $0.sourceID == activeSourceID }) == false {
+            normalized.activeSourceID = nil
+        }
         normalized.pinnedItems = normalized.pinnedItems
             .map { item in
                 var updatedItem = item
