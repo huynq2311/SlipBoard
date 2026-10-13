@@ -68,12 +68,77 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 - Items that arrive from your iPhone, iPad or another Mac through Universal
   Clipboard (Handoff) are labelled as such.
 
-### 2. Find and organize
+### 2. Find, filter and organize
 
-- **Pinned** and **Recent** rails, with filters by type.
-- Full-text search across your whole history: just start typing while the
-  popup is open.
-- Attach a **note** to any item and sort items into custom **collections**.
+The popup has two rails of cards: **Pinned** (top) and **Recent**. Above them
+sit the filter bar and the search box. The type filter, the source filter
+and the search query all work **together**.
+
+#### Filter by type
+
+Each filter button shows how many items it matches.
+
+| Filter | What it covers |
+| --- | --- |
+| All | Your entire history |
+| Text | Plain text |
+| Image | Screenshots, images copied from a browser or an app |
+| Rich Text | Formatted text (RTF, HTML); shown only when your history has some |
+| Code | Code snippets, detected automatically |
+| File | One or more files |
+| URL | Links |
+| Color | Color values such as `#ff8800`; shown only when your history has some |
+
+#### Filter by source
+
+Every card shows **which app** it came from: the app's real icon, its name and
+how long ago you copied it. To see only what came from one app:
+
+- Open the **Source** menu in the filter bar. It lists the apps you copy from
+  most (up to 8) with the number of items from each. Pick an app and the popup
+  shows only its items; pick **All** to clear the filter.
+- The source filter works **together** with the type filter and search, for
+  example pick **Image** and then the source **Safari**. If
+  every item from that app is deleted or cleaned up, the filter returns to
+  **All** by itself.
+- An app outside the top 8 can still be found: type its name (for example
+  `Slack`) into the search box, since the source app name is part of the search
+  index.
+- While App Lock is locked, the Source menu is hidden so app names are not
+  revealed.
+- Items that arrive from your iPhone, iPad or another Mac through **Universal
+  Clipboard** (Handoff) are labelled so you can tell them apart from what you
+  copied on this Mac.
+- To **never record** anything from an app, add it under
+  **Settings → Exclusions** (see section 4). An extra option can also hide the
+  popup while you are inside that app.
+
+#### Full-text search
+
+- Just **type any character** while the popup is open, or press `⌘/`.
+- **Case- and accent-insensitive**: `viet` still finds `Việt`.
+- Searches the clip content, its metadata (file names, sizes, ...), the source
+  app name and your **notes**.
+- For very long text only the beginning is indexed, which keeps locking,
+  unlocking and copying fast.
+- While App Lock is locked, search is disabled until you unlock.
+
+#### Pins and notes
+
+- **Pin** an item to keep it in the **Pinned** rail. Pinned items are never
+  cleaned up by the item limit or by age. **Hide/Show pinned** collapses the
+  rail to give Recent more room.
+- Attach a **note** to an item to remember why you kept it; notes are
+  searchable too.
+
+#### Card actions
+
+| Action | Result |
+| --- | --- |
+| Click | Select the card |
+| Double-click | Paste the card into the app you were using |
+| `⌘` + click | **Quick paste**: select and paste immediately. Change it to `⌥` or `⇧`, or turn it off, in **Settings → Organization → Quick paste** |
+| Right-click, or `⌃` + click | Open the card's action menu: Paste, Paste As, Copy, Pin/Unpin, Note, Delete |
 
 ### 3. Paste how you want
 
@@ -93,9 +158,12 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 
 - **Exclude apps** from capture (for example a password manager).
 - **Pause capture** for 15 minutes, 1 hour, or until you resume.
-- **Retention:** keep up to 2,000 items for 1 week, 2 weeks, 1 month, 3 months
-  or forever. Pinned items are never cleaned up. Optionally clear history when
-  the app quits.
+- **Retention:** keep up to 2,000 items (adjustable with a slider) for 1 week,
+  2 weeks, 1 month, 3 months, forever, or a **custom period** (1-999 hours,
+  days, weeks or months). Pinned items are never cleaned up. Optionally clear
+  history when the app quits.
+- **Move pasted item to top:** optionally move an item to the front of Recent
+  after you paste it.
 
 ### 5. App Lock
 
@@ -113,7 +181,9 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 - Light, dark or follow-system appearance, with **Liquid Glass** styling on
   macOS 26 and a standard theme on earlier versions.
 - **English** and **Tiếng Việt** interface.
-- Optional launch at login and customizable global hotkeys.
+- A dedicated menu bar icon. Click it to see capture status, pause capture,
+  change retention quickly, or open the popup or Settings.
+- Optional **launch at login** and customizable global hotkeys.
 
 ---
 
@@ -130,7 +200,7 @@ in Settings → Hotkeys). Inside the popup:
 | `⌥↩` | Paste and keep the popup open |
 | `⌘↩` | Open the **Paste As** menu (plain text, Markdown, …) |
 | `⌫` | Delete the selected item |
-| *any character* | Start searching |
+| `⌘/` or *any character* | Start searching |
 | `esc` | Close the popup |
 
 ---
@@ -282,6 +352,7 @@ design/                           design docs and UI contracts
 
 ## Known limitations
 
+- Items are always listed newest first; there is no other sort order yet.
 - Rich-text formatting is kept only while the app is running. After a restart
   the item is still in your history as plain text.
 - File sizes and image dimensions are read when a card is shown: if a file has

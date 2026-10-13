@@ -67,11 +67,72 @@ vừa dùng.
 - Nội dung đến từ iPhone, iPad hoặc máy Mac khác qua Universal Clipboard
   (Handoff) được gắn nhãn riêng.
 
-### 2. Tìm và sắp xếp
+### 2. Tìm, lọc và sắp xếp
 
-- Hai nhóm **Đã ghim** và **Gần đây**, kèm bộ lọc theo loại.
-- Tìm kiếm toàn văn trên toàn bộ lịch sử: chỉ cần gõ khi popup đang mở.
-- Gắn **ghi chú** cho từng mục và xếp vào các **bộ sưu tập** tùy chọn.
+Popup chia làm hai hàng thẻ: **Đã ghim** (ở trên) và **Gần đây**. Phía trên là
+thanh lọc và ô tìm kiếm; ba thứ này dùng được **cùng lúc**: bộ lọc theo loại,
+bộ lọc theo nguồn và từ khóa tìm kiếm.
+
+#### Bộ lọc theo loại
+
+Mỗi nút lọc hiện kèm **số lượng** mục tương ứng.
+
+| Bộ lọc | Gồm những gì |
+| --- | --- |
+| Tất cả | Toàn bộ lịch sử |
+| Văn bản | Văn bản thuần |
+| Hình ảnh | Ảnh chụp màn hình, ảnh sao chép từ trình duyệt hoặc ứng dụng |
+| Rich Text | Văn bản có định dạng (RTF, HTML); chỉ hiện khi lịch sử có mục loại này |
+| Code | Đoạn code, được nhận diện tự động |
+| File | Một hoặc nhiều file |
+| URL | Liên kết |
+| Màu | Mã màu như `#ff8800`; chỉ hiện khi lịch sử có mục loại này |
+
+#### Lọc theo nguồn
+
+Mỗi thẻ cho biết nó đến từ **ứng dụng nào**: logo thật của ứng dụng cùng tên
+và thời gian sao chép. Để chỉ xem những gì đến từ một ứng dụng:
+
+- Mở menu **Nguồn** trên thanh lọc. Menu liệt kê các ứng dụng đã sao chép nhiều
+  nhất (tối đa 8), kèm số mục của từng ứng dụng. Chọn một ứng dụng để popup chỉ
+  còn các mục từ ứng dụng đó, chọn **Tất cả** để bỏ lọc.
+- Bộ lọc nguồn dùng được **cùng lúc** với bộ lọc loại và tìm kiếm,
+  ví dụ lọc **Hình ảnh** rồi chọn nguồn **Safari**. Nếu mọi mục của ứng dụng đó
+  bị xóa hoặc bị dọn, bộ lọc tự quay về **Tất cả**.
+- Ứng dụng không nằm trong 8 mục đầu vẫn tìm được: gõ tên ứng dụng (ví dụ
+  `Slack`) vào ô tìm kiếm, vì tên ứng dụng nguồn nằm trong chỉ mục tìm kiếm.
+- Khi App Lock đang khóa, menu Nguồn bị ẩn để không lộ tên ứng dụng.
+- Nội dung đến từ iPhone, iPad hoặc máy Mac khác qua **Universal Clipboard**
+  (Handoff) được gắn nhãn riêng để phân biệt với thứ bạn copy trên máy này.
+- Muốn **không bao giờ ghi** nội dung từ một ứng dụng, thêm nó vào
+  **Cài đặt → Loại trừ** (xem mục 4). Tùy chọn kèm theo có thể ẩn luôn popup
+  khi bạn đang ở trong ứng dụng đó.
+
+#### Tìm kiếm toàn văn
+
+- Chỉ cần **gõ bất kỳ ký tự nào** khi popup đang mở, hoặc nhấn `⌘/`.
+- **Không phân biệt hoa thường và dấu**: gõ `viet` vẫn thấy `Việt`.
+- Tìm trong: nội dung clip, thông tin kèm theo (tên file, kích thước…), tên
+  ứng dụng nguồn và **ghi chú** của mục.
+- Với văn bản rất dài, chỉ phần đầu được đưa vào chỉ mục để việc khóa, mở khóa
+  và sao chép luôn nhanh.
+- Khi App Lock đang khóa, tìm kiếm bị tắt cho đến khi bạn mở khóa.
+
+#### Ghim và ghi chú
+
+- **Ghim** một mục để nó luôn nằm ở hàng **Đã ghim** và không bao giờ bị dọn
+  theo giới hạn số lượng hay thời gian. Nút **Ẩn/Hiện đã ghim** thu gọn hàng
+  này để hàng Gần đây có thêm chỗ.
+- Gắn **ghi chú** cho một mục để nhớ vì sao bạn giữ nó; ghi chú cũng tìm được.
+
+#### Thao tác trên thẻ
+
+| Thao tác | Kết quả |
+| --- | --- |
+| Click | Chọn thẻ |
+| Click đúp | Dán thẻ vào ứng dụng đang dùng |
+| `⌘` + click | **Dán nhanh**: chọn và dán ngay. Đổi sang `⌥` hoặc `⇧`, hoặc tắt, tại **Cài đặt → Tổ chức → Dán nhanh** |
+| Chuột phải, hoặc `⌃` + click | Mở menu thao tác của thẻ: Dán, Dán dưới dạng, Sao chép, Ghim/Bỏ ghim, Ghi chú, Xóa |
 
 ### 3. Dán theo ý bạn
 
@@ -90,8 +151,11 @@ vừa dùng.
 
 - **Loại trừ ứng dụng** (ví dụ trình quản lý mật khẩu).
 - **Tạm dừng ghi** trong 15 phút, 1 giờ, hoặc đến khi bạn bật lại.
-- **Lưu giữ:** tối đa 2.000 mục, giữ 1 tuần, 2 tuần, 1 tháng, 3 tháng hoặc
-  mãi mãi. Mục đã ghim không bao giờ bị dọn. Có thể xóa lịch sử khi thoát app.
+- **Lưu giữ:** tối đa 2.000 mục (chỉnh bằng thanh trượt), giữ 1 tuần, 2 tuần,
+  1 tháng, 3 tháng, mãi mãi, hoặc **thời gian tùy chọn** (1-999 giờ, ngày,
+  tuần hoặc tháng). Mục đã ghim không bao giờ bị dọn. Có thể xóa lịch sử khi
+  thoát app.
+- **Dán xong đưa lên đầu:** tùy chọn chuyển mục vừa dán lên đầu hàng Gần đây.
 
 ### 5. Khóa ứng dụng (App Lock)
 
@@ -108,7 +172,9 @@ vừa dùng.
 - Sáng, tối hoặc theo hệ thống; hiệu ứng **Liquid Glass** trên macOS 26, giao
   diện chuẩn trên các phiên bản trước.
 - Giao diện **tiếng Việt** và **English**.
-- Tùy chọn khởi động cùng máy, phím tắt toàn cục tùy chỉnh.
+- Biểu tượng riêng trên thanh menu. Bấm vào để xem trạng thái ghi, tạm dừng
+  ghi, đổi nhanh thời gian lưu giữ, mở popup hoặc Cài đặt.
+- Tùy chọn **mở khi đăng nhập**, phím tắt toàn cục tùy chỉnh.
 
 ---
 
@@ -125,7 +191,7 @@ Cài đặt → Phím tắt). Trong popup:
 | `⌥↩` | Dán và giữ popup mở |
 | `⌘↩` | Mở menu **Dán dưới dạng** (plain text, Markdown, …) |
 | `⌫` | Xóa mục đang chọn |
-| *bất kỳ ký tự nào* | Bắt đầu tìm kiếm |
+| `⌘/` hoặc *bất kỳ ký tự nào* | Bắt đầu tìm kiếm |
 | `esc` | Đóng popup |
 
 ---
@@ -273,6 +339,7 @@ design/                           tài liệu thiết kế
 
 ## Giới hạn đã biết
 
+- Danh sách luôn xếp mới nhất trước; chưa có tùy chọn sắp xếp khác.
 - Định dạng văn bản có định dạng chỉ được giữ khi ứng dụng đang chạy. Sau khi
   khởi động lại, mục đó vẫn còn trong lịch sử nhưng ở dạng văn bản thuần.
 - Dung lượng file và kích thước ảnh được đọc khi hiển thị thẻ: nếu file đã bị
