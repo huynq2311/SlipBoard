@@ -909,7 +909,22 @@ struct SBHorizontalClipRail: View {
     @State private var scrollMetrics = SBRailScrollMetrics()
     @State private var scrollPosition = ScrollPosition(x: 0)
     @State private var isHoveringRail = false
+    @State private var lastClipIDs: [String] = []
+    @State private var lastClipIDsChangeAt = Date.distantPast
     @Environment(\.sbPopupPresentationID) private var popupPresentationID
+
+    private var clipIDs: [String] { clips.map(\.id) }
+
+    // Animating every change to the rail stacked transitions on top of each
+    // other when clips arrived in quick succession or hundreds were pruned at
+    // once, leaving cards half faded and overlapping. Only a change of one or
+    // two cards, not right after another change, is animated. The @State
+    // values still hold the previous change while the body is evaluated.
+    private var railAnimation: Animation? {
+        let changedCount = Set(clipIDs).symmetricDifference(lastClipIDs).count
+        let isBurst = Date().timeIntervalSince(lastClipIDsChangeAt) < 0.4
+        return changedCount <= 2 && isBurst == false ? .easeInOut(duration: 0.22) : nil
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -976,14 +991,19 @@ struct SBHorizontalClipRail: View {
                         }
                     }
                 }
-                .animation(.easeInOut(duration: 0.22), value: clips)
+                .animation(railAnimation, value: clipIDs)
                 .padding(.top, 5)
                 .padding(.bottom, 2)
             }
             .contentMargins(.horizontal, theme.spacing.popupPadding, for: .scrollContent)
             .scrollPosition($scrollPosition)
             .onAppear {
+                lastClipIDs = clipIDs
                 scrollToSelectionIfNeeded(using: proxy, animated: false)
+            }
+            .onChange(of: clipIDs) { _, newIDs in
+                lastClipIDs = newIDs
+                lastClipIDsChangeAt = Date()
             }
             .onChange(of: selectedClipID) { _, _ in
                 scrollToSelectionIfNeeded(using: proxy, animated: true)
