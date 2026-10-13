@@ -212,7 +212,7 @@ how long ago you copied it. To see only what came from one app:
 
 - Paste and close the popup, or paste and **keep it open** to paste several
   items in a row.
-- **Snippets:** reusable text, each with its own global hotkey.
+- **Snippets:** reusable text, created and edited in **Settings → Snippets**. Give each snippet a global hotkey; press it in any app to paste the snippet there.
 
 ### 4. Control what is recorded
 

@@ -17,6 +17,11 @@ struct SBSettingsWindowShell: View {
     var onSelectAction: (String) -> Void = { _ in }
     var onBeginHotkeyRecording: (HotkeyBindingTarget) -> Void = { _ in }
     var onClearHotkeyBinding: (HotkeyBindingTarget) -> Void = { _ in }
+    var onSelectSnippet: (SnippetID?) -> Void = { _ in }
+    var onCreateSnippet: () -> Void = {}
+    var onSaveSnippet: (SnippetEditorDraft) -> Void = { _ in }
+    var onDiscardSnippet: () -> Void = {}
+    var onDeleteSnippet: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 0) {
@@ -58,6 +63,8 @@ struct SBSettingsWindowShell: View {
                     organizationPaneSections(for: pane)
                 } else if pane.id == .hotkeys, let snippetsHotkeysSnapshot {
                     hotkeysPaneSections(for: pane, snapshot: snippetsHotkeysSnapshot)
+                } else if pane.id == .snippets, let snippetsHotkeysSnapshot {
+                    snippetsPaneSections(snapshot: snippetsHotkeysSnapshot)
                 } else if pane.id == .bridge {
                     bridgePaneSections(for: pane)
                 } else if pane.id == .security {
@@ -1151,6 +1158,90 @@ struct SBSettingsWindowShell: View {
         }
     }
 
+    @ViewBuilder
+    private func snippetsPaneSections(snapshot: SnippetsHotkeysRuntimeSnapshot) -> some View {
+        let snippetsState = snapshot.snippetsSettingsState
+        let editorState = snippetsState.editorState
+        let isInteractive = snapshot.runtimeAvailability.isInteractive
+
+        SBPaneSection(
+            title: copy.text(.settingsLibrary),
+            descriptionText: copy.text(.snippetsHowTo),
+            theme: theme
+        ) {
+            SBControlPillButton(
+                title: "+ " + copy.text(.snippetsNew),
+                theme: theme,
+                tone: .primary,
+                isEnabled: isInteractive && editorState.mode != .newDraft,
+                action: onCreateSnippet
+            )
+
+            if snippetsState.libraryEntries.isEmpty {
+                SBSettingsSectionPlaceholder(
+                    placeholder: SettingsPanePlaceholder(
+                        id: "snippets.library.empty",
+                        title: copy.text(.settingsNoSnippets),
+                        detailText: copy.text(.settingsNoSnippetsDetail),
+                        kind: .emptyState
+                    ),
+                    theme: theme
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(snippetsState.libraryEntries) { entry in
+                        Button {
+                            onSelectSnippet(entry.snippetID)
+                        } label: {
+                            SBListRow(
+                                title: entry.title,
+                                detailText: entry.subtitle,
+                                accessoryText: entry.hotkeyLabel == "No hotkey"
+                                    ? copy.text(.hotkeyNoShortcut)
+                                    : entry.hotkeyLabel,
+                                badgeText: nil,
+                                symbolName: entry.kind == .code ? "curlybraces" : "text.alignleft",
+                                theme: theme,
+                                isHighlighted: editorState.selectedSnippetID == entry.snippetID
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .sbSurface(.subpanel, theme: theme)
+            }
+        }
+
+        if editorState.mode != .noSelection {
+            SBPaneSection(title: copy.text(.snippetsEditorHeading), theme: theme) {
+                SnippetEditorPanel(
+                    editorState: editorState,
+                    theme: theme,
+                    onSave: onSaveSnippet,
+                    onDiscard: onDiscardSnippet,
+                    onDelete: onDeleteSnippet
+                )
+                .id(editorState.selectedSnippetID?.rawValue ?? "new-draft")
+
+                VStack(alignment: .leading, spacing: theme.spacing.control6) {
+                    Text(copy.text(.snippetsShortcutHeading))
+                        .font(theme.typography.rowPrimary)
+                        .foregroundStyle(theme.palette.textPrimary)
+
+                    if let snippetID = editorState.savedRecord?.id,
+                       let binding = snapshot.hotkeysSettingsState.snippetBindings.first(where: { $0.target == .snippet(snippetID) }) {
+                        shortcutAssignmentRow(for: binding, recorderSession: snapshot.hotkeysSettingsState.recorderSession)
+                    } else {
+                        Text(copy.text(.snippetsShortcutAfterSave))
+                            .font(theme.typography.rowSecondary)
+                            .foregroundStyle(theme.palette.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+
     private func shortcutAssignmentRow(
         for binding: HotkeyBindingSummary,
         recorderSession: HotkeyRecorderSessionState
@@ -1925,6 +2016,158 @@ private struct RetentionPeriodRow: View {
         case .weeks: copy.text(.retentionUnitWeeks)
         case .months: copy.text(.retentionUnitMonths)
         }
+    }
+}
+
+/// Title and content are edited locally and sent to the runtime on Save, so
+/// typing does not round-trip through the published snapshot.
+private struct SnippetEditorPanel: View {
+    let editorState: SnippetEditorState
+    let theme: SBTheme
+    let onSave: (SnippetEditorDraft) -> Void
+    let onDiscard: () -> Void
+    let onDelete: () -> Void
+
+    @SBLocalizedCopy private var copy
+    @State private var title: String
+    @State private var content: String
+    @State private var confirmsDelete = false
+
+    init(
+        editorState: SnippetEditorState,
+        theme: SBTheme,
+        onSave: @escaping (SnippetEditorDraft) -> Void,
+        onDiscard: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        self.editorState = editorState
+        self.theme = theme
+        self.onSave = onSave
+        self.onDiscard = onDiscard
+        self.onDelete = onDelete
+        _title = State(initialValue: editorState.draft.title)
+        _content = State(initialValue: editorState.draft.content)
+    }
+
+    private var isEditable: Bool { editorState.availability.isInteractive }
+    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedContent: String { content.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var hasChanges: Bool {
+        guard let saved = editorState.savedRecord else { return true }
+        return trimmedTitle != saved.title || content != saved.content
+    }
+
+    private var validationText: String? {
+        if trimmedTitle.isEmpty { return copy.text(.settingsSnippetMissingTitle) }
+        if trimmedContent.isEmpty { return copy.text(.snippetsMissingContent) }
+        if case let .hotkeyConflict(conflict) = editorState.validationState { return conflict.message }
+        return nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.control10) {
+            VStack(alignment: .leading, spacing: theme.spacing.control4) {
+                Text(copy.text(.snippetsTitleField))
+                    .font(theme.typography.rowSecondary)
+                    .foregroundStyle(theme.palette.textSecondary)
+
+                TextField("", text: $title)
+                    .textFieldStyle(.plain)
+                    .font(theme.typography.rowPrimary)
+                    .foregroundStyle(theme.palette.textPrimary)
+                    .overlay(alignment: .leading) {
+                        if title.isEmpty {
+                            Text(copy.text(.snippetsUntitled))
+                                .font(theme.typography.rowPrimary)
+                                .foregroundStyle(theme.palette.textTertiary)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .padding(.horizontal, theme.spacing.control8)
+                    .frame(height: 30)
+                    .background(theme.palette.canvas)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(theme.palette.border, lineWidth: theme.border.hairline)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: theme.spacing.control4) {
+                Text(copy.text(.snippetsContentField))
+                    .font(theme.typography.rowSecondary)
+                    .foregroundStyle(theme.palette.textSecondary)
+
+                TextEditor(text: $content)
+                    .font(.system(size: 13, design: editorState.draft.kind == .code ? .monospaced : .default))
+                    .foregroundStyle(theme.palette.textPrimary)
+                    .scrollContentBackground(.hidden)
+                    .padding(theme.spacing.control6)
+                    .frame(minHeight: 120, maxHeight: 240)
+                    .background(theme.palette.canvas)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(theme.palette.border, lineWidth: theme.border.hairline)
+                    )
+            }
+
+            if let validationText, title.isEmpty == false || content.isEmpty == false {
+                Text(validationText)
+                    .font(theme.typography.rowSecondary)
+                    .foregroundStyle(theme.accent(for: .warning))
+            }
+
+            HStack(spacing: theme.spacing.control8) {
+                SBControlPillButton(
+                    title: copy.text(.snippetsSave),
+                    theme: theme,
+                    tone: .primary,
+                    isEnabled: isEditable && validationText == nil && hasChanges
+                ) {
+                    var draft = editorState.draft
+                    draft.title = trimmedTitle
+                    draft.content = content
+                    onSave(draft)
+                }
+                .keyboardShortcut("s", modifiers: .command)
+
+                SBControlPillButton(
+                    title: copy.text(.cancel),
+                    theme: theme,
+                    isEnabled: isEditable && (hasChanges || editorState.savedRecord == nil)
+                ) {
+                    // The panel keeps its identity for a saved snippet, so put
+                    // the saved text back here as well.
+                    if let saved = editorState.savedRecord {
+                        title = saved.title
+                        content = saved.content
+                    }
+                    confirmsDelete = false
+                    onDiscard()
+                }
+
+                Spacer(minLength: 0)
+
+                if editorState.canDelete {
+                    SBControlPillButton(
+                        title: confirmsDelete ? copy.text(.snippetsConfirmDelete) : copy.text(.actionDelete),
+                        theme: theme,
+                        tone: .danger
+                    ) {
+                        if confirmsDelete {
+                            onDelete()
+                        } else {
+                            confirmsDelete = true
+                        }
+                    }
+                }
+            }
+        }
+        .disabled(isEditable == false)
+        .padding(theme.spacing.control12)
+        .sbSurface(.subpanel, theme: theme)
     }
 }
 

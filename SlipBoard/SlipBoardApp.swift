@@ -954,6 +954,32 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         settingsState = shellCoordinator.settingsShellState
     }
 
+    func selectSnippet(id: SnippetID?) {
+        recordSecurityInteraction()
+        snippetsHotkeysRuntime.selectSnippet(id: id)
+    }
+
+    func createSnippetDraft() {
+        recordSecurityInteraction()
+        snippetsHotkeysRuntime.createSnippetDraft()
+    }
+
+    func discardSnippetDraft() {
+        recordSecurityInteraction()
+        snippetsHotkeysRuntime.discardActiveDraft()
+    }
+
+    func saveSnippet(_ draft: SnippetEditorDraft) {
+        recordSecurityInteraction()
+        snippetsHotkeysRuntime.updateEditorDraft(draft)
+        snippetsHotkeysRuntime.saveActiveDraft()
+    }
+
+    func deleteSelectedSnippet() {
+        recordSecurityInteraction()
+        snippetsHotkeysRuntime.deleteSelectedSnippet()
+    }
+
     func beginHotkeyRecorderSession(for target: HotkeyBindingTarget) {
         recordSecurityInteraction()
         snippetsHotkeysRuntime.beginRecorderSession(for: target)
@@ -2792,12 +2818,17 @@ private struct SlipBoardSettingsRuntimeView: View {
             onAdjustSlider: runtime.handleSettingsSlider,
             onSelectAction: runtime.handleSettingsAction,
             onBeginHotkeyRecording: runtime.beginHotkeyRecorderSession,
-            onClearHotkeyBinding: runtime.clearHotkeyBinding
+            onClearHotkeyBinding: runtime.clearHotkeyBinding,
+            onSelectSnippet: runtime.selectSnippet,
+            onCreateSnippet: runtime.createSnippetDraft,
+            onSaveSnippet: runtime.saveSnippet,
+            onDiscardSnippet: runtime.discardSnippetDraft,
+            onDeleteSnippet: runtime.deleteSelectedSnippet
         )
         .onAppear(perform: synchronizeRecorderMonitor)
         .onDisappear(perform: cancelRecordingAndStopMonitor)
         .onChange(of: runtime.settingsState.selectedSection) { _, selectedSection in
-            if selectedSection == .hotkeys {
+            if Self.recordsHotkeys(in: selectedSection) {
                 synchronizeRecorderMonitor()
             } else {
                 cancelRecordingAndStopMonitor()
@@ -2809,7 +2840,7 @@ private struct SlipBoardSettingsRuntimeView: View {
     }
 
     private func synchronizeRecorderMonitor() {
-        if runtime.settingsState.selectedSection == .hotkeys,
+        if Self.recordsHotkeys(in: runtime.settingsState.selectedSection),
            runtime.snippetsHotkeysSnapshot.hotkeysSettingsState.recorderSession.phase == .recording {
             if recorderMonitor == nil {
                 recorderMonitor = HotkeyRecorderKeyEventMonitor(
@@ -2823,6 +2854,11 @@ private struct SlipBoardSettingsRuntimeView: View {
         } else {
             stopRecorderMonitor()
         }
+    }
+
+    /// The Snippets pane assigns snippet shortcuts too.
+    private static func recordsHotkeys(in section: SettingsSectionID) -> Bool {
+        section == .hotkeys || section == .snippets
     }
 
     private func stopRecorderMonitor() {
