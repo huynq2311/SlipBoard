@@ -99,6 +99,8 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 
 ### 5. App Lock
 
+- Locks within a session only: SlipBoard opens unlocked after launch or
+  reinstall, then locks when you choose Lock or after the auto-lock timeout.
 - Unlock with **Touch ID** or your system password.
 - Lock automatically after 1 minute, 5 minutes, 15 minutes or 1 hour of
   inactivity.

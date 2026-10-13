@@ -13,6 +13,13 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         static let payloadKeySize = 32
     }
 
+    /// Keys wrapped from this version on can be unwrapped without Touch ID, so
+    /// SlipBoard opens unlocked after launch. App Lock then only locks within a
+    /// session, and unlocking asks for Touch ID through LocalAuthentication.
+    /// Version 1 keys still need user presence to unwrap; they are rewrapped as
+    /// version 2 after the first successful unlock.
+    static let sessionOnlyKeyVersion = 2
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -155,7 +162,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             let accessControl = SecAccessControlCreateWithFlags(
                 nil,
                 kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                [.privateKeyUsage, .userPresence],
+                .privateKeyUsage,
                 nil
             ),
             let privateKey = createOrLoadSecureEnclavePrivateKey(accessControl: accessControl),
@@ -177,7 +184,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         }
 
         return WrappedPayloadKey(
-            keyVersion: 1,
+            keyVersion: Self.sessionOnlyKeyVersion,
             wrappingPolicy: .secureEnclaveWrapped,
             wrappedKeyData: encryptedData,
             createdAt: date,
@@ -186,24 +193,13 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     private func wrapWithFallbackKeychain(_ payloadKeyData: Data, at date: Date) -> WrappedPayloadKey? {
-        guard
-            let accessControl = SecAccessControlCreateWithFlags(
-                nil,
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                .userPresence,
-                nil
-            )
-        else {
-            return nil
-        }
-
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount,
             kSecValueData: payloadKeyData,
-            kSecAttrAccessControl: accessControl
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
 
         _ = deleteFallbackKeychainItem()
@@ -213,7 +209,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         }
 
         return WrappedPayloadKey(
-            keyVersion: 1,
+            keyVersion: Self.sessionOnlyKeyVersion,
             wrappingPolicy: .keychainThisDeviceOnly,
             wrappedKeyData: Data("keychain:this-device-only".utf8),
             createdAt: date,

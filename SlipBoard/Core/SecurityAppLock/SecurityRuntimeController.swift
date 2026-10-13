@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 final class SecurityRuntimeController: SecurityStateProviding, SearchLockStateProviding {
     private let settingsStore: SecuritySettingsStoring
@@ -45,6 +46,18 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     func bootstrap() {
         let settings = settingsStore.currentSettings
+
+        // App Lock only locks within a session: open unlocked when the key can
+        // be unwrapped without Touch ID. An old key still needs it, so the app
+        // stays locked until the first unlock rewraps it.
+        if settings.isAppLockEnabled,
+           payloadStore.keyMaterialState.hasUnwrappedKeyInMemory == false,
+           hasSessionOnlyKey,
+           case .unwrappedInMemory = payloadStore.unlockAccessKey(authenticationMethod: settings.unlockMethod, at: now())
+        {
+            completeUnlock(at: now())
+            return
+        }
         let lockState: SecurityLockState
         let lockedReason: SecurityLockedVisibleReason?
 
@@ -181,10 +194,41 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
             )
         )
 
+        // A session-only key unwraps without asking, so ask here first. An old
+        // key asks for Touch ID itself while it is unwrapped.
+        guard hasSessionOnlyKey else {
+            unwrapKeyAndCompleteUnlock(using: method)
+            return
+        }
+
+        let context = LAContext()
+        context.localizedReason = "Unlock SlipBoard"
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock SlipBoard") { [weak self] success, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if success {
+                    self.unwrapKeyAndCompleteUnlock(using: method)
+                } else {
+                    self.failUnlock(
+                        SecurityFailureState(
+                            kind: .authenticationFailed,
+                            title: "Unlock cancelled",
+                            detailText: "SlipBoard stays locked until you authenticate.",
+                            occurredAt: self.now()
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private var hasSessionOnlyKey: Bool {
+        (payloadStore.activeWrappedKey?.keyVersion ?? 0) >= PayloadKeychainStore.sessionOnlyKeyVersion
+    }
+
+    private func unwrapKeyAndCompleteUnlock(using method: SecurityUnlockMethod) {
         let nextState = payloadStore.unlockAccessKey(authenticationMethod: method, at: now())
-        if case .unwrappedInMemory = nextState {
-            completeUnlock(at: now())
-        } else {
+        guard case let .unwrappedInMemory(wrappedKey, _) = nextState else {
             failUnlock(
                 SecurityFailureState(
                     kind: .keyUnwrapFailed,
@@ -193,7 +237,22 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
                     occurredAt: now()
                 )
             )
+            return
         }
+
+        if wrappedKey.keyVersion < PayloadKeychainStore.sessionOnlyKeyVersion,
+           case .absent = payloadStore.rewrapAccessKey(using: wrappedKey.wrappingPolicy, at: now()) {
+            failUnlock(
+                SecurityFailureState(
+                    kind: .keyWrapFailed,
+                    title: "Protected storage unavailable",
+                    detailText: "SlipBoard could not store the payload key for session-only App Lock.",
+                    occurredAt: now()
+                )
+            )
+            return
+        }
+        completeUnlock(at: now())
     }
 
     func completeUnlock(at date: Date) {
