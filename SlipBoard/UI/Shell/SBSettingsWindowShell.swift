@@ -225,6 +225,12 @@ struct SBSettingsWindowShell: View {
                 theme: theme,
                 onToggle: { onToggle(item.id, $0) }
             )
+        case let .choice(item) where item.id == "ttl":
+            RetentionPeriodRow(
+                item: normalizedRetentionChoiceItem(item),
+                theme: theme,
+                onSelect: { onSelectChoice(item.id, $0) }
+            )
         case let .choice(item):
             InteractiveChoiceRow(
                 item: normalizedRetentionChoiceItem(item),
@@ -308,6 +314,9 @@ struct SBSettingsWindowShell: View {
             return id
         case "never":
             return copy.text(.retentionNever)
+        case RetentionTTLPolicy.customOptionID:
+            let custom = copy.text(.retentionCustom)
+            return fallback == "Custom" ? custom : "\(custom) · \(fallback)"
         default:
             return fallback
         }
@@ -1793,6 +1802,122 @@ private struct OrganizationGroupRow: View {
         }
         .padding(theme.spacing.control12)
         .sbSurface(.subpanel, theme: theme)
+    }
+}
+
+/// The retention chips plus a "Custom" chip that opens an amount + unit editor.
+private struct RetentionPeriodRow: View {
+    let item: SettingsChoiceItem
+    let theme: SBTheme
+    let onSelect: (String) -> Void
+
+    @SBLocalizedCopy private var copy
+    @State private var isEditingCustom = false
+    @State private var amountText = ""
+    @State private var unit: RetentionTTLUnit = .days
+
+    private var storedCustomPolicy: RetentionTTLPolicy? {
+        item.options
+            .first(where: { $0.id == RetentionTTLPolicy.customOptionID })?
+            .detailText
+            .flatMap(RetentionTTLPolicy.init(rawValue:))
+    }
+
+    private var enteredPolicy: RetentionTTLPolicy? {
+        guard let amount = Int(amountText.trimmingCharacters(in: .whitespaces)),
+              RetentionTTLPolicy.customAmountRange.contains(amount)
+        else {
+            return nil
+        }
+        return .custom(amount: amount, unit: unit)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.control8) {
+            Text(item.title)
+                .font(theme.typography.rowPrimary)
+                .foregroundStyle(theme.palette.textPrimary)
+
+            if let detailText = item.detailText, detailText.isEmpty == false {
+                Text(detailText)
+                    .font(theme.typography.rowSecondary)
+                    .foregroundStyle(theme.palette.textSecondary)
+            }
+
+            SBSegmentedControl(
+                options: item.options,
+                selection: isEditingCustom ? RetentionTTLPolicy.customOptionID : item.selectedOptionID,
+                theme: theme,
+                label: { $0.label },
+                action: { optionID in
+                    if optionID == RetentionTTLPolicy.customOptionID {
+                        startEditingCustom()
+                    } else {
+                        isEditingCustom = false
+                        onSelect(optionID)
+                    }
+                }
+            )
+
+            if isEditingCustom {
+                HStack(spacing: theme.spacing.control8) {
+                    Text(copy.text(.retentionCustomHint))
+                        .font(theme.typography.rowSecondary)
+                        .foregroundStyle(theme.palette.textSecondary)
+
+                    TextField("", text: $amountText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 64)
+                        .onSubmit(apply)
+
+                    Picker("", selection: $unit) {
+                        ForEach(RetentionTTLUnit.allCases) { unit in
+                            Text(label(for: unit)).tag(unit)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 110)
+
+                    Button(copy.text(.retentionCustomApply), action: apply)
+                        .disabled(enteredPolicy == nil)
+
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(theme.spacing.control12)
+        .sbSurface(.subpanel, theme: theme)
+        .onAppear {
+            if storedCustomPolicy != nil {
+                startEditingCustom()
+            }
+        }
+    }
+
+    private func startEditingCustom() {
+        if case let .custom(amount, storedUnit)? = storedCustomPolicy {
+            amountText = String(amount)
+            unit = storedUnit
+        } else if amountText.isEmpty {
+            amountText = "3"
+            unit = .days
+        }
+        isEditingCustom = true
+    }
+
+    private func apply() {
+        guard let enteredPolicy else { return }
+        onSelect(enteredPolicy.rawValue)
+    }
+
+    private func label(for unit: RetentionTTLUnit) -> String {
+        switch unit {
+        case .hours: copy.text(.retentionUnitHours)
+        case .days: copy.text(.retentionUnitDays)
+        case .weeks: copy.text(.retentionUnitWeeks)
+        case .months: copy.text(.retentionUnitMonths)
+        }
     }
 }
 
