@@ -76,7 +76,7 @@ struct SBSearchFieldShell: View {
         }
         .padding(.horizontal, theme.spacing.control8)
         .frame(width: isVisible ? (collapsesWhenHidden ? 240 : 220) : 0, height: 32, alignment: .leading)
-        .background(theme.palette.subpanel.opacity(isVisible ? SBTheme.headerControlFillOpacity : 0.001))
+        .background(theme.palette.subpanel.opacity(isVisible ? theme.headerControlFillOpacity : 0.001))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -219,7 +219,7 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
             .font(theme.typography.chip)
             .padding(.horizontal, theme.spacing.control10)
             .frame(width: buttonWidth, height: 32)
-            .background(theme.palette.subpanel.opacity(SBTheme.headerControlFillOpacity))
+            .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

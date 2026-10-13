@@ -27,10 +27,6 @@ enum SBSurfaceTreatment: Hashable {
 /// `SBThemeRegistry`; typography, spacing and radii stay in code so no theme
 /// file can change layout.
 struct SBTheme {
-    /// Search field, Source menu and overflow button in the popup header sit
-    /// on the toolbar background, so their fill is kept see-through.
-    static let headerControlFillOpacity: Double = 0.4
-
     struct Palette {
         var canvas: Color
         var panel: Color
@@ -128,6 +124,12 @@ struct SBTheme {
     let shadow: Shadow
     /// Present only for glass themes.
     var glassRim: SBGlassRim? = nil
+
+    /// Fill opacity of the search field, Source menu and overflow button in
+    /// the popup header: see-through on Liquid Glass, solid otherwise.
+    var headerControlFillOpacity: Double {
+        treatment == .liquidGlass ? 0.4 : 1
+    }
 
     var treatment: SBSurfaceTreatment {
         glassRim == nil ? .solid : .liquidGlass
