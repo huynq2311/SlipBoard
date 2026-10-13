@@ -387,9 +387,6 @@ struct SBSettingsWindowShell: View {
         case "organization.search":
             localized.title = copy.text(.settingsSearchHeading)
             localized.descriptionText = copy.text(.settingsSearchDescription)
-        case "organization.collections":
-            localized.title = copy.text(.settingsCollectionsHeading)
-            localized.descriptionText = copy.text(.settingsCollectionsDescription)
         case "organization.locked":
             localized.title = copy.text(.settingsLockedStateHeading)
         case "retention.history-limit":
@@ -467,10 +464,7 @@ struct SBSettingsWindowShell: View {
 
         localized.rows = section.rows.map(localizedRow)
         if var placeholder = localized.placeholder {
-            if placeholder.id == "organization.collections.empty" {
-                placeholder.title = copy.text(.settingsCreateFirstGroup)
-                placeholder.detailText = copy.text(.settingsCollectionsEmptyDetail)
-            } else if placeholder.id == "organization.locked.callout" {
+            if placeholder.id == "organization.locked.callout" {
                 let isLocked = (securitySnapshot as? SecurityRuntimeSnapshot)?.lockState.revealsProtectedContent == false
                 placeholder.title = copy.text(isLocked ? .settingsSearchDisabledTitle : .settingsAppLockLiveTitle)
                 placeholder.detailText = copy.text(isLocked ? .settingsSearchLockedDetail : .settingsSearchUnlockedLockDetail)
@@ -590,10 +584,6 @@ struct SBSettingsWindowShell: View {
             case "organization.note-source":
                 item.title = copy.text(.settingsNoteSource)
                 item.detailText = copy.text(.settingsNoteSourceDetail)
-            case let id where id.hasPrefix("organization.group."):
-                let isSelected = item.accessoryText != nil
-                item.detailText = copy.text(isSelected ? .settingsGroupActiveDetail : .settingsGroupAvailableDetail)
-                item.accessoryText = isSelected ? copy.text(.settingsSelected) : nil
             case let id where id.hasPrefix("exclusions.remove."):
                 item.accessoryText = copy.text(.settingsRemoveApp)
             case "global:openSlipboard":
@@ -903,7 +893,6 @@ struct SBSettingsWindowShell: View {
     private func organizationPaneSections(for pane: SettingsPaneModel) -> some View {
         let startupSection = pane.sections.first { $0.id == "startup" }
         let searchSection = pane.sections.first { $0.id == "organization.search" }
-        let collectionsSection = pane.sections.first { $0.id == "organization.collections" }
         let calloutPlaceholder = pane.sections.compactMap(\.placeholder).first
 
         if let startupSection {
@@ -973,22 +962,6 @@ struct SBSettingsWindowShell: View {
                 }
 
                 if let placeholder = searchSection.placeholder {
-                    SBSettingsSectionPlaceholder(placeholder: placeholder, theme: theme)
-                }
-            }
-        }
-
-        if let collectionsSection {
-            SBPaneSection(
-                title: collectionsSection.title,
-                descriptionText: collectionsSection.descriptionText,
-                theme: theme
-            ) {
-                ForEach(Array(collectionsSection.rows.enumerated()), id: \.offset) { _, row in
-                    organizationRow(row)
-                }
-
-                if let placeholder = collectionsSection.placeholder {
                     SBSettingsSectionPlaceholder(placeholder: placeholder, theme: theme)
                 }
             }

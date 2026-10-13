@@ -7,7 +7,6 @@ import SwiftUI
 enum SBHeaderMenuKind: Equatable {
     case overflow
     case source
-    case collection
 }
 
 enum SBPopupLayoutMetrics {
@@ -61,14 +60,11 @@ struct SBPopupTopBar: View {
     @SBLocalizedCopy private var copy
     var isSearchEnabled: Bool = true
     var searchFocusRequestToken: Int = 0
-    var groupChips: [OrganizationChipSummary] = []
-    var activeGroupID: OrganizationGroupID? = nil
     var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectSource: (String?) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
-    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}
     var onOpenSettings: () -> Void = {}
@@ -83,15 +79,12 @@ struct SBPopupTopBar: View {
         state: PopupShellViewState,
         isSearchEnabled: Bool = true,
         searchFocusRequestToken: Int = 0,
-        groupChips: [OrganizationChipSummary] = [],
-        activeGroupID: OrganizationGroupID? = nil,
         activeMenu: Binding<SBHeaderMenuKind?>,
         onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
         onSelectSource: @escaping (String?) -> Void = { _ in },
         onSelectThemePreview: @escaping (PopupThemeSelection) -> Void = { _ in },
-        onSelectOrganizationGroup: @escaping (OrganizationGroupID) -> Void = { _ in },
         onPauseCapture: @escaping () -> Void = {},
         onClearHistory: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void = {},
@@ -102,15 +95,12 @@ struct SBPopupTopBar: View {
         self.state = state
         self.isSearchEnabled = isSearchEnabled
         self.searchFocusRequestToken = searchFocusRequestToken
-        self.groupChips = groupChips
-        self.activeGroupID = activeGroupID
         _activeMenu = activeMenu
         self.onToggleSearchPresented = onToggleSearchPresented
         self.onSearchQueryChange = onSearchQueryChange
         self.onSelectFilter = onSelectFilter
         self.onSelectSource = onSelectSource
         self.onSelectThemePreview = onSelectThemePreview
-        self.onSelectOrganizationGroup = onSelectOrganizationGroup
         self.onPauseCapture = onPauseCapture
         self.onClearHistory = onClearHistory
         self.onOpenSettings = onOpenSettings
@@ -202,21 +192,6 @@ struct SBPopupTopBar: View {
                         activeMenu = nil
                     }
                 )
-
-                SBUtilityDropdown(
-                    label: copy.text(.popupCollections),
-                    selectionText: collectionSelectionText,
-                    options: groupChips,
-                    theme: theme,
-                    isEnabled: isSearchEnabled,
-                    isOpen: activeMenu == .collection,
-                    optionLabel: { $0.label },
-                    onToggle: { toggleMenu(.collection) },
-                    action: { chip in
-                        onSelectOrganizationGroup(chip.groupID)
-                        activeMenu = nil
-                    }
-                )
             }
         }
         .padding(.horizontal, theme.spacing.popupPadding)
@@ -261,10 +236,6 @@ struct SBPopupTopBar: View {
 
     private var sourceSelectionText: String {
         state.sourceOptions.first(where: { $0.id == state.activeSourceID })?.label ?? copy.text(.commonAll)
-    }
-
-    private var collectionSelectionText: String {
-        groupChips.first(where: { $0.isSelected })?.label ?? copy.text(.commonAll)
     }
 
     private func toggleMenu(_ kind: SBHeaderMenuKind) {
@@ -414,7 +385,6 @@ struct SBPopupShell: View {
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectSource: (String?) -> Void = { _ in }
     var onSelectThemePreview: (PopupThemeSelection) -> Void = { _ in }
-    var onSelectOrganizationGroup: (OrganizationGroupID) -> Void = { _ in }
     var onPauseCapture: () -> Void = {}
     var onClearHistory: () -> Void = {}
     var onOpenSettings: () -> Void = {}
@@ -462,15 +432,12 @@ struct SBPopupShell: View {
                     state: state,
                     isSearchEnabled: isSearchEnabled,
                     searchFocusRequestToken: searchFocusRequestToken,
-                    groupChips: searchNotesState.groupChips,
-                    activeGroupID: searchNotesState.activeGroupID,
                     activeMenu: $activeHeaderMenu,
                     onToggleSearchPresented: onToggleSearchPresented,
                     onSearchQueryChange: onSearchQueryChange,
                     onSelectFilter: onSelectFilter,
                     onSelectSource: onSelectSource,
                     onSelectThemePreview: onSelectThemePreview,
-                    onSelectOrganizationGroup: onSelectOrganizationGroup,
                     onPauseCapture: onPauseCapture,
                     onClearHistory: onClearHistory,
                     onOpenSettings: onOpenSettings,
