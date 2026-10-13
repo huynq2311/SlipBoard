@@ -12,7 +12,7 @@ enum SBHeaderMenuKind: Equatable {
 enum SBPopupLayoutMetrics {
     /// Width of a clip card when the pinned rail is open.
     static let cardWidth: CGFloat = 216
-    static let expandedContentHeight: CGFloat = 460
+    static let expandedContentHeight: CGFloat = 418
     static let pinnedCollapsedHeightReduction: CGFloat = 93
     /// Transparent room around a glass shell so the borderless panel does not
     /// clip its shadow and rim into square corners. Bottom stays below the
@@ -60,7 +60,6 @@ struct SBPopupTopBar: View {
     @SBLocalizedCopy private var copy
     var isSearchEnabled: Bool = true
     var searchFocusRequestToken: Int = 0
-    var onToggleSearchPresented: (Bool) -> Void = { _ in }
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectSource: (String?) -> Void = { _ in }
@@ -80,7 +79,6 @@ struct SBPopupTopBar: View {
         isSearchEnabled: Bool = true,
         searchFocusRequestToken: Int = 0,
         activeMenu: Binding<SBHeaderMenuKind?>,
-        onToggleSearchPresented: @escaping (Bool) -> Void = { _ in },
         onSearchQueryChange: @escaping (String) -> Void = { _ in },
         onSelectFilter: @escaping (String) -> Void = { _ in },
         onSelectSource: @escaping (String?) -> Void = { _ in },
@@ -96,7 +94,6 @@ struct SBPopupTopBar: View {
         self.isSearchEnabled = isSearchEnabled
         self.searchFocusRequestToken = searchFocusRequestToken
         _activeMenu = activeMenu
-        self.onToggleSearchPresented = onToggleSearchPresented
         self.onSearchQueryChange = onSearchQueryChange
         self.onSelectFilter = onSelectFilter
         self.onSelectSource = onSelectSource
@@ -109,90 +106,71 @@ struct SBPopupTopBar: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: theme.spacing.control8) {
-                SBIconButton(
-                    symbolName: "magnifyingglass",
-                    theme: theme,
-                    isActive: state.isSearchPresented,
-                    accessibilityLabel: copy.text(.search),
-                    action: {
-                        guard isSearchEnabled else { return }
-                        onToggleSearchPresented(state.isSearchPresented == false)
-                    }
-                )
-                .disabled(isSearchEnabled == false)
-                .opacity(isSearchEnabled ? 1 : 0.55)
+        HStack(spacing: theme.spacing.control8) {
+            SBSearchFieldShell(
+                text: $searchText,
+                theme: theme,
+                isPresented: state.isSearchPresented,
+                placeholder: copy.text(.searchPlaceholder),
+                trailingHint: "ESC",
+                focusRequestToken: searchFocusRequestToken,
+                collapsesWhenHidden: false
+            )
+            .disabled(isSearchEnabled == false)
+            .opacity(isSearchEnabled ? 1 : 0.55)
 
-                SBSearchFieldShell(
-                    text: $searchText,
-                    theme: theme,
-                    isPresented: state.isSearchPresented,
-                    trailingHint: "ESC",
-                    focusRequestToken: searchFocusRequestToken
-                )
-                .disabled(isSearchEnabled == false)
-                .opacity(isSearchEnabled ? 1 : 0.55)
-
-                Spacer(minLength: theme.spacing.control8)
-
-                SBKeyboardHint(text: "⌘K", theme: theme)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "menubar.rectangle")
-                        .font(.system(size: 11, weight: .medium))
-
-                    Text(copy.text(.appName))
-                        .font(theme.typography.chip)
+            SBUtilityDropdown(
+                label: copy.text(.commonSource),
+                selectionText: sourceSelectionText,
+                options: sourceMenuOptions,
+                theme: theme,
+                isEnabled: isSearchEnabled,
+                isOpen: activeMenu == .source,
+                optionLabel: { $0.label },
+                optionIcon: { AnyView(sourceMenuIcon($0)) },
+                onToggle: { toggleMenu(.source) },
+                action: { option in
+                    onSelectSource(option.id.isEmpty ? nil : option.id)
+                    activeMenu = nil
                 }
-                .foregroundStyle(theme.palette.textSecondary)
-
-                overflowMenu
-            }
-            // Wins hit-testing against the filter/dropdown row below, which
-            // this menu's popout visually overlaps when open (see zIndex
-            // note on SBPopupTopBar's own call site).
+            )
+            // Its popout drops over the chips to its right.
             .zIndex(1)
 
-            HStack(spacing: theme.spacing.control8) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: theme.spacing.control6) {
-                        ForEach(filters) { filter in
-                            SBFilterChip(
-                                title: filter.label,
-                                systemImage: filter.iconName,
-                                countText: filter.count.map(String.init),
-                                theme: theme,
-                                isSelected: filter.id == state.activeFilterID,
-                                tintColor: SBClipTypeColor.base(forFilterID: filter.id),
-                                action: {
-                                    onSelectFilter(filter.id)
-                                }
-                            )
-                            .disabled(isSearchEnabled == false)
-                            .opacity(isSearchEnabled ? 1 : 0.55)
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: theme.spacing.control6) {
+                    ForEach(filters) { filter in
+                        SBFilterChip(
+                            title: filter.label,
+                            systemImage: filter.iconName,
+                            countText: filter.count.map(String.init),
+                            theme: theme,
+                            isSelected: filter.id == state.activeFilterID,
+                            tintColor: SBClipTypeColor.base(forFilterID: filter.id),
+                            action: {
+                                onSelectFilter(filter.id)
+                            }
+                        )
+                        .disabled(isSearchEnabled == false)
+                        .opacity(isSearchEnabled ? 1 : 0.55)
                     }
                 }
-                .layoutPriority(1)
-
-                Spacer(minLength: theme.spacing.control8)
-
-                SBUtilityDropdown(
-                    label: copy.text(.commonSource),
-                    selectionText: sourceSelectionText,
-                    options: sourceMenuOptions,
-                    theme: theme,
-                    isEnabled: isSearchEnabled,
-                    isOpen: activeMenu == .source,
-                    optionLabel: { $0.label },
-                    onToggle: { toggleMenu(.source) },
-                    action: { option in
-                        onSelectSource(option.id.isEmpty ? nil : option.id)
-                        activeMenu = nil
-                    }
-                )
             }
+            .layoutPriority(1)
+
+            Spacer(minLength: theme.spacing.control8)
+
+            HStack(spacing: 4) {
+                Image(systemName: "menubar.rectangle")
+                    .font(.system(size: 11, weight: .medium))
+
+                Text(copy.text(.appName))
+                    .font(theme.typography.chip)
+            }
+            .foregroundStyle(theme.palette.textSecondary)
+            .fixedSize()
+
+            overflowMenu
         }
         .padding(.horizontal, theme.spacing.popupPadding)
         .padding(.vertical, theme.spacing.control8)
@@ -227,10 +205,23 @@ struct SBPopupTopBar: View {
     /// row uses an empty id, which `onSelectSource` turns back into `nil`.
     private var sourceMenuOptions: [SBUtilityDropdownOption] {
         guard state.sourceOptions.isEmpty == false else { return [] }
-        let total = state.sourceOptions.reduce(0) { $0 + $1.count }
+        // The list is capped, so the total comes from the "All" type filter.
+        let total = filters.first(where: { $0.id == "all" })?.count ?? 0
         let all = SBUtilityDropdownOption(id: "", label: "\(copy.text(.commonAll)) (\(total))")
         return [all] + state.sourceOptions.map {
             SBUtilityDropdownOption(id: $0.id, label: "\($0.label) (\($0.count))")
+        }
+    }
+
+    @ViewBuilder
+    private func sourceMenuIcon(_ option: SBUtilityDropdownOption) -> some View {
+        if option.id.isEmpty {
+            Image(systemName: "square.stack")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(theme.palette.textSecondary)
+                .frame(width: 16, height: 16)
+        } else {
+            SBSourceAppAvatar(appID: option.id, symbolName: nil, accentToken: "accent.primary", theme: theme, size: 16)
         }
     }
 
@@ -380,7 +371,8 @@ struct SBPopupShell: View {
     var pasteOverlayState: PasteActionOverlayState = .hidden
     var supportedTransformActionIDs: Set<PasteActionID> = Set(PasteActionID.transformMenuOrder)
     var searchFocusRequestToken: Int = 0
-    var onToggleSearchPresented: (Bool) -> Void = { _ in }
+    /// Whether the popup panel is on screen; header menus close with it.
+    var isPresented: Bool = true
     var onSearchQueryChange: (String) -> Void = { _ in }
     var onSelectFilter: (String) -> Void = { _ in }
     var onSelectSource: (String?) -> Void = { _ in }
@@ -433,7 +425,6 @@ struct SBPopupShell: View {
                     isSearchEnabled: isSearchEnabled,
                     searchFocusRequestToken: searchFocusRequestToken,
                     activeMenu: $activeHeaderMenu,
-                    onToggleSearchPresented: onToggleSearchPresented,
                     onSearchQueryChange: onSearchQueryChange,
                     onSelectFilter: onSelectFilter,
                     onSelectSource: onSelectSource,
@@ -449,6 +440,11 @@ struct SBPopupShell: View {
                 // (and hit-test) on top of them, per SwiftUI's normal
                 // declaration-order stacking.
                 .zIndex(1)
+                // The panel is only ordered out on close, so its state survives;
+                // a menu left open would still be open on the next show.
+                .onChange(of: isPresented) { _, isShown in
+                    if isShown == false { activeHeaderMenu = nil }
+                }
 
                 if let securitySnapshot, securitySnapshot.lockState.revealsProtectedContent == false {
                     SBLockedPopupStateCard(

@@ -2734,6 +2734,7 @@ private struct SBPopupRootView: View {
             pasteOverlayState: runtime.pasteOverlayState,
             supportedTransformActionIDs: runtime.supportedTransformActionIDs,
             searchFocusRequestToken: runtime.searchFocusRequestToken,
+            isPresented: runtime.isPopupPresented,
             onToggleSearchPresented: runtime.setSearchPresented,
             onSearchQueryChange: runtime.updateSearchQuery,
             onSelectFilter: runtime.selectFilter,

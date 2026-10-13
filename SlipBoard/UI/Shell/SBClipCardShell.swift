@@ -815,7 +815,7 @@ private struct SBRichTextPreviewFallback: View {
 /// The real icon of the app a clip was copied from. `appID` is the source
 /// app's bundle id; when no installed app has it (or it is just a display
 /// name), the symbol avatar is shown instead.
-private struct SBSourceAppAvatar: View {
+struct SBSourceAppAvatar: View {
     let appID: String
     let symbolName: String?
     let accentToken: String
