@@ -127,6 +127,10 @@ struct SBOverlayMenuShell<Header: View>: View {
                             isHighlighted: highlightedActionID == action.id
                         )
                         .opacity(action.isEnabled ? 1 : 0.46)
+                        // A plain button only hits its drawn parts; without
+                        // this a click on the row's empty middle fell through
+                        // to the card under the menu.
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(action.isEnabled == false)
@@ -139,6 +143,9 @@ struct SBOverlayMenuShell<Header: View>: View {
         }
         .frame(width: width, alignment: .topLeading)
         .sbSurface(.overlay, theme: theme)
+        // Swallows clicks between rows so they never reach the cards below.
+        .contentShape(Rectangle())
+        .onTapGesture {}
     }
 }
 

@@ -38,7 +38,6 @@ struct SBClipCardShell: View {
     var onUpdateNoteDraft: (String) -> Void = { _ in }
     var onSaveNote: () -> Void = {}
     var onCancelNoteEditing: () -> Void = {}
-    var onClearNote: () -> Void = {}
     var onPrimaryAction: () -> Void = {}
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
@@ -82,6 +81,8 @@ struct SBClipCardShell: View {
                     footer
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .overlay(alignment: .bottom) { noteEditorOverlay }
         }
         // Keyed on visibility too, so a card hidden by App Lock loads its
         // metrics once it is unlocked instead of staying blank.
@@ -289,25 +290,6 @@ struct SBClipCardShell: View {
                     richTextBody
                 }
             }
-
-            if showsCollapsedNoteSummary, let noteText = clip.noteText, noteText.isEmpty == false {
-                Text(noteText)
-                    .font(theme.typography.meta)
-                    .foregroundStyle(theme.palette.textSecondary)
-                    .lineLimit(2)
-            }
-
-            if isInlineEditorVisible, let noteEditorState = noteEditorState {
-                ClipNoteEditorInline(
-                    state: noteEditorState,
-                    theme: theme,
-                    onUpdateDraft: onUpdateNoteDraft,
-                    onSave: onSaveNote,
-                    onCancel: onCancelNoteEditing,
-                    onClear: onClearNote
-                )
-                .padding(.top, 2)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -460,14 +442,67 @@ struct SBClipCardShell: View {
     // the length, size or dimensions of what it hides.
     private var showsFooter: Bool {
         guard isPreviewRedacted == false else { return false }
-        return clip.kind != .color
+        return clip.kind != .color || footerNoteText != nil
+    }
+
+    /// A note replaces the footer's metrics; it says more about the clip.
+    private var footerNoteText: String? {
+        guard clip.hasNote, let noteText = clip.noteText else { return nil }
+        // One line in the footer, so line breaks become spaces.
+        let trimmed = noteText
+            .split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var footerReservedHeight: CGFloat {
         showsFooter ? Self.footerHeight : 0
     }
 
+    // Drawn over the card's bottom edge rather than in the footer's slot, so
+    // opening it does not shrink the preview above.
+    @ViewBuilder
+    private var noteEditorOverlay: some View {
+        if isInlineEditorVisible, let noteEditorState {
+            ClipNoteFooterEditor(
+                state: noteEditorState,
+                theme: theme,
+                onUpdateDraft: onUpdateNoteDraft,
+                onSave: onSaveNote,
+                onCancel: onCancelNoteEditing
+            )
+            .padding(.horizontal, 8)
+            .padding(.bottom, 9)
+        }
+    }
+
+    @ViewBuilder
     private var footer: some View {
+        if isInlineEditorVisible {
+            // The editor overlay covers this slot.
+            Color.clear.frame(height: Self.footerHeight)
+        } else if let footerNoteText {
+            HStack(spacing: 4) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(footerNoteText)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .foregroundStyle(theme.palette.accentPrimary)
+            .help(footerNoteText)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: Self.footerHeight)
+        } else {
+            metricsFooter
+        }
+    }
+
+    private var metricsFooter: some View {
         Text(footerText ?? " ")
             .font(.system(size: 12, weight: .medium).monospacedDigit())
             .foregroundStyle(theme.palette.textTertiary)
@@ -561,18 +596,6 @@ struct SBClipCardShell: View {
         return max(3, Int((bodyAreaHeight / approxLineHeight).rounded(.down)))
     }
 
-    private var headerLabelText: String {
-        if isPreviewRedacted {
-            return clip.sourceApp.displayName
-        }
-
-        if clip.hasNote, let noteText = clip.noteText, noteText.isEmpty == false {
-            return noteText
-        }
-
-        return clip.sourceApp.displayName
-    }
-
     private var clipKindLabel: String {
         switch clip.kind {
         case .text:
@@ -615,11 +638,6 @@ struct SBClipCardShell: View {
         guard isPreviewRedacted == false else { return false }
         guard let noteEditorState else { return false }
         return noteEditorState.clipID == clip.id && noteEditorState.isPresented && isSelected
-    }
-
-    private var showsCollapsedNoteSummary: Bool {
-        guard isPreviewRedacted == false else { return false }
-        return clip.hasNote && isInlineEditorVisible == false && headerLabelText == clip.sourceApp.displayName
     }
 
     private func handleHeaderTap() {
@@ -889,7 +907,6 @@ struct SBHorizontalClipRail: View {
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
     var onSaveNoteDraft: (String) -> Void = { _ in }
     var onCancelNoteEditing: (String) -> Void = { _ in }
-    var onClearNote: (String) -> Void = { _ in }
     var onPrimaryAction: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
@@ -952,9 +969,6 @@ struct SBHorizontalClipRail: View {
                                 },
                                 onCancelNoteEditing: {
                                     onCancelNoteEditing(clip.id)
-                                },
-                                onClearNote: {
-                                    onClearNote(clip.id)
                                 },
                                 onPrimaryAction: {
                                     if securitySnapshot?.lockState.revealsProtectedContent != false,
@@ -1139,83 +1153,75 @@ private struct SBRailScrollbarThumb: View {
     }
 }
 
-private struct ClipNoteEditorInline: View {
+/// Edits a clip's note in place of the card footer. Return saves; Escape or
+/// clicking away closes without saving (the popup routes Escape here while
+/// it is open). Saving an empty note removes it.
+private struct ClipNoteFooterEditor: View {
     let state: ClipNoteEditorState
     let theme: SBTheme
     @SBLocalizedCopy private var copy
     let onUpdateDraft: (String) -> Void
     let onSave: () -> Void
     let onCancel: () -> Void
-    let onClear: () -> Void
+    @FocusState private var isFocused: Bool
 
+    // Styled like the popup's search field.
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.control6) {
-            HStack(spacing: theme.spacing.control6) {
-                Image(systemName: "note.text")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(state.isEditable ? theme.palette.accentPrimary : theme.palette.textTertiary)
-
-                TextField(
-                    state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote),
-                    text: Binding(
-                        get: { state.draftText },
-                        set: onUpdateDraft
-                    )
-                )
+        HStack(spacing: theme.spacing.control6) {
+            if state.isEditable {
+                // The system placeholder draws almost invisibly in the
+                // non-key popup panel, so it is drawn here instead.
+                TextField("", text: Binding(
+                    get: { state.draftText },
+                    set: onUpdateDraft
+                ))
                 .textFieldStyle(.plain)
-                .font(theme.typography.meta)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.palette.textPrimary)
-                .disabled(state.isEditable == false)
-
-                if state.canClear {
-                    Button(action: onClear) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
+                .focused($isFocused)
+                .onSubmit(save)
+                .onChange(of: isFocused) { wasFocused, isFocused in
+                    if wasFocused, isFocused == false { onCancel() }
+                }
+                .overlay(alignment: .leading) {
+                    if state.draftText.isEmpty {
+                        Text(state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote))
+                            .font(theme.typography.chip)
                             .foregroundStyle(theme.palette.textTertiary)
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(state.isEditable == false)
                 }
-            }
-
-            HStack(spacing: theme.spacing.control6) {
-                if state.isEditable == false {
-                    Text(copy.text(.popupNotesLocked))
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(theme.palette.textTertiary)
-                        .lineLimit(2)
-                } else {
-                    Button(copy.text(.cancel), action: onCancel)
-                        .buttonStyle(.plain)
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(theme.palette.textSecondary)
-
-                    Spacer(minLength: theme.spacing.control6)
-
-                    Button(copy.text(.save), action: onSave)
-                        .buttonStyle(.plain)
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(state.canSave ? Color.white : theme.palette.textTertiary)
-                        .padding(.horizontal, theme.spacing.control6)
-                        .padding(.vertical, 3)
-                        .background(state.canSave ? theme.palette.accentPrimary : theme.palette.raised)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
-                        .disabled(state.canSave == false)
+                .onAppear {
+                    isFocused = true
+                    // Focusing selects the whole note; put the caret at the
+                    // end so the first key press does not replace it.
+                    DispatchQueue.main.async {
+                        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
+                        editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+                    }
                 }
+            } else {
+                Text(copy.text(.popupNotesLocked))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .lineLimit(1)
             }
         }
-        .padding(.horizontal, theme.spacing.control8)
-        .padding(.vertical, theme.spacing.control6)
-        .background(theme.palette.canvas)
-        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
+        .padding(.horizontal, theme.spacing.control10)
+        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
+        .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
+        .clipShape(Capsule(style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous)
-                .stroke(
-                    state.isEditable ? theme.palette.accentPrimary : theme.palette.border,
-                    lineWidth: theme.border.hairline
-                )
+            Capsule(style: .continuous)
+                .stroke(theme.palette.border, lineWidth: theme.border.hairline)
         )
-        .opacity(state.isEditable ? 1 : 0.8)
+    }
+
+    private func save() {
+        guard state.isEditable, state.isDirty else { return }
+        onSave()
+        onCancel()
     }
 }
 

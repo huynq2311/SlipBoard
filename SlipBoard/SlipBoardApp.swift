@@ -758,6 +758,16 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         }
     }
 
+    /// Closes the note editor shown on the selected card without saving.
+    /// Returns false when none is showing.
+    func cancelActiveNoteEditing() -> Bool {
+        guard let activeEditor = searchNotesState.activeEditor,
+              activeEditor.isPresented,
+              activeEditor.clipID == controller.latestSnapshot.selectedItemID else { return false }
+        cancelNoteEditing(for: activeEditor.clipID)
+        return true
+    }
+
     func clearSelectedClipGroups() {
         recordSecurityInteraction()
         guard let selectedClipID = selectedClipIDForOrganization else { return }
@@ -797,11 +807,6 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         if searchNotesState.activeEditor?.clipID == clipID {
             controller.dismissNoteEditor()
         }
-    }
-
-    func clearNote(for clipID: String) {
-        recordSecurityInteraction()
-        controller.clearNote(for: clipID)
     }
 
     func moveSelection(by delta: Int) {
@@ -2529,6 +2534,9 @@ struct SlipBoardApp: App {
         popupPresentationController.onTypeToSearchCharacters = { characters in
             runtime.appendTypedCharactersToSearch(characters)
         }
+        popupPresentationController.onEscapeRequested = {
+            runtime.cancelActiveNoteEditing()
+        }
         runtime.focusSettings(on: .general)
         runtime.startMonitoring()
         didInitializeShellLifecycle = true
@@ -2788,7 +2796,6 @@ private struct SBPopupRootView: View {
             onUpdateNoteDraft: runtime.updateNoteDraft,
             onSaveNoteDraft: runtime.saveNoteDraft,
             onCancelNoteEditing: runtime.cancelNoteEditing,
-            onClearNote: runtime.clearNote,
             onOpenContextMenu: runtime.openContextMenu,
             onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
             onCloseActiveOverlay: runtime.closeActiveOverlay,

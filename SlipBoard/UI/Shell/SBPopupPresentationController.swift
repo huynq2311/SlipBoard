@@ -28,6 +28,8 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     var onPrimaryPasteRequested: (() -> Void)?
     var onMoveSelectionRequested: ((Int) -> Void)?
     var onTypeToSearchCharacters: ((String) -> Void)?
+    /// Returns true when it handled Escape itself, so the popup stays open.
+    var onEscapeRequested: (() -> Bool)?
 
     private var panel: NSPanel?
     private var hostingController: NSHostingController<AnyView>?
@@ -403,6 +405,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
 
             switch event.keyCode {
             case 53:
+                if self.onEscapeRequested?() == true { return nil }
                 self.dismiss()
                 return nil
             case 51, 117:
