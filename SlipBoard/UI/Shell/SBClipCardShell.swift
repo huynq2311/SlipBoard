@@ -1144,9 +1144,9 @@ private struct SBRailScrollbarThumb: View {
     }
 }
 
-/// Edits a clip's note in place of the card footer. Return saves and Escape
-/// closes without saving (the popup routes Escape here while it is open);
-/// saving an empty note removes it.
+/// Edits a clip's note in place of the card footer. Return saves; Escape or
+/// clicking away closes without saving (the popup routes Escape here while
+/// it is open). Saving an empty note removes it.
 private struct ClipNoteFooterEditor: View {
     let state: ClipNoteEditorState
     let theme: SBTheme
@@ -1171,6 +1171,9 @@ private struct ClipNoteFooterEditor: View {
                 .foregroundStyle(theme.palette.textPrimary)
                 .focused($isFocused)
                 .onSubmit(save)
+                .onChange(of: isFocused) { wasFocused, isFocused in
+                    if wasFocused, isFocused == false { onCancel() }
+                }
                 .overlay(alignment: .leading) {
                     if state.draftText.isEmpty {
                         Text(state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote))
