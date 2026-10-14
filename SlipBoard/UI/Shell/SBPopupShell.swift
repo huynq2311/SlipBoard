@@ -15,6 +15,11 @@ enum SBMotion {
     static let dismiss = Animation.easeIn(duration: 0.14)
     static let menu = Animation.easeOut(duration: 0.14)
     static let rail = Animation.spring(response: 0.32, dampingFraction: 0.86)
+    static let list = Animation.easeOut(duration: 0.22)
+    static let listTransition = AnyTransition.asymmetric(
+        insertion: .opacity.combined(with: .offset(x: 16)),
+        removal: .opacity
+    )
 
     static func menuTransition(anchor: UnitPoint) -> AnyTransition {
         .opacity.combined(with: .scale(scale: 0.96, anchor: anchor))
@@ -478,56 +483,65 @@ struct SBPopupShell: View {
                     .padding(.vertical, theme.spacing.control12)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: theme.spacing.control8) {
-                            ClipboardHistoryRailSection(
-                                kind: .pinned,
-                                clips: state.pinnedClips,
-                                theme: theme,
-                                selectedClipID: state.selectedClipID,
-                                searchQuery: state.searchQuery,
-                                activeFilterLabel: activeFilterLabel,
-                                activeGroupLabel: activeGroupLabel,
-                                noteEditorState: searchNotesState.activeEditor,
-                                searchDisabledMessage: searchNotesState.searchDisabledMessage,
-                                isEmphasized: true,
-                                isCollapsed: isPinnedCollapsed,
-                                onToggleCollapse: togglePinnedCollapsed,
-                                onSelectClip: onSelectClip,
-                                onToggleNoteEditor: onToggleNoteEditor,
-                                onUpdateNoteDraft: onUpdateNoteDraft,
-                                onSaveNoteDraft: onSaveNoteDraft,
-                                onCancelNoteEditing: onCancelNoteEditing,
-                                onClearNote: onClearNote,
-                                onPrimaryAction: onPrimaryAction,
-                                onOpenContextMenu: onOpenContextMenu,
-                                onPerformContextAction: onPerformContextAction
-                            )
+                        // Keyed by filter and source so switching either
+                        // crossfades the whole list instead of cards popping
+                        // in place. The ZStack overlaps the outgoing and
+                        // incoming lists rather than stacking them.
+                        ZStack(alignment: .topLeading) {
+                            VStack(spacing: theme.spacing.control8) {
+                                ClipboardHistoryRailSection(
+                                    kind: .pinned,
+                                    clips: state.pinnedClips,
+                                    theme: theme,
+                                    selectedClipID: state.selectedClipID,
+                                    searchQuery: state.searchQuery,
+                                    activeFilterLabel: activeFilterLabel,
+                                    activeGroupLabel: activeGroupLabel,
+                                    noteEditorState: searchNotesState.activeEditor,
+                                    searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                    isEmphasized: true,
+                                    isCollapsed: isPinnedCollapsed,
+                                    onToggleCollapse: togglePinnedCollapsed,
+                                    onSelectClip: onSelectClip,
+                                    onToggleNoteEditor: onToggleNoteEditor,
+                                    onUpdateNoteDraft: onUpdateNoteDraft,
+                                    onSaveNoteDraft: onSaveNoteDraft,
+                                    onCancelNoteEditing: onCancelNoteEditing,
+                                    onClearNote: onClearNote,
+                                    onPrimaryAction: onPrimaryAction,
+                                    onOpenContextMenu: onOpenContextMenu,
+                                    onPerformContextAction: onPerformContextAction
+                                )
 
-                            ClipboardHistoryRailSection(
-                                kind: .recent,
-                                clips: state.recentClips,
-                                theme: theme,
-                                selectedClipID: state.selectedClipID,
-                                searchQuery: state.searchQuery,
-                                activeFilterLabel: activeFilterLabel,
-                                activeGroupLabel: activeGroupLabel,
-                                noteEditorState: searchNotesState.activeEditor,
-                                searchDisabledMessage: searchNotesState.searchDisabledMessage,
-                                cardWidth: isPinnedCollapsed ? Self.recentCardWidthPinnedCollapsed : Self.recentCardWidth,
-                                cardHeight: isPinnedCollapsed ? Self.recentCardHeightPinnedCollapsed : Self.recentCardHeight,
-                                onSelectClip: onSelectClip,
-                                onToggleNoteEditor: onToggleNoteEditor,
-                                onUpdateNoteDraft: onUpdateNoteDraft,
-                                onSaveNoteDraft: onSaveNoteDraft,
-                                onCancelNoteEditing: onCancelNoteEditing,
-                                onClearNote: onClearNote,
-                                onPrimaryAction: onPrimaryAction,
-                                onOpenContextMenu: onOpenContextMenu,
-                                onPerformContextAction: onPerformContextAction
-                            )
+                                ClipboardHistoryRailSection(
+                                    kind: .recent,
+                                    clips: state.recentClips,
+                                    theme: theme,
+                                    selectedClipID: state.selectedClipID,
+                                    searchQuery: state.searchQuery,
+                                    activeFilterLabel: activeFilterLabel,
+                                    activeGroupLabel: activeGroupLabel,
+                                    noteEditorState: searchNotesState.activeEditor,
+                                    searchDisabledMessage: searchNotesState.searchDisabledMessage,
+                                    cardWidth: isPinnedCollapsed ? Self.recentCardWidthPinnedCollapsed : Self.recentCardWidth,
+                                    cardHeight: isPinnedCollapsed ? Self.recentCardHeightPinnedCollapsed : Self.recentCardHeight,
+                                    onSelectClip: onSelectClip,
+                                    onToggleNoteEditor: onToggleNoteEditor,
+                                    onUpdateNoteDraft: onUpdateNoteDraft,
+                                    onSaveNoteDraft: onSaveNoteDraft,
+                                    onCancelNoteEditing: onCancelNoteEditing,
+                                    onClearNote: onClearNote,
+                                    onPrimaryAction: onPrimaryAction,
+                                    onOpenContextMenu: onOpenContextMenu,
+                                    onPerformContextAction: onPerformContextAction
+                                )
+                            }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .id(listTransitionKey)
+                            .transition(SBMotion.listTransition)
                         }
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
+                    .animation(SBMotion.list, value: listTransitionKey)
                     .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
@@ -584,6 +598,10 @@ struct SBPopupShell: View {
         .offset(y: isPresented ? 0 : 14)
         .scaleEffect(isPresented ? 1 : 0.985, anchor: .bottom)
         .animation(isPresented ? SBMotion.present : SBMotion.dismiss, value: isPresented)
+    }
+
+    private var listTransitionKey: String {
+        "\(state.activeFilterID)|\(state.activeSourceID ?? "")"
     }
 
     private var activeFilterLabel: String? {
