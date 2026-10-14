@@ -537,6 +537,10 @@ struct SBPopupShell: View {
                                 )
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
+                            // Inside the ZStack the rails were handed the
+                            // viewport height and the pinned rail grew, pushing
+                            // the recent cards past the bottom edge.
+                            .fixedSize(horizontal: false, vertical: true)
                             .id(listTransitionKey)
                             .transition(SBMotion.listTransition)
                         }
