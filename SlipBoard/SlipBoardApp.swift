@@ -2809,6 +2809,7 @@ private struct SBPopupRootView: View {
         )
         .padding(runtime.popupTheme.treatment == .liquidGlass ? SBPopupLayoutMetrics.glassShellMargin : EdgeInsets())
         .environment(\.sbPopupPresentationID, runtime.popupPresentationID)
+        .environment(\.sbPopupIsPresented, runtime.isPopupPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .sbLocalization(runtime.localization, language: runtime.appLanguage)
     }
