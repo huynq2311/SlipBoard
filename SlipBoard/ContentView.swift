@@ -164,7 +164,6 @@ struct ContentView: View {
                 onUpdateNoteDraft: runtime.updateNoteDraft,
                 onSaveNoteDraft: runtime.saveNoteDraft,
                 onCancelNoteEditing: runtime.cancelNoteEditing,
-                onClearNote: runtime.clearNote,
                 onOpenContextMenu: runtime.openContextMenu,
                 onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
                 onCloseActiveOverlay: runtime.closeActiveOverlay,

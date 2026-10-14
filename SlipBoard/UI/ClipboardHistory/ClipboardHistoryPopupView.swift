@@ -32,7 +32,6 @@ struct ClipboardHistoryPopupView: View {
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
     var onSaveNoteDraft: (String) -> Void = { _ in }
     var onCancelNoteEditing: (String) -> Void = { _ in }
-    var onClearNote: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onOpenPasteTransformMenu: (String, PasteActionID) -> Void = { _, _ in }
     var onCloseActiveOverlay: () -> Void = {}
@@ -71,7 +70,6 @@ struct ClipboardHistoryPopupView: View {
             onUpdateNoteDraft: onUpdateNoteDraft,
             onSaveNoteDraft: onSaveNoteDraft,
             onCancelNoteEditing: onCancelNoteEditing,
-            onClearNote: onClearNote,
             onPrimaryAction: handlePrimaryAction,
             onOpenContextMenu: { clipID in
                 onSelectClipID(clipID)

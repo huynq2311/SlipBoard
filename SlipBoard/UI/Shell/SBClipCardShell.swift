@@ -38,7 +38,6 @@ struct SBClipCardShell: View {
     var onUpdateNoteDraft: (String) -> Void = { _ in }
     var onSaveNote: () -> Void = {}
     var onCancelNoteEditing: () -> Void = {}
-    var onClearNote: () -> Void = {}
     var onPrimaryAction: () -> Void = {}
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
@@ -289,18 +288,6 @@ struct SBClipCardShell: View {
                     richTextBody
                 }
             }
-
-            if isInlineEditorVisible, let noteEditorState = noteEditorState {
-                ClipNoteEditorInline(
-                    state: noteEditorState,
-                    theme: theme,
-                    onUpdateDraft: onUpdateNoteDraft,
-                    onSave: onSaveNote,
-                    onCancel: onCancelNoteEditing,
-                    onClear: onClearNote
-                )
-                .padding(.top, 2)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -453,13 +440,12 @@ struct SBClipCardShell: View {
     // the length, size or dimensions of what it hides.
     private var showsFooter: Bool {
         guard isPreviewRedacted == false else { return false }
-        return clip.kind != .color || footerNoteText != nil
+        return clip.kind != .color || footerNoteText != nil || isInlineEditorVisible
     }
 
     /// A note replaces the footer's metrics; it says more about the clip.
-    /// Not while the note is being edited, where it is already on screen.
     private var footerNoteText: String? {
-        guard clip.hasNote, isInlineEditorVisible == false, let noteText = clip.noteText else { return nil }
+        guard clip.hasNote, let noteText = clip.noteText else { return nil }
         // One line in the footer, so line breaks become spaces.
         let trimmed = noteText
             .split(whereSeparator: \.isNewline)
@@ -474,7 +460,18 @@ struct SBClipCardShell: View {
 
     @ViewBuilder
     private var footer: some View {
-        if let footerNoteText {
+        if isInlineEditorVisible, let noteEditorState {
+            ClipNoteFooterEditor(
+                state: noteEditorState,
+                theme: theme,
+                onUpdateDraft: onUpdateNoteDraft,
+                onSave: onSaveNote,
+                onCancel: onCancelNoteEditing
+            )
+            .padding(.horizontal, 8)
+            .padding(.bottom, 4)
+            .frame(height: Self.footerHeight)
+        } else if let footerNoteText {
             HStack(spacing: 4) {
                 Image(systemName: "note.text")
                     .font(.system(size: 10, weight: .semibold))
@@ -899,7 +896,6 @@ struct SBHorizontalClipRail: View {
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
     var onSaveNoteDraft: (String) -> Void = { _ in }
     var onCancelNoteEditing: (String) -> Void = { _ in }
-    var onClearNote: (String) -> Void = { _ in }
     var onPrimaryAction: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
@@ -962,9 +958,6 @@ struct SBHorizontalClipRail: View {
                                 },
                                 onCancelNoteEditing: {
                                     onCancelNoteEditing(clip.id)
-                                },
-                                onClearNote: {
-                                    onClearNote(clip.id)
                                 },
                                 onPrimaryAction: {
                                     if securitySnapshot?.lockState.revealsProtectedContent != false,
@@ -1149,22 +1142,24 @@ private struct SBRailScrollbarThumb: View {
     }
 }
 
-private struct ClipNoteEditorInline: View {
+/// Edits a clip's note in place of the card footer. Return saves, the
+/// cross closes without saving; saving an empty note removes it.
+private struct ClipNoteFooterEditor: View {
     let state: ClipNoteEditorState
     let theme: SBTheme
     @SBLocalizedCopy private var copy
     let onUpdateDraft: (String) -> Void
     let onSave: () -> Void
     let onCancel: () -> Void
-    let onClear: () -> Void
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.control6) {
-            HStack(spacing: theme.spacing.control6) {
-                Image(systemName: "note.text")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(state.isEditable ? theme.palette.accentPrimary : theme.palette.textTertiary)
+        HStack(spacing: 4) {
+            Image(systemName: "note.text")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(state.isEditable ? theme.palette.accentPrimary : theme.palette.textTertiary)
 
+            if state.isEditable {
                 TextField(
                     state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote),
                     text: Binding(
@@ -1173,59 +1168,52 @@ private struct ClipNoteEditorInline: View {
                     )
                 )
                 .textFieldStyle(.plain)
-                .font(theme.typography.meta)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.palette.textPrimary)
-                .disabled(state.isEditable == false)
+                .focused($isFocused)
+                .onSubmit(save)
+                .onAppear { isFocused = true }
 
-                if state.canClear {
-                    Button(action: onClear) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(theme.palette.textTertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(state.isEditable == false)
+                Button(action: save) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(state.isDirty ? theme.palette.accentPrimary : theme.palette.textTertiary)
                 }
+                .buttonStyle(.plain)
+                .disabled(state.isDirty == false)
+                .help(copy.text(.save))
+            } else {
+                Text(copy.text(.popupNotesLocked))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .lineLimit(1)
             }
 
-            HStack(spacing: theme.spacing.control6) {
-                if state.isEditable == false {
-                    Text(copy.text(.popupNotesLocked))
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(theme.palette.textTertiary)
-                        .lineLimit(2)
-                } else {
-                    Button(copy.text(.cancel), action: onCancel)
-                        .buttonStyle(.plain)
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(theme.palette.textSecondary)
-
-                    Spacer(minLength: theme.spacing.control6)
-
-                    Button(copy.text(.save), action: onSave)
-                        .buttonStyle(.plain)
-                        .font(theme.typography.keyboard)
-                        .foregroundStyle(state.canSave ? Color.white : theme.palette.textTertiary)
-                        .padding(.horizontal, theme.spacing.control6)
-                        .padding(.vertical, 3)
-                        .background(state.canSave ? theme.palette.accentPrimary : theme.palette.raised)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
-                        .disabled(state.canSave == false)
-                }
+            Button(action: onCancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(theme.palette.textTertiary)
             }
+            .buttonStyle(.plain)
+            .help(copy.text(.cancel))
         }
-        .padding(.horizontal, theme.spacing.control8)
-        .padding(.vertical, theme.spacing.control6)
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
         .background(theme.palette.canvas)
-        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: theme.radius.control, style: .continuous)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .stroke(
                     state.isEditable ? theme.palette.accentPrimary : theme.palette.border,
                     lineWidth: theme.border.hairline
                 )
         )
-        .opacity(state.isEditable ? 1 : 0.8)
+    }
+
+    private func save() {
+        guard state.isEditable, state.isDirty else { return }
+        onSave()
+        onCancel()
     }
 }
 

@@ -48,7 +48,6 @@ struct ClipboardHistoryRailSection: View {
     var onUpdateNoteDraft: (String, String) -> Void = { _, _ in }
     var onSaveNoteDraft: (String) -> Void = { _ in }
     var onCancelNoteEditing: (String) -> Void = { _ in }
-    var onClearNote: (String) -> Void = { _ in }
     var onPrimaryAction: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
@@ -120,7 +119,6 @@ struct ClipboardHistoryRailSection: View {
                         onUpdateNoteDraft: onUpdateNoteDraft,
                         onSaveNoteDraft: onSaveNoteDraft,
                         onCancelNoteEditing: onCancelNoteEditing,
-                        onClearNote: onClearNote,
                         onPrimaryAction: onPrimaryAction,
                         onOpenContextMenu: onOpenContextMenu,
                         onPerformContextAction: onPerformContextAction

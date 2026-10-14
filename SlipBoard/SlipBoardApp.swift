@@ -799,11 +799,6 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         }
     }
 
-    func clearNote(for clipID: String) {
-        recordSecurityInteraction()
-        controller.clearNote(for: clipID)
-    }
-
     func moveSelection(by delta: Int) {
         recordSecurityInteraction()
         controller.moveSelection(by: delta)
@@ -2788,7 +2783,6 @@ private struct SBPopupRootView: View {
             onUpdateNoteDraft: runtime.updateNoteDraft,
             onSaveNoteDraft: runtime.saveNoteDraft,
             onCancelNoteEditing: runtime.cancelNoteEditing,
-            onClearNote: runtime.clearNote,
             onOpenContextMenu: runtime.openContextMenu,
             onOpenPasteTransformMenu: runtime.openPasteTransformMenu,
             onCloseActiveOverlay: runtime.closeActiveOverlay,
