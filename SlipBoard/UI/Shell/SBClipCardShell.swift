@@ -484,7 +484,7 @@ struct SBClipCardShell: View {
             .help(footerNoteText)
             .padding(.horizontal, 12)
             .padding(.bottom, 5)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: Self.footerHeight)
         } else {
             metricsFooter
@@ -1153,26 +1153,43 @@ private struct ClipNoteFooterEditor: View {
     let onCancel: () -> Void
     @FocusState private var isFocused: Bool
 
+    // Styled like the popup's search field.
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: theme.spacing.control6) {
             Image(systemName: "note.text")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(state.isEditable ? theme.palette.accentPrimary : theme.palette.textTertiary)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(theme.palette.textTertiary)
 
             if state.isEditable {
-                TextField(
-                    state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote),
-                    text: Binding(
-                        get: { state.draftText },
-                        set: onUpdateDraft
-                    )
-                )
+                // The system placeholder draws almost invisibly in the
+                // non-key popup panel, so it is drawn here instead.
+                TextField("", text: Binding(
+                    get: { state.draftText },
+                    set: onUpdateDraft
+                ))
                 .textFieldStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.palette.textPrimary)
                 .focused($isFocused)
                 .onSubmit(save)
-                .onAppear { isFocused = true }
+                .overlay(alignment: .leading) {
+                    if state.draftText.isEmpty {
+                        Text(state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote))
+                            .font(theme.typography.chip)
+                            .foregroundStyle(theme.palette.textTertiary)
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .onAppear {
+                    isFocused = true
+                    // Focusing selects the whole note; put the caret at the
+                    // end so the first key press does not replace it.
+                    DispatchQueue.main.async {
+                        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
+                        editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+                    }
+                }
 
                 Button(action: save) {
                     Image(systemName: "checkmark")
@@ -1197,16 +1214,13 @@ private struct ClipNoteFooterEditor: View {
             .buttonStyle(.plain)
             .help(copy.text(.cancel))
         }
-        .padding(.horizontal, 7)
+        .padding(.horizontal, theme.spacing.control8)
         .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
-        .background(theme.palette.canvas)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
+        .clipShape(Capsule(style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(
-                    state.isEditable ? theme.palette.accentPrimary : theme.palette.border,
-                    lineWidth: theme.border.hairline
-                )
+            Capsule(style: .continuous)
+                .stroke(theme.palette.border, lineWidth: theme.border.hairline)
         )
     }
 
