@@ -9,6 +9,18 @@ enum SBHeaderMenuKind: Equatable {
     case source
 }
 
+/// Shared timing for popup motion.
+enum SBMotion {
+    static let present = Animation.spring(response: 0.34, dampingFraction: 0.86)
+    static let dismiss = Animation.easeIn(duration: 0.14)
+    static let menu = Animation.easeOut(duration: 0.14)
+    static let rail = Animation.spring(response: 0.32, dampingFraction: 0.86)
+
+    static func menuTransition(anchor: UnitPoint) -> AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.96, anchor: anchor))
+    }
+}
+
 enum SBPopupLayoutMetrics {
     /// Width of a clip card when the pinned rail is open.
     static let cardWidth: CGFloat = 216
@@ -180,6 +192,7 @@ struct SBPopupTopBar: View {
         }
         .padding(.horizontal, theme.spacing.popupPadding)
         .padding(.vertical, 15)
+        .animation(SBMotion.menu, value: activeMenu)
         .background(SBPopupToolbarBackground(theme: theme))
         .background {
             // The open menu sits above the clip list through this view's zIndex,
@@ -262,6 +275,7 @@ struct SBPopupTopBar: View {
             if activeMenu == .overflow {
                 overflowMenuContent
                     .offset(y: 34)
+                    .transition(SBMotion.menuTransition(anchor: .topTrailing))
             }
         }
     }
@@ -541,6 +555,7 @@ struct SBPopupShell: View {
                         }
                     )
                     .offset(contextMenuOffset(in: proxy, anchors: anchors))
+                    .transition(SBMotion.menuTransition(anchor: .top))
                     .zIndex(1)
                 }
 
@@ -557,11 +572,18 @@ struct SBPopupShell: View {
                         onCancel: onCloseActiveOverlay
                     )
                     .offset(pasteTransformMenuOffset(in: proxy, anchors: anchors))
+                    .transition(SBMotion.menuTransition(anchor: .bottom))
                     .zIndex(1)
                 }
             }
+            .animation(SBMotion.menu, value: showContextOverlay)
+            .animation(SBMotion.menu, value: showPasteOverlay)
             }
         }
+        // The panel window only fades; the shell itself rises into place.
+        .offset(y: isPresented ? 0 : 14)
+        .scaleEffect(isPresented ? 1 : 0.985, anchor: .bottom)
+        .animation(isPresented ? SBMotion.present : SBMotion.dismiss, value: isPresented)
     }
 
     private var activeFilterLabel: String? {

@@ -2584,7 +2584,6 @@ struct SlipBoardApp: App {
             isLocked: runtime.securitySnapshot.lockState.revealsProtectedContent == false,
             reservesOverlayHeadroom: runtime.pasteOverlayState.isPresented
                 && runtime.pasteOverlayState.kind == .pasteTransformMenu,
-            isPinnedCollapsed: runtime.isPinnedCollapsed,
             shellMargin: popupShellMargin,
             content: popupContent
         )
