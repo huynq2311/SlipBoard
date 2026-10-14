@@ -290,13 +290,6 @@ struct SBClipCardShell: View {
                 }
             }
 
-            if showsCollapsedNoteSummary, let noteText = clip.noteText, noteText.isEmpty == false {
-                Text(noteText)
-                    .font(theme.typography.meta)
-                    .foregroundStyle(theme.palette.textSecondary)
-                    .lineLimit(2)
-            }
-
             if isInlineEditorVisible, let noteEditorState = noteEditorState {
                 ClipNoteEditorInline(
                     state: noteEditorState,
@@ -460,14 +453,48 @@ struct SBClipCardShell: View {
     // the length, size or dimensions of what it hides.
     private var showsFooter: Bool {
         guard isPreviewRedacted == false else { return false }
-        return clip.kind != .color
+        return clip.kind != .color || footerNoteText != nil
+    }
+
+    /// A note replaces the footer's metrics; it says more about the clip.
+    /// Not while the note is being edited, where it is already on screen.
+    private var footerNoteText: String? {
+        guard clip.hasNote, isInlineEditorVisible == false, let noteText = clip.noteText else { return nil }
+        // One line in the footer, so line breaks become spaces.
+        let trimmed = noteText
+            .split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var footerReservedHeight: CGFloat {
         showsFooter ? Self.footerHeight : 0
     }
 
+    @ViewBuilder
     private var footer: some View {
+        if let footerNoteText {
+            HStack(spacing: 4) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(footerNoteText)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .foregroundStyle(theme.palette.accentPrimary)
+            .help(footerNoteText)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 5)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(height: Self.footerHeight)
+        } else {
+            metricsFooter
+        }
+    }
+
+    private var metricsFooter: some View {
         Text(footerText ?? " ")
             .font(.system(size: 12, weight: .medium).monospacedDigit())
             .foregroundStyle(theme.palette.textTertiary)
@@ -561,18 +588,6 @@ struct SBClipCardShell: View {
         return max(3, Int((bodyAreaHeight / approxLineHeight).rounded(.down)))
     }
 
-    private var headerLabelText: String {
-        if isPreviewRedacted {
-            return clip.sourceApp.displayName
-        }
-
-        if clip.hasNote, let noteText = clip.noteText, noteText.isEmpty == false {
-            return noteText
-        }
-
-        return clip.sourceApp.displayName
-    }
-
     private var clipKindLabel: String {
         switch clip.kind {
         case .text:
@@ -615,11 +630,6 @@ struct SBClipCardShell: View {
         guard isPreviewRedacted == false else { return false }
         guard let noteEditorState else { return false }
         return noteEditorState.clipID == clip.id && noteEditorState.isPresented && isSelected
-    }
-
-    private var showsCollapsedNoteSummary: Bool {
-        guard isPreviewRedacted == false else { return false }
-        return clip.hasNote && isInlineEditorVisible == false && headerLabelText == clip.sourceApp.displayName
     }
 
     private func handleHeaderTap() {
