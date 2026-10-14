@@ -248,8 +248,10 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
 
         return Group {
             if let maxVisibleRows, options.count > maxVisibleRows {
-                ScrollView(.vertical, showsIndicators: true) { rows }
-                    .frame(height: CGFloat(maxVisibleRows) * Self.rowHeight + 8)
+                // No system scroller (the legacy one is thick when scroll bars
+                // are always shown); half a row peeks out to show it scrolls.
+                ScrollView(.vertical, showsIndicators: false) { rows }
+                    .frame(height: (CGFloat(maxVisibleRows) + 0.5) * Self.rowHeight + 4)
             } else {
                 rows
             }

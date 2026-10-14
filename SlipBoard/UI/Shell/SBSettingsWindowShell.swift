@@ -6,6 +6,7 @@ struct SBSettingsWindowShell: View {
     @SBLocalizedCopy private var copy
     @Environment(\.sbLocalizationLanguage) private var localizationLanguage
     @AppStorage(QuickPasteModifier.storageKey) private var quickPasteModifier = QuickPasteModifier.command.rawValue
+    @AppStorage(ClipboardHistoryAppRuntime.clearSearchOnCloseDefaultsKey) private var clearsSearchOnClose = false
     var securitySnapshot: Any? = nil
     var bridgeSnapshot: BridgeRuntimeSnapshot? = nil
     var exclusionsPauseSnapshot: ExclusionsPauseSnapshot? = nil
@@ -973,6 +974,17 @@ struct SBSettingsWindowShell: View {
                 descriptionText: searchSection.descriptionText,
                 theme: theme
             ) {
+                InteractiveToggleRow(
+                    item: SettingsToggleItem(
+                        id: "search.clear-on-close",
+                        title: copy.text(.settingsClearSearchOnClose),
+                        detailText: copy.text(.settingsClearSearchOnCloseDetail),
+                        isOn: clearsSearchOnClose
+                    ),
+                    theme: theme,
+                    onToggle: { clearsSearchOnClose = $0 }
+                )
+
                 ForEach(Array(searchSection.rows.enumerated()), id: \.offset) { _, row in
                     SBSettingsRow(row: row, theme: theme)
                 }

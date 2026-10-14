@@ -380,6 +380,9 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         transitionGeneration += 1
         let generation = transitionGeneration
         isDismissing = true
+        // The panel is only ordered out, so a focused search field would still
+        // hold the keyboard the next time it opens.
+        panel.makeFirstResponder(nil)
         removeEscapeKeyMonitor()
         removeOutsideClickMonitor()
         if notifyVisibilityChange {
