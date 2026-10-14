@@ -758,6 +758,16 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         }
     }
 
+    /// Closes the note editor shown on the selected card without saving.
+    /// Returns false when none is showing.
+    func cancelActiveNoteEditing() -> Bool {
+        guard let activeEditor = searchNotesState.activeEditor,
+              activeEditor.isPresented,
+              activeEditor.clipID == controller.latestSnapshot.selectedItemID else { return false }
+        cancelNoteEditing(for: activeEditor.clipID)
+        return true
+    }
+
     func clearSelectedClipGroups() {
         recordSecurityInteraction()
         guard let selectedClipID = selectedClipIDForOrganization else { return }
@@ -2523,6 +2533,9 @@ struct SlipBoardApp: App {
         }
         popupPresentationController.onTypeToSearchCharacters = { characters in
             runtime.appendTypedCharactersToSearch(characters)
+        }
+        popupPresentationController.onEscapeRequested = {
+            runtime.cancelActiveNoteEditing()
         }
         runtime.focusSettings(on: .general)
         runtime.startMonitoring()

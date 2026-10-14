@@ -52,6 +52,7 @@ struct SBClipCardShell: View {
     @State private var loadedCharacterCount: Int?
 
     private static let footerHeight: CGFloat = 27
+    private static let editingFooterHeight: CGFloat = 40
 
     private struct FooterTaskKey: Hashable {
         let clipID: String
@@ -455,7 +456,8 @@ struct SBClipCardShell: View {
     }
 
     private var footerReservedHeight: CGFloat {
-        showsFooter ? Self.footerHeight : 0
+        guard showsFooter else { return 0 }
+        return isInlineEditorVisible ? Self.editingFooterHeight : Self.footerHeight
     }
 
     @ViewBuilder
@@ -469,8 +471,8 @@ struct SBClipCardShell: View {
                 onCancel: onCancelNoteEditing
             )
             .padding(.horizontal, 8)
-            .padding(.bottom, 4)
-            .frame(height: Self.footerHeight)
+            .padding(.bottom, 9)
+            .frame(height: Self.editingFooterHeight, alignment: .bottom)
         } else if let footerNoteText {
             HStack(spacing: 4) {
                 Image(systemName: "note.text")
@@ -1142,8 +1144,9 @@ private struct SBRailScrollbarThumb: View {
     }
 }
 
-/// Edits a clip's note in place of the card footer. Return saves, the
-/// cross closes without saving; saving an empty note removes it.
+/// Edits a clip's note in place of the card footer. Return saves and Escape
+/// closes without saving (the popup routes Escape here while it is open);
+/// saving an empty note removes it.
 private struct ClipNoteFooterEditor: View {
     let state: ClipNoteEditorState
     let theme: SBTheme
@@ -1156,10 +1159,6 @@ private struct ClipNoteFooterEditor: View {
     // Styled like the popup's search field.
     var body: some View {
         HStack(spacing: theme.spacing.control6) {
-            Image(systemName: "note.text")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(theme.palette.textTertiary)
-
             if state.isEditable {
                 // The system placeholder draws almost invisibly in the
                 // non-key popup panel, so it is drawn here instead.
@@ -1190,32 +1189,15 @@ private struct ClipNoteFooterEditor: View {
                         editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
                     }
                 }
-
-                Button(action: save) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(state.isDirty ? theme.palette.accentPrimary : theme.palette.textTertiary)
-                }
-                .buttonStyle(.plain)
-                .disabled(state.isDirty == false)
-                .help(copy.text(.save))
             } else {
                 Text(copy.text(.popupNotesLocked))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.palette.textTertiary)
                     .lineLimit(1)
             }
-
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(theme.palette.textTertiary)
-            }
-            .buttonStyle(.plain)
-            .help(copy.text(.cancel))
         }
-        .padding(.horizontal, theme.spacing.control8)
-        .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
+        .padding(.horizontal, theme.spacing.control10)
+        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
         .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
         .clipShape(Capsule(style: .continuous))
         .overlay(
