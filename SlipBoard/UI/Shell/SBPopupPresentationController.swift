@@ -19,14 +19,8 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         // Enough room for the Paste As menu above a recent card. This region
         // stays transparent, allowing the menu to overlap the app underneath.
         static let overlayHeadroom: CGFloat = 420
-        // The pinned rail's collapsed state frees up vertical space; shrink
-        // the panel by a bit of it instead of only growing the recent cards.
-        // Freed rail height (128pt card + 7pt rail padding = 135) minus the
-        // recent card's own collapsed-state growth (190 - 148 = 42).
-        static let pinnedCollapsedHeightReduction: CGFloat = SBPopupLayoutMetrics.pinnedCollapsedHeightReduction
-        static let presentationOffset: CGFloat = 18
-        static let presentationDuration: TimeInterval = 0.16
-        static let dismissalDuration: TimeInterval = 0.16
+        static let presentationDuration: TimeInterval = 0.18
+        static let dismissalDuration: TimeInterval = 0.14
     }
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -46,7 +40,6 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     private var transitionGeneration = 0
     private var isDismissing = false
     private var reservesOverlayHeadroom = false
-    private var isPinnedCollapsed = false
     private var shellMargin = EdgeInsets()
 
     override init() {
@@ -79,14 +72,12 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     func present<Content: View>(
         isLocked: Bool = false,
         reservesOverlayHeadroom: Bool = false,
-        isPinnedCollapsed: Bool = false,
         shellMargin: EdgeInsets = EdgeInsets(),
         @ViewBuilder content: () -> Content
     ) {
         let rootView = AnyView(content())
         isLockedPresentation = isLocked
         self.reservesOverlayHeadroom = reservesOverlayHeadroom
-        self.isPinnedCollapsed = isPinnedCollapsed
         self.shellMargin = shellMargin
         capturePasteTargetApplication()
         // `.nonactivatingPanel` + makeKeyAndOrderFront already grants this
@@ -334,8 +325,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     private func targetFrame(for screen: NSScreen) -> NSRect {
         let visibleFrame = screen.visibleFrame
         let width = max(1, visibleFrame.width - (Layout.horizontalInset * 2))
-        let baseHeight = Layout.preferredHeight - (isPinnedCollapsed ? Layout.pinnedCollapsedHeightReduction : 0)
-        let requestedHeight = baseHeight + (reservesOverlayHeadroom ? Layout.overlayHeadroom : 0)
+        // Always the expanded height: collapsing the pinned rail shrinks the
+        // shell inside a transparent window instead of resizing the window,
+        // so SwiftUI can animate it without fighting a window resize.
+        let requestedHeight = Layout.preferredHeight + (reservesOverlayHeadroom ? Layout.overlayHeadroom : 0)
         let height = max(1, min(requestedHeight, visibleFrame.height - Layout.dockRevealInset - (Layout.verticalInset * 2)))
 
         // The shell keeps its on-screen position; only the transparent window
@@ -349,28 +342,20 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     }
 
     private func presentPanel(_ panel: NSPanel, on screen: NSScreen) {
-        let targetFrame = targetFrame(for: screen)
-        var startFrame = targetFrame
-        startFrame.origin.y -= Layout.presentationOffset
-
         transitionGeneration += 1
         isDismissing = false
 
-        // Lay out and draw the real content at its start position before
-        // anything becomes visible or starts moving, so the slide/fade below
-        // animates a fully-rendered panel instead of stalling on first paint.
+        // The window only fades; the shell's slide is a SwiftUI animation on
+        // `isPresented`, which runs on the display link instead of moving the
+        // whole window frame by frame.
         panel.alphaValue = 0
-        panel.setFrame(startFrame, display: true)
+        panel.setFrame(targetFrame(for: screen), display: true)
         panel.makeKeyAndOrderFront(nil)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.presentationDuration
-            // Ease out so the panel leads with its fastest movement, which
-            // reads as more responsive than the default ease-in-ease-out.
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            context.allowsImplicitAnimation = true
             panel.animator().alphaValue = 1
-            panel.animator().setFrame(targetFrame, display: true)
         }
     }
 
@@ -389,34 +374,22 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
             onVisibilityChange?(false)
         }
 
-        let visibleFrame = panel.frame
-        var dismissedFrame = visibleFrame
-        dismissedFrame.origin.y -= Layout.presentationOffset
-
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.dismissalDuration
-            context.allowsImplicitAnimation = true
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
-            panel.animator().setFrame(dismissedFrame, display: true)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in
-                self?.finishDismissal(
-                    generation: generation,
-                    restoring: visibleFrame
-                )
+                self?.finishDismissal(generation: generation)
             }
         }
     }
 
-    private func finishDismissal(
-        generation: Int,
-        restoring visibleFrame: NSRect
-    ) {
+    private func finishDismissal(generation: Int) {
         guard let panel, generation == transitionGeneration else { return }
 
         panel.orderOut(nil)
         panel.alphaValue = 1
-        panel.setFrame(visibleFrame, display: false)
         isDismissing = false
     }
 

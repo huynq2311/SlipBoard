@@ -234,6 +234,7 @@ struct SBUtilityDropdown<Option: Identifiable & Hashable>: View {
             if isOpen {
                 dropdownList
                     .offset(y: 34)
+                    .transition(SBMotion.menuTransition(anchor: .topLeading))
             }
         }
     }

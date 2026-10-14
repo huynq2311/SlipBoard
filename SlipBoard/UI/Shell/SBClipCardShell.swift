@@ -911,7 +911,10 @@ struct SBHorizontalClipRail: View {
     private var railAnimation: Animation? {
         let changedCount = Set(clipIDs).symmetricDifference(lastClipIDs).count
         let isBurst = Date().timeIntervalSince(lastClipIDsChangeAt) < 0.4
-        return changedCount <= 2 && isBurst == false ? .easeInOut(duration: 0.22) : nil
+        guard isBurst == false else { return nil }
+        // A filter or search swaps most cards; a quick fade reads better than
+        // springing a whole row.
+        return changedCount <= 2 ? SBMotion.rail : .easeOut(duration: 0.16)
     }
 
     var body: some View {
