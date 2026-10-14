@@ -52,7 +52,6 @@ struct SBClipCardShell: View {
     @State private var loadedCharacterCount: Int?
 
     private static let footerHeight: CGFloat = 27
-    private static let editingFooterHeight: CGFloat = 40
 
     private struct FooterTaskKey: Hashable {
         let clipID: String
@@ -82,6 +81,8 @@ struct SBClipCardShell: View {
                     footer
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .overlay(alignment: .bottom) { noteEditorOverlay }
         }
         // Keyed on visibility too, so a card hidden by App Lock loads its
         // metrics once it is unlocked instead of staying blank.
@@ -441,7 +442,7 @@ struct SBClipCardShell: View {
     // the length, size or dimensions of what it hides.
     private var showsFooter: Bool {
         guard isPreviewRedacted == false else { return false }
-        return clip.kind != .color || footerNoteText != nil || isInlineEditorVisible
+        return clip.kind != .color || footerNoteText != nil
     }
 
     /// A note replaces the footer's metrics; it says more about the clip.
@@ -456,12 +457,13 @@ struct SBClipCardShell: View {
     }
 
     private var footerReservedHeight: CGFloat {
-        guard showsFooter else { return 0 }
-        return isInlineEditorVisible ? Self.editingFooterHeight : Self.footerHeight
+        showsFooter ? Self.footerHeight : 0
     }
 
+    // Drawn over the card's bottom edge rather than in the footer's slot, so
+    // opening it does not shrink the preview above.
     @ViewBuilder
-    private var footer: some View {
+    private var noteEditorOverlay: some View {
         if isInlineEditorVisible, let noteEditorState {
             ClipNoteFooterEditor(
                 state: noteEditorState,
@@ -472,7 +474,14 @@ struct SBClipCardShell: View {
             )
             .padding(.horizontal, 8)
             .padding(.bottom, 9)
-            .frame(height: Self.editingFooterHeight, alignment: .bottom)
+        }
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        if isInlineEditorVisible {
+            // The editor overlay covers this slot.
+            Color.clear.frame(height: Self.footerHeight)
         } else if let footerNoteText {
             HStack(spacing: 4) {
                 Image(systemName: "note.text")
