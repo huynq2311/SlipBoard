@@ -900,6 +900,7 @@ struct SBHorizontalClipRail: View {
     @State private var lastClipIDs: [String] = []
     @State private var lastClipIDsChangeAt = Date.distantPast
     @Environment(\.sbPopupPresentationID) private var popupPresentationID
+    @Environment(\.sbPopupIsPresented) private var isPopupPresented
 
     private var clipIDs: [String] { clips.map(\.id) }
 
@@ -909,12 +910,25 @@ struct SBHorizontalClipRail: View {
     // two cards, not right after another change, is animated. The @State
     // values still hold the previous change while the body is evaluated.
     private var railAnimation: Animation? {
+        // Clips copied or removed while the popup is hidden just appear on
+        // the next open.
+        guard isPopupPresented else { return nil }
         let changedCount = Set(clipIDs).symmetricDifference(lastClipIDs).count
         let isBurst = Date().timeIntervalSince(lastClipIDsChangeAt) < 0.4
         guard isBurst == false else { return nil }
         // A filter or search swaps most cards; a quick fade reads better than
         // springing a whole row.
         return changedCount <= 2 ? SBMotion.rail : .easeOut(duration: 0.16)
+    }
+
+    /// A card added grows out of its slot while rising in from the bottom
+    /// left; a removed one shrinks back down that way. Its neighbours slide
+    /// over instead of jumping.
+    private var cardTransition: AnyTransition {
+        .modifier(
+            active: SBCardSlotTransition(progress: 0, width: cardWidth, gap: theme.spacing.railGap),
+            identity: SBCardSlotTransition(progress: 1, width: cardWidth, gap: theme.spacing.railGap)
+        )
     }
 
     var body: some View {
@@ -971,7 +985,6 @@ struct SBHorizontalClipRail: View {
                                 onPerformContextAction: onPerformContextAction
                             )
                             .id(clip.id)
-                            .transition(.opacity.combined(with: .scale(scale: 0.94)))
                             .onScrollVisibilityChange(threshold: 0.85) { isVisible in
                                 if isVisible {
                                     visibleClipIDs.insert(clip.id)
@@ -979,6 +992,7 @@ struct SBHorizontalClipRail: View {
                                     visibleClipIDs.remove(clip.id)
                                 }
                             }
+                            .transition(cardTransition)
                         }
                     }
                 }
@@ -1064,9 +1078,35 @@ struct SBHorizontalClipRail: View {
     }
 }
 
+// Animatable so every frame of the transition gets an in-between progress;
+// otherwise SwiftUI only blends the two end states.
+private struct SBCardSlotTransition: ViewModifier, Animatable {
+    var progress: CGFloat
+    let width: CGFloat
+    let gap: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let travel: CGFloat = 36
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(0.4 + 0.6 * progress)
+            .offset(x: -Self.travel * (1 - progress), y: Self.travel * (1 - progress))
+            .opacity(progress)
+            .frame(width: width * progress)
+            // The stack still adds its gap next to a zero-width slot.
+            .padding(.trailing, -gap * (1 - progress))
+    }
+}
+
 extension EnvironmentValues {
     /// Bumped each time the popup is shown again.
     @Entry var sbPopupPresentationID = 0
+    @Entry var sbPopupIsPresented = true
 }
 
 private struct SBRailScrollMetrics: Equatable {
