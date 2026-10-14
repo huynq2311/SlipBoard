@@ -943,10 +943,18 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             shellCoordinator.closePopup()
             controller.pasteActions.closeActiveOverlay()
             syncPasteOverlayState()
-            setSearchPresented(false)
+            if UserDefaults.standard.bool(forKey: Self.clearSearchOnCloseDefaultsKey) {
+                setSearchPresented(false)
+                let snapshot = controller.latestSnapshot
+                if snapshot.activeFilter != .all { controller.updateActiveFilter(.all) }
+                if snapshot.activeSourceID != nil { controller.updateActiveSource(nil) }
+            }
         }
         isPopupPresented = shellCoordinator.isPopupPresented
     }
+
+    /// Off by default: closing the popup keeps the search query and filters.
+    static let clearSearchOnCloseDefaultsKey = "SlipBoard.Search.clearOnPopupClose"
 
     func showSettingsPresentation(selecting section: SettingsSectionID = .general) {
         recordSecurityInteraction()

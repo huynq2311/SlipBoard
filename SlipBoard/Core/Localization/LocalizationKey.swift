@@ -313,6 +313,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case settingsNoSnippetShortcutsDetail
     case settingsHotkeyConflictTiming
     case settingsLibrary
+    case settingsClearSearchOnClose
+    case settingsClearSearchOnCloseDetail
     case snippetsNew
     case hotkeyActionEdit
     case hotkeyNoShortcut
@@ -806,6 +808,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .settingsNoSnippetShortcutsDetail: "Create snippets, then assign per-snippet hotkeys without leaving the live settings path."
         case .settingsHotkeyConflictTiming: "Conflicts are validated when a shortcut is assigned, not when it fires."
         case .settingsLibrary: "Library"
+        case .settingsClearSearchOnClose: "Reset search and filters when the popup closes"
+        case .settingsClearSearchOnCloseDetail: "Clears the search and sets the type and source filters back to All. When off, the popup reopens as you left it."
         case .snippetsNew: "New snippet"
         case .hotkeyActionEdit: "Edit"
         case .hotkeyNoShortcut: "No hotkey"
@@ -1340,6 +1344,8 @@ struct LocalizationCatalog: Sendable {
         .settingsNoSnippetShortcutsDetail: "Tạo snippet rồi gán phím tắt riêng mà không rời luồng cài đặt trực tiếp.",
         .settingsHotkeyConflictTiming: "Xung đột được kiểm tra khi gán phím tắt, không phải lúc kích hoạt.",
         .settingsLibrary: "Thư viện",
+        .settingsClearSearchOnClose: "Đặt lại tìm kiếm và bộ lọc khi đóng popup",
+        .settingsClearSearchOnCloseDetail: "Xóa từ khóa tìm kiếm, đưa bộ lọc loại và nguồn về Tất cả. Khi tắt, mở lại popup vẫn giữ nguyên như lúc đóng.",
         .snippetsNew: "Snippet mới",
         .hotkeyActionEdit: "Sửa",
         .hotkeyNoShortcut: "Chưa gán",
