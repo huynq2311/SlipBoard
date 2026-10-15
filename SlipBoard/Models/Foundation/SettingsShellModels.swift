@@ -8,6 +8,7 @@ enum SettingsSectionID: String, CaseIterable, Identifiable, Hashable {
     case snippets
     case security
     case bridge
+    case about
 
     var id: String { rawValue }
 
@@ -27,6 +28,8 @@ enum SettingsSectionID: String, CaseIterable, Identifiable, Hashable {
             return "Security"
         case .bridge:
             return "Bridge"
+        case .about:
+            return "About"
         }
     }
 
@@ -46,6 +49,8 @@ enum SettingsSectionID: String, CaseIterable, Identifiable, Hashable {
             return "lock"
         case .bridge:
             return "icloud"
+        case .about:
+            return "info.circle"
         }
     }
 }
@@ -294,11 +299,12 @@ struct SettingsShellState: Hashable {
     var snippets: SettingsPaneModel
     var security: SettingsPaneModel
     var bridge: SettingsPaneModel
+    var about: SettingsPaneModel
 
     // Bridge is hidden for v1.0: Universal Clipboard already covers iPhone <-> Mac
     // transfer and the bridge transport has no real CloudKit backend yet.
     var allSections: [SettingsPaneModel] {
-        [general, retention, exclusions, hotkeys, snippets, security]
+        [general, retention, exclusions, hotkeys, snippets, security, about]
     }
 
     init(
@@ -309,7 +315,8 @@ struct SettingsShellState: Hashable {
         hotkeys: SettingsPaneModel,
         snippets: SettingsPaneModel,
         security: SettingsPaneModel,
-        bridge: SettingsPaneModel
+        bridge: SettingsPaneModel,
+        about: SettingsPaneModel
     ) {
         self.selectedSection = selectedSection
         self.general = general
@@ -319,6 +326,7 @@ struct SettingsShellState: Hashable {
         self.snippets = snippets
         self.security = security
         self.bridge = bridge
+        self.about = about
     }
 
     func pane(for section: SettingsSectionID) -> SettingsPaneModel {
@@ -337,6 +345,8 @@ struct SettingsShellState: Hashable {
             return security
         case .bridge:
             return bridge
+        case .about:
+            return about
         }
     }
 }

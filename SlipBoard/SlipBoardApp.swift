@@ -527,6 +527,13 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             } else {
                 securityRuntime.beginUnlock(using: securitySnapshot.settings.unlockMethod)
             }
+        // SlipBoard has no networking code; these only open pages in the browser.
+        case "about.check-updates":
+            openInBrowser("https://github.com/huynq2311/SlipBoard/releases/latest")
+        case "about.github":
+            openInBrowser("https://github.com/huynq2311/SlipBoard")
+        case "about.privacy-policy":
+            openInBrowser("https://github.com/huynq2311/SlipBoard/blob/main/PRIVACY.md")
         default:
             if id.hasPrefix("exclusions.remove.") {
                 let excludedAppID = String(id.dropFirst("exclusions.remove.".count))
@@ -539,6 +546,11 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             }
             break
         }
+    }
+
+    private func openInBrowser(_ string: String) {
+        guard let url = URL(string: string) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func setSearchPresented(_ isPresented: Bool) {
@@ -1413,7 +1425,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             hotkeys: hotkeysPane(from: snippetsSnapshot),
             snippets: snippetsPane(from: snippetsSnapshot),
             security: securityPane(from: securitySnapshot),
-            bridge: bridgePane(from: bridgeSnapshot)
+            bridge: bridgePane(from: bridgeSnapshot),
+            about: pane(.about, subtitle: "Version, links, and privacy information for SlipBoard.")
         )
     }
 

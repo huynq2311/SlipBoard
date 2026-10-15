@@ -493,6 +493,17 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case bridgeNoDevicesDetail
     case bridgeSubtitleFallback
     case bridgeDeviceLastSeenDetail
+    case sidebarAbout
+    case settingsAbout
+    case settingsAboutDescription
+    case aboutVersion
+    case aboutSummary
+    case aboutUpdates
+    case aboutCheckForUpdates
+    case aboutUpdatesNote
+    case aboutLinks
+    case aboutGitHub
+    case aboutPrivacyPolicy
 
     var englishFallback: String {
         switch self {
@@ -988,6 +999,17 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .bridgeNoDevicesDetail: "Bridge can stay enabled on Mac before an iPhone companion signs into the same iCloud account."
         case .bridgeSubtitleFallback: "Paste on Mac, then paste on iPhone. Mac history stays local."
         case .bridgeDeviceLastSeenDetail: "Same iCloud account · Last seen %{time}"
+        case .sidebarAbout: "About"
+        case .settingsAbout: "About"
+        case .settingsAboutDescription: "Version, links, and privacy information for SlipBoard."
+        case .aboutVersion: "Version %{version} (Build %{build})"
+        case .aboutSummary: "SlipBoard keeps a local, offline history of everything you copy, right in the menu bar. Search past clips, pin the ones you need, add notes, save snippets, and protect your history with App Lock."
+        case .aboutUpdates: "Updates"
+        case .aboutCheckForUpdates: "Check for Updates"
+        case .aboutUpdatesNote: "SlipBoard does not connect to the internet. This button opens the Releases page in your browser."
+        case .aboutLinks: "Links"
+        case .aboutGitHub: "GitHub"
+        case .aboutPrivacyPolicy: "Privacy Policy"
         }
     }
 }
@@ -1523,6 +1545,17 @@ struct LocalizationCatalog: Sendable {
         .bridgeSupportedPastesV1Detail: "Chỉ các lần dán cục bộ thành công của loại được hỗ trợ mới được Bridge trong v1.",
         .bridgeNoDevicesDetail: "Bridge vẫn có thể bật trên Mac trước khi ứng dụng đồng hành iPhone đăng nhập cùng tài khoản iCloud.",
         .bridgeSubtitleFallback: "Dán trên Mac, rồi dán trên iPhone. Lịch sử Mac cục bộ vẫn được giữ tại máy.",
-        .bridgeDeviceLastSeenDetail: "Cùng tài khoản iCloud · Hoạt động %{time}"
+        .bridgeDeviceLastSeenDetail: "Cùng tài khoản iCloud · Hoạt động %{time}",
+        .sidebarAbout: "Giới thiệu",
+        .settingsAbout: "Giới thiệu",
+        .settingsAboutDescription: "Phiên bản, liên kết và thông tin quyền riêng tư của SlipBoard.",
+        .aboutVersion: "Phiên bản %{version} (Bản dựng %{build})",
+        .aboutSummary: "SlipBoard lưu lịch sử mọi thứ bạn sao chép ngay trên thanh menu, cục bộ và không cần mạng. Tìm lại clip cũ, ghim những mục cần dùng, thêm ghi chú, lưu snippet và bảo vệ lịch sử bằng Khóa ứng dụng.",
+        .aboutUpdates: "Cập nhật",
+        .aboutCheckForUpdates: "Kiểm tra cập nhật",
+        .aboutUpdatesNote: "SlipBoard không kết nối internet. Nút này mở trang Releases trong trình duyệt của bạn.",
+        .aboutLinks: "Liên kết",
+        .aboutGitHub: "GitHub",
+        .aboutPrivacyPolicy: "Chính sách quyền riêng tư"
     ]
 }

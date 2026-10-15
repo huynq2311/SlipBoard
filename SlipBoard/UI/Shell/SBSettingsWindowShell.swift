@@ -72,6 +72,8 @@ struct SBSettingsWindowShell: View {
                     securityPaneSections(for: pane)
                 } else if pane.id == .retention {
                     retentionPaneSections(for: pane)
+                } else if pane.id == .about {
+                    aboutPaneSections()
                 } else {
                     standardPaneSections(for: pane)
                 }
@@ -346,6 +348,7 @@ struct SBSettingsWindowShell: View {
         case .hotkeys: copy.text(.sidebarHotkeys)
         case .snippets: copy.text(.sidebarSnippets)
         case .security: copy.text(.sidebarSecurity)
+        case .about: copy.text(.sidebarAbout)
         }
     }
 
@@ -386,6 +389,9 @@ struct SBSettingsWindowShell: View {
         case .security:
             localized.title = copy.text(.settingsSecurity)
             localized.subtitle = copy.text(.settingsSecurityDescription)
+        case .about:
+            localized.title = copy.text(.settingsAbout)
+            localized.subtitle = copy.text(.settingsAboutDescription)
         }
 
         localized.sections = pane.sections.map(localizedSection)
@@ -1091,6 +1097,70 @@ struct SBSettingsWindowShell: View {
                 theme: theme,
                 onChange: { onAdjustSlider(item.id, $0) }
             )
+        }
+    }
+
+    @ViewBuilder
+    private func aboutPaneSections() -> some View {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "-"
+        let build = info["CFBundleVersion"] as? String ?? "-"
+
+        HStack(alignment: .center, spacing: theme.spacing.section16) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 64, height: 64)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(copy.text(.appName))
+                    .font(theme.typography.paneTitle)
+                    .foregroundStyle(theme.palette.textPrimary)
+
+                Text(copy.text(.aboutVersion, ["version": version, "build": build]))
+                    .font(theme.typography.rowSecondary)
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .textSelection(.enabled)
+
+                if let copyright = info["NSHumanReadableCopyright"] as? String {
+                    Text(copyright)
+                        .font(theme.typography.meta)
+                        .foregroundStyle(theme.palette.textTertiary)
+                }
+            }
+        }
+
+        Text(copy.text(.aboutSummary))
+            .font(theme.typography.rowSecondary)
+            .foregroundStyle(theme.palette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        SBPaneSection(title: copy.text(.aboutUpdates), theme: theme) {
+            SBControlPillButton(
+                title: copy.text(.aboutCheckForUpdates),
+                theme: theme,
+                tone: .primary,
+                action: { onSelectAction("about.check-updates") }
+            )
+
+            Text(copy.text(.aboutUpdatesNote))
+                .font(theme.typography.meta)
+                .foregroundStyle(theme.palette.textTertiary)
+        }
+
+        SBPaneSection(title: copy.text(.aboutLinks), theme: theme) {
+            HStack(spacing: theme.spacing.control8) {
+                SBControlPillButton(
+                    title: copy.text(.aboutGitHub),
+                    theme: theme,
+                    action: { onSelectAction("about.github") }
+                )
+
+                SBControlPillButton(
+                    title: copy.text(.aboutPrivacyPolicy),
+                    theme: theme,
+                    action: { onSelectAction("about.privacy-policy") }
+                )
+            }
         }
     }
 
