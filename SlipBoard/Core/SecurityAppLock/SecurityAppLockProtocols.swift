@@ -34,6 +34,7 @@ protocol SecuritySettingsStoring {
 protocol PayloadKeyWrapping: AnyObject {
     var keyMaterialState: PayloadKeyMaterialState { get }
     var activeWrappedKey: WrappedPayloadKey? { get }
+    var isKeyRecordMissing: Bool { get }
     var unwrappedPayloadKeyData: Data? { get }
 
     @discardableResult
@@ -79,6 +80,7 @@ protocol ProtectedPayloadManaging: ProtectedPayloadStoring {
     var latestMigrationState: SecurityMigrationState { get }
     var keyMaterialState: PayloadKeyMaterialState { get }
     var activeWrappedKey: WrappedPayloadKey? { get }
+    var isKeyRecordMissing: Bool { get }
 
     func protectedPayload(for itemID: String) -> ProtectedClipPayload?
 

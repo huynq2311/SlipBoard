@@ -60,6 +60,10 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
         keyStore.activeWrappedKey
     }
 
+    var isKeyRecordMissing: Bool {
+        keyStore.isKeyRecordMissing
+    }
+
     func envelope(for itemID: String) -> EncryptedPayloadEnvelope? {
         envelopesByItemID[itemID]
     }

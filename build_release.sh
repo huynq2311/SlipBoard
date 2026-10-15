@@ -10,6 +10,9 @@
 #
 # Optional settings, read from a .env file next to this script (see .env.example):
 #   DEVELOPMENT_TEAM   Apple team ID used for signing. Defaults to the project's team.
+#   SIGN_IDENTITY      Self-signed code signing certificate for the default build.
+#                      The same certificate keeps the Accessibility permission
+#                      across updates; without it each build is ad-hoc signed.
 #   NOTARY_PROFILE     notarytool keychain profile. When set, and the app is signed
 #                      with a Developer ID certificate, the DMG is notarized and stapled.
 
@@ -30,7 +33,7 @@ for arg in "$@"; do
   case "$arg" in
     --team) SIGN_MODE=team ;;
     --no-sign) SIGN_MODE=none ;;
-    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -75,13 +78,18 @@ APP_PATH="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
 [ -d "$APP_PATH" ] || { echo "Build did not produce $APP_PATH" >&2; exit 1; }
 cp -R "$APP_PATH" "$OUT_DIR/"
 
+if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
+  say "Signing with $SIGN_IDENTITY"
+  codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$OUT_DIR/$APP_NAME.app"
+fi
+
 if [ "$SIGN_MODE" != none ]; then
   say "Verifying signature"
   codesign --verify --deep --strict "$OUT_DIR/$APP_NAME.app"
   codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Signature=|Authority=|TeamIdentifier=' || true
 fi
 if [ "$SIGN_MODE" = adhoc ] && codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null | grep -q keychain-access-groups; then
-  echo "Ad-hoc build carries keychain-access-groups; macOS would kill it at launch." >&2
+  echo "Build without a profile carries keychain-access-groups; macOS would kill it at launch." >&2
   exit 1
 fi
 

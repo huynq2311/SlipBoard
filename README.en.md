@@ -312,13 +312,14 @@ other apps.
 > stable signing identity, so macOS ties the permission to that exact build.
 > In **System Settings → Privacy & Security → Accessibility**, remove SlipBoard
 > with **−**, then reopen SlipBoard and allow it when asked. If App Lock is on,
-> macOS may also ask once to let SlipBoard use its keychain item; enter your
-> login password and choose **Always Allow**.
+> macOS also asks to let SlipBoard use its keychain items (up to two prompts);
+> enter your login password and choose **Always Allow** each time. If you deny
+> one, SlipBoard stays locked: quit it and reopen it to be asked again.
 >
 > **Coming from an earlier release with App Lock on?** Its key belongs to the
-> old signature and cannot be read by an ad-hoc build, so SlipBoard stays
-> locked. Turn **Lock Slipboard** off and on again in **Settings → Security**
-> to create a new key.
+> old signature and cannot be read by an ad-hoc build, so SlipBoard creates a
+> new one on first launch. Notes saved under the old key cannot be read
+> anymore; clip history is not affected.
 
 ### Build from source
 
@@ -340,8 +341,8 @@ An unsigned build runs. For App Lock, use the ad-hoc build from
 **Team-signed build**
 
 A team-signed build keeps the App Lock key in the Data Protection keychain,
-wrapped by a Secure Enclave key. Ad-hoc builds keep it in the login keychain
-instead, because they cannot carry the keychain entitlement.
+wrapped by a Secure Enclave key when the Mac has one. Ad-hoc builds keep it in
+the login keychain instead, because they cannot carry the keychain entitlement.
 
 1. In Xcode, open `SlipBoard.xcodeproj`, select the **SlipBoard** target and
    set **Signing & Capabilities** to your own team. Change the bundle
@@ -373,9 +374,26 @@ instead, because they cannot carry the keychain entitlement.
 ```
 
 Output goes to `Release/`: `SlipBoard.app`, `SlipBoard.dmg` and
-`SlipBoard.dmg.sha256`. You can set `DEVELOPMENT_TEAM` and `NOTARY_PROFILE` in
-a `.env` file (see [`.env.example`](.env.example)). Notarization only runs when
-the app is signed with a **Developer ID** certificate.
+`SlipBoard.dmg.sha256`. You can set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and
+`NOTARY_PROFILE` in a `.env` file (see [`.env.example`](.env.example)).
+Notarization only runs when the app is signed with a **Developer ID**
+certificate.
+
+**Keep Accessibility across updates (optional).** Sign every release with the
+same self-signed certificate instead of ad-hoc, so macOS keeps the
+Accessibility permission after an update. The App Lock keychain prompts still
+appear, because macOS ties those items to the exact build:
+
+1. In **Keychain Access**, choose **Keychain Access → Certificate Assistant →
+   Create a Certificate…**. Name it (for example `SlipBoard Signing`), set
+   **Identity Type** to **Self-Signed Root** and **Certificate Type** to
+   **Code Signing**, then create it.
+2. Put `SIGN_IDENTITY=SlipBoard Signing` in `.env` and run `./build_release.sh`.
+
+Keep that certificate (export it with its private key as a backup): a release
+signed with a different one counts as a new app again. Gatekeeper still asks
+for **Open Anyway** on first launch. If you sign releases this way, update the
+install notes above.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
@@ -405,8 +423,8 @@ history store is the single source of truth. The projector turns it into the
 view state the popup renders, while Core Data persistence and the SQLite
 full-text index are kept in sync from it. With App Lock on, a copy of the
 content and notes of each item is additionally written to an encrypted store.
-Its key is wrapped by the Secure Enclave in team-signed builds and kept in the
-login keychain in ad-hoc builds. The Core Data store itself is not encrypted.
+Its key is wrapped by the Secure Enclave in team-signed builds (when the Mac
+has one) and kept in the login keychain in ad-hoc builds. The Core Data store itself is not encrypted.
 
 ## Project layout
 

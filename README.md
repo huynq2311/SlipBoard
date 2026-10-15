@@ -302,12 +302,14 @@ dụng khác.
 > có danh tính ký cố định, nên macOS gắn quyền với đúng bản dựng đó. Vào
 > **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng
 > nút **−**, rồi mở lại SlipBoard và cho phép khi được hỏi. Nếu đang bật App
-> Lock, macOS có thể hỏi một lần để SlipBoard dùng item trong keychain; nhập mật
-> khẩu đăng nhập và chọn **Luôn cho phép**.
+> Lock, macOS còn hỏi để SlipBoard dùng các item trong keychain (tối đa hai lần);
+> mỗi lần nhập mật khẩu đăng nhập và chọn **Luôn cho phép**. Nếu bấm từ chối,
+> SlipBoard sẽ đứng ở trạng thái khóa: thoát rồi mở lại để được hỏi lại.
 >
 > **Đã bật App Lock ở bản Release trước?** Khóa cũ gắn với chữ ký cũ, bản ký
-> ad-hoc không đọc được nên SlipBoard sẽ đứng ở trạng thái khóa. Tắt rồi bật lại
-> **Lock Slipboard** trong **Settings → Security** để tạo khóa mới.
+> ad-hoc không đọc được, nên SlipBoard tự tạo khóa mới ở lần mở đầu tiên. Ghi
+> chú đã lưu bằng khóa cũ sẽ không đọc được nữa; lịch sử clipboard không bị ảnh
+> hưởng.
 
 ### Build từ mã nguồn
 
@@ -328,8 +330,8 @@ Bản không ký chạy được. Muốn dùng App Lock, hãy build bản ký ad
 **Build ký bằng team**
 
 Bản ký bằng team giữ khóa App Lock trong Data Protection keychain, được bọc bởi
-một khóa Secure Enclave. Bản ký ad-hoc không mang được entitlement keychain nên
-giữ khóa trong login keychain.
+một khóa Secure Enclave nếu máy có. Bản ký ad-hoc không mang được entitlement
+keychain nên giữ khóa trong login keychain.
 
 1. Mở `SlipBoard.xcodeproj` trong Xcode, chọn target **SlipBoard**, vào
    **Signing & Capabilities** và chọn team của bạn. Đổi bundle identifier thành
@@ -360,9 +362,24 @@ Script `build_release.sh` build bản Release và đóng gói thành DMG:
 ```
 
 Kết quả nằm trong `Release/`: `SlipBoard.app`, `SlipBoard.dmg` và
-`SlipBoard.dmg.sha256`. Có thể đặt `DEVELOPMENT_TEAM` và `NOTARY_PROFILE` trong
-file `.env` (xem [`.env.example`](.env.example)). Notarize chỉ chạy khi app được
-ký bằng chứng chỉ **Developer ID**.
+`SlipBoard.dmg.sha256`. Có thể đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và
+`NOTARY_PROFILE` trong file `.env` (xem [`.env.example`](.env.example)). Notarize
+chỉ chạy khi app được ký bằng chứng chỉ **Developer ID**.
+
+**Giữ quyền Trợ năng qua các bản cập nhật (tùy chọn).** Ký mọi bản phát hành
+bằng cùng một chứng chỉ self-signed thay vì ad-hoc, để macOS giữ quyền Trợ năng
+sau khi cập nhật. Hộp thoại keychain của App Lock vẫn hiện, vì macOS gắn các item
+đó với đúng bản dựng:
+
+1. Trong **Keychain Access**, chọn **Keychain Access → Certificate Assistant →
+   Create a Certificate…**. Đặt tên (ví dụ `SlipBoard Signing`), chọn
+   **Identity Type** là **Self-Signed Root** và **Certificate Type** là
+   **Code Signing**, rồi tạo.
+2. Ghi `SIGN_IDENTITY=SlipBoard Signing` vào `.env` và chạy `./build_release.sh`.
+
+Giữ lại chứng chỉ đó (export kèm private key để sao lưu): bản ký bằng chứng chỉ
+khác sẽ bị coi là app mới. Gatekeeper vẫn hỏi **Vẫn mở** ở lần mở đầu tiên. Nếu
+phát hành theo cách này, hãy sửa lại phần hướng dẫn cài đặt ở trên.
 
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
@@ -390,8 +407,8 @@ flowchart LR
 lịch sử là nguồn dữ liệu duy nhất; projector biến nó thành trạng thái view cho
 popup, còn lưu trữ Core Data và chỉ mục toàn văn SQLite được đồng bộ từ đó. Khi
 bật App Lock, một bản sao nội dung và ghi chú của từng mục còn được ghi vào một
-kho mã hóa. Khóa của kho được Secure Enclave bọc ở bản ký bằng team, và nằm
-trong login keychain ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
+kho mã hóa. Khóa của kho được Secure Enclave bọc ở bản ký bằng team (nếu máy
+có), và nằm trong login keychain ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
 
 ## Cấu trúc dự án
 

@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import OSLog
 import Security
 
 final class PayloadKeychainStore: PayloadKeyWrapping {
@@ -38,19 +39,34 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         case login
     }
 
+    private static let logger = Logger(subsystem: "huynq.SlipBoard", category: "AppLock")
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let backend: KeychainBackend
 
     private(set) var keyMaterialState: PayloadKeyMaterialState
+    /// True only when the keychain reported that no key record exists. A record
+    /// that could not be read (for example, keychain access was denied) is not
+    /// missing, so it is never replaced.
+    private(set) var isKeyRecordMissing: Bool
     private var activeKeyData: Data?
 
     init() {
-        backend = Self.resolveBackend()
-        if let wrappedKey = Self.loadWrappedKeyRecord(decoder: decoder, backend: backend) {
+        let backend = Self.resolveBackend()
+        self.backend = backend
+        let storageName = backend == .dataProtection ? "data protection keychain" : "login keychain"
+        Self.logger.info("App Lock key storage: \(storageName, privacy: .public)")
+
+        let lookup = Self.loadWrappedKeyRecord(decoder: decoder, backend: backend)
+        isKeyRecordMissing = lookup.status == errSecItemNotFound
+        if let wrappedKey = lookup.wrappedKey {
             keyMaterialState = .wrappedOnly(wrappedKey)
         } else {
             keyMaterialState = .absent
+            if lookup.status != errSecItemNotFound {
+                Self.logger.error("App Lock key record unreadable: \(lookup.status, privacy: .public)")
+            }
         }
     }
 
@@ -89,7 +105,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             return keyMaterialState
         }
 
-        persistWrappedKey(wrappedKey)
+        guard persistWrappedKey(wrappedKey) else {
+            return discardUnrecordedKey()
+        }
+
+        isKeyRecordMissing = false
         activeKeyData = payloadKeyData
         keyMaterialState = .unwrappedInMemory(wrappedKey, unwrappedAt: date)
         return keyMaterialState
@@ -160,7 +180,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             return keyMaterialState
         }
 
-        persistWrappedKey(wrappedKey)
+        guard persistWrappedKey(wrappedKey) else {
+            return discardUnrecordedKey()
+        }
+
         activeKeyData = keyData
         keyMaterialState = .unwrappedInMemory(wrappedKey, unwrappedAt: date)
         return keyMaterialState
@@ -174,6 +197,16 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         } else {
             keyMaterialState = .absent
         }
+        return keyMaterialState
+    }
+
+    /// Without its record a relaunch cannot find the key, so the key must not be
+    /// reported as stored, and the raw key is not left behind in the keychain.
+    private func discardUnrecordedKey() -> PayloadKeyMaterialState {
+        Self.logger.error("App Lock key record could not be saved")
+        _ = deleteFallbackKeychainItem()
+        keyMaterialState = .absent
+        activeKeyData = nil
         return keyMaterialState
     }
 
@@ -274,10 +307,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return item as? Data
     }
 
-    private func persistWrappedKey(_ wrappedKey: WrappedPayloadKey) {
+    private func persistWrappedKey(_ wrappedKey: WrappedPayloadKey) -> Bool {
         let record = WrappedPayloadKeyRecord(wrappedKey: wrappedKey)
         guard let data = try? encoder.encode(record) else {
-            return
+            return false
         }
 
         let baseQuery = Self.keychainQuery([
@@ -296,8 +329,9 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
         let status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
         if status == errSecItemNotFound {
-            _ = SecItemAdd(addQuery as CFDictionary, nil)
+            return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
         }
+        return status == errSecSuccess
     }
 
     private func createOrLoadSecureEnclavePrivateKey(accessControl: SecAccessControl) -> SecKey? {
@@ -384,7 +418,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return Data(bytes)
     }
 
-    private static func loadWrappedKeyRecord(decoder: JSONDecoder, backend: KeychainBackend) -> WrappedPayloadKey? {
+    private static func loadWrappedKeyRecord(
+        decoder: JSONDecoder,
+        backend: KeychainBackend
+    ) -> (wrappedKey: WrappedPayloadKey?, status: OSStatus) {
         let query = keychainQuery([
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: Constants.metadataService,
@@ -395,10 +432,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess, let data = item as? Data else {
-            return nil
+            return (nil, status)
         }
 
-        return try? decoder.decode(WrappedPayloadKeyRecord.self, from: data).materialize()
+        return (try? decoder.decode(WrappedPayloadKeyRecord.self, from: data).materialize(), status)
     }
 
     /// Falls back to the login keychain only on errSecMissingEntitlement. Any
