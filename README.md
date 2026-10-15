@@ -234,6 +234,8 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 - Biểu tượng riêng trên thanh menu. Bấm vào để xem trạng thái ghi, tạm dừng
   ghi, đổi nhanh thời gian lưu giữ, mở popup hoặc Cài đặt.
 - Tùy chọn **mở khi đăng nhập**, phím tắt toàn cục tùy chỉnh.
+- **Cài đặt → Giới thiệu** hiện phiên bản và mở trang Releases để kiểm tra cập
+  nhật. Bản thân SlipBoard không bao giờ kết nối mạng.
 
 ---
 
@@ -362,7 +364,10 @@ Script `build_release.sh` build bản Release và đóng gói thành DMG:
 ```
 
 Kết quả nằm trong `Release/`: `SlipBoard.app`, `SlipBoard.dmg` và
-`SlipBoard.dmg.sha256`. Có thể đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và
+`SlipBoard.dmg.sha256`. DMG mở ra một cửa sổ hướng dẫn kéo SlipBoard vào
+Applications; script nhờ Finder sắp xếp cửa sổ này, nên lần chạy đầu macOS sẽ hỏi
+cho phép terminal điều khiển Finder. Ảnh nền được tạo bởi
+`Tools/dmg/make-background.swift`. Có thể đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và
 `NOTARY_PROFILE` trong file `.env` (xem [`.env.example`](.env.example)). Notarize
 chỉ chạy khi app được ký bằng chứng chỉ **Developer ID**.
 

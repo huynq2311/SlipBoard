@@ -244,6 +244,8 @@ how long ago you copied it. To see only what came from one app:
 - A dedicated menu bar icon. Click it to see capture status, pause capture,
   change retention quickly, or open the popup or Settings.
 - Optional **launch at login** and customizable global hotkeys.
+- **Settings → About** shows the version and opens the Releases page to check
+  for updates. SlipBoard itself never goes online.
 
 ---
 
@@ -374,7 +376,10 @@ the login keychain instead, because they cannot carry the keychain entitlement.
 ```
 
 Output goes to `Release/`: `SlipBoard.app`, `SlipBoard.dmg` and
-`SlipBoard.dmg.sha256`. You can set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and
+`SlipBoard.dmg.sha256`. The DMG opens a window that shows dragging SlipBoard
+onto Applications; the script asks Finder to lay it out, so the first run asks
+to let your terminal control Finder. The background comes from
+`Tools/dmg/make-background.swift`. You can set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and
 `NOTARY_PROFILE` in a `.env` file (see [`.env.example`](.env.example)).
 Notarization only runs when the app is signed with a **Developer ID**
 certificate.
