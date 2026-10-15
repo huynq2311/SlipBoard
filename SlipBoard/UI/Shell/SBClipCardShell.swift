@@ -795,6 +795,9 @@ private enum SBRichTextPreview {
                 .underlineStyle: NSUnderlineStyle.single.rawValue
             ], range: attributeRange)
         }
+        // Links come from untrusted pasteboard RTF; a click on the card would
+        // otherwise open their target. Keep the styling, drop the URL.
+        normalized.removeAttribute(.link, range: range)
 
         return AttributedString(normalized)
     }
