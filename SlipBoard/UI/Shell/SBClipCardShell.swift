@@ -795,6 +795,9 @@ private enum SBRichTextPreview {
                 .underlineStyle: NSUnderlineStyle.single.rawValue
             ], range: attributeRange)
         }
+        // Keep the link look but drop the target: clip RTF is untrusted, and a
+        // live link would open its URL on the ordinary card-select click.
+        normalized.removeAttribute(.link, range: range)
 
         return AttributedString(normalized)
     }

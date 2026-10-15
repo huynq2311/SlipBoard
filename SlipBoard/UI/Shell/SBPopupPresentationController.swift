@@ -143,7 +143,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
     }
 
     private func makePanel(rootView: AnyView, isLocked: Bool) -> NSPanel {
-        let hostingController = NSHostingController(rootView: rootView)
+        // Popup content renders clipboard data, so no link in it may open a URL.
+        let hostingController = NSHostingController(
+            rootView: AnyView(rootView.environment(\.openURL, OpenURLAction { _ in .discarded }))
+        )
         hostingController.sizingOptions = []
         let panel = SBPopupPanel(
             contentRect: NSRect(x: 0, y: 0, width: 716, height: 456),
