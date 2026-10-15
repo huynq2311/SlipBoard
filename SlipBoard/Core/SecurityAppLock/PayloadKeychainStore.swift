@@ -9,6 +9,8 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         static let fallbackKeyService = "com.slipboard.security.payload-key"
         static let fallbackKeyAccount = "raw-key"
         static let secureEnclaveKeyTag = "com.slipboard.security.secureenclave.payload-key"
+        static let backendProbeService = "com.slipboard.security.keychain-probe"
+        static let backendProbeAccount = "never-written"
         static let unlockPrompt = "Unlock SlipBoard protected payload"
         static let payloadKeySize = 32
     }
@@ -20,14 +22,32 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     /// version 2 after the first successful unlock.
     static let sessionOnlyKeyVersion = 2
 
+    /// Where the key material lives, decided once per launch.
+    ///
+    /// Team-signed builds carry `keychain-access-groups` and keep the key in the
+    /// Data Protection keychain, wrapped by a Secure Enclave key.
+    ///
+    /// Ad-hoc builds cannot carry that entitlement (macOS kills them at launch),
+    /// so every Data Protection call fails with errSecMissingEntitlement. They
+    /// use the login keychain instead: the raw key is a generic password there,
+    /// encrypted with the login password and readable without a prompt only by
+    /// this app's signature. There is no Secure Enclave wrapping, which App Lock
+    /// can afford because it hides the window and does not encrypt the disk.
+    private enum KeychainBackend {
+        case dataProtection
+        case login
+    }
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let backend: KeychainBackend
 
     private(set) var keyMaterialState: PayloadKeyMaterialState
     private var activeKeyData: Data?
 
     init() {
-        if let wrappedKey = Self.loadWrappedKeyRecord(decoder: decoder) {
+        backend = Self.resolveBackend()
+        if let wrappedKey = Self.loadWrappedKeyRecord(decoder: decoder, backend: backend) {
             keyMaterialState = .wrappedOnly(wrappedKey)
         } else {
             keyMaterialState = .absent
@@ -158,6 +178,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     private func wrapWithSecureEnclave(_ payloadKeyData: Data, at date: Date) -> WrappedPayloadKey? {
+        // A Secure Enclave key can only be persisted in the Data Protection keychain.
+        guard backend == .dataProtection else {
+            return nil
+        }
+
         guard
             let accessControl = SecAccessControlCreateWithFlags(
                 nil,
@@ -193,14 +218,13 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     private func wrapWithFallbackKeychain(_ payloadKeyData: Data, at date: Date) -> WrappedPayloadKey? {
-        let query: [CFString: Any] = [
+        let query = Self.keychainQuery([
             kSecClass: kSecClassGenericPassword,
-            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount,
             kSecValueData: payloadKeyData,
             kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
+        ], backend: backend)
 
         _ = deleteFallbackKeychainItem()
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -233,14 +257,13 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
     private func loadFallbackKeychainKeyData() -> Data? {
         let context = makeAuthenticationContext()
-        let query: [CFString: Any] = [
+        let query = Self.keychainQuery([
             kSecClass: kSecClassGenericPassword,
-            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount,
             kSecReturnData: true,
             kSecUseAuthenticationContext: context
-        ]
+        ], backend: backend)
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -257,12 +280,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             return
         }
 
-        let baseQuery: [CFString: Any] = [
+        let baseQuery = Self.keychainQuery([
             kSecClass: kSecClassGenericPassword,
-            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.metadataService,
             kSecAttrAccount: Constants.metadataAccount
-        ]
+        ], backend: backend)
         let addQuery: [CFString: Any] = baseQuery.merging([
             kSecValueData: data,
             kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
@@ -301,6 +323,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     private func loadSecureEnclavePrivateKey() -> SecKey? {
+        guard backend == .dataProtection else {
+            return nil
+        }
+
         let tagData = Data(Constants.secureEnclaveKeyTag.utf8)
         let context = makeAuthenticationContext()
         let query: [CFString: Any] = [
@@ -323,6 +349,10 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
     @discardableResult
     private func deleteSecureEnclaveKey() -> Bool {
+        guard backend == .dataProtection else {
+            return true
+        }
+
         let tagData = Data(Constants.secureEnclaveKeyTag.utf8)
         let query: [CFString: Any] = [
             kSecClass: kSecClassKey,
@@ -336,12 +366,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
     @discardableResult
     private func deleteFallbackKeychainItem() -> Bool {
-        let query: [CFString: Any] = [
+        let query = Self.keychainQuery([
             kSecClass: kSecClassGenericPassword,
-            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.fallbackKeyService,
             kSecAttrAccount: Constants.fallbackKeyAccount
-        ]
+        ], backend: backend)
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
@@ -355,14 +384,13 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return Data(bytes)
     }
 
-    private static func loadWrappedKeyRecord(decoder: JSONDecoder) -> WrappedPayloadKey? {
-        let query: [CFString: Any] = [
+    private static func loadWrappedKeyRecord(decoder: JSONDecoder, backend: KeychainBackend) -> WrappedPayloadKey? {
+        let query = keychainQuery([
             kSecClass: kSecClassGenericPassword,
-            kSecUseDataProtectionKeychain: true,
             kSecAttrService: Constants.metadataService,
             kSecAttrAccount: Constants.metadataAccount,
             kSecReturnData: true
-        ]
+        ], backend: backend)
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -371,6 +399,28 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         }
 
         return try? decoder.decode(WrappedPayloadKeyRecord.self, from: data).materialize()
+    }
+
+    /// Falls back to the login keychain only on errSecMissingEntitlement. Any
+    /// other status keeps the Data Protection keychain, so a team-signed build
+    /// never reads or writes key material outside it. Deleting an item that is
+    /// never written has no effect; only the status matters.
+    private static func resolveBackend() -> KeychainBackend {
+        let probe: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecUseDataProtectionKeychain: true,
+            kSecAttrService: Constants.backendProbeService,
+            kSecAttrAccount: Constants.backendProbeAccount
+        ]
+        return SecItemDelete(probe as CFDictionary) == errSecMissingEntitlement ? .login : .dataProtection
+    }
+
+    /// Without `kSecUseDataProtectionKeychain`, macOS uses the login keychain.
+    private static func keychainQuery(_ query: [CFString: Any], backend: KeychainBackend) -> [CFString: Any] {
+        guard backend == .dataProtection else {
+            return query
+        }
+        return query.merging([kSecUseDataProtectionKeychain: true]) { _, flag in flag }
     }
 
     private func makeAuthenticationContext() -> LAContext {

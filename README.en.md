@@ -296,14 +296,29 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 ### Install from a release
 
 Download `SlipBoard.dmg` from [Releases](../../releases), open it and drag
-**SlipBoard** into **Applications**. On first launch, grant **Accessibility**
-access when asked so SlipBoard can paste into other apps.
+**SlipBoard** into **Applications**.
 
-> [!NOTE]
-> Current builds are signed with a development certificate (Apple Development),
-> are not notarized, and only run on the devices listed in that build's
-> provisioning profile. If a release will not open on your Mac, build from
-> source below.
+Releases are ad-hoc signed and not notarized, so macOS blocks the first launch:
+
+1. Open SlipBoard. macOS says it cannot verify the app; click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll to **Security** and
+   click **Open Anyway** next to SlipBoard, then confirm.
+
+Then grant **Accessibility** access when asked so SlipBoard can paste into
+other apps.
+
+> [!IMPORTANT]
+> **After each update, grant Accessibility again.** An ad-hoc build has no
+> stable signing identity, so macOS ties the permission to that exact build.
+> In **System Settings → Privacy & Security → Accessibility**, remove SlipBoard
+> with **−**, then reopen SlipBoard and allow it when asked. If App Lock is on,
+> macOS may also ask once to let SlipBoard use its keychain item; enter your
+> login password and choose **Always Allow**.
+>
+> **Coming from an earlier release with App Lock on?** Its key belongs to the
+> old signature and cannot be read by an ad-hoc build, so SlipBoard stays
+> locked. Turn **Lock Slipboard** off and on again in **Settings → Security**
+> to create a new key.
 
 ### Build from source
 
@@ -319,10 +334,14 @@ xcodebuild \
   build
 ```
 
-An unsigned build runs, but **App Lock cannot be enabled in it**: storing the
-protection key needs the keychain entitlement, which only a signed build has.
+An unsigned build runs. For App Lock, use the ad-hoc build from
+[Packaging a release](#packaging-a-release), which needs no account either.
 
-**Signed build (needed for App Lock)**
+**Team-signed build**
+
+A team-signed build keeps the App Lock key in the Data Protection keychain,
+wrapped by a Secure Enclave key. Ad-hoc builds keep it in the login keychain
+instead, because they cannot carry the keychain entitlement.
 
 1. In Xcode, open `SlipBoard.xcodeproj`, select the **SlipBoard** target and
    set **Signing & Capabilities** to your own team. Change the bundle
@@ -348,7 +367,8 @@ protection key needs the keychain entitlement, which only a signed build has.
 `build_release.sh` builds the Release configuration and packages it as a DMG:
 
 ```bash
-./build_release.sh              # signed build (needed for App Lock)
+./build_release.sh              # ad-hoc signed build (default, what releases use)
+./build_release.sh --team       # team-signed build, needs a provisioning profile
 ./build_release.sh --no-sign    # unsigned build, like CI
 ```
 
@@ -384,9 +404,9 @@ The app is a SwiftUI menu-bar app with an AppKit panel for the popup. The
 history store is the single source of truth. The projector turns it into the
 view state the popup renders, while Core Data persistence and the SQLite
 full-text index are kept in sync from it. With App Lock on, a copy of the
-content and notes of each item is additionally written to an encrypted store
-whose key is held by the Secure Enclave. The Core Data store itself is not
-encrypted.
+content and notes of each item is additionally written to an encrypted store.
+Its key is wrapped by the Secure Enclave in team-signed builds and kept in the
+login keychain in ad-hoc builds. The Core Data store itself is not encrypted.
 
 ## Project layout
 

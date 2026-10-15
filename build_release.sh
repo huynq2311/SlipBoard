@@ -2,8 +2,9 @@
 #
 # Build SlipBoard in Release configuration and package it as a DMG.
 #
-#   ./build_release.sh              signed build (needed for App Lock)
-#   ./build_release.sh --no-sign    unsigned build (what CI builds; App Lock unavailable)
+#   ./build_release.sh              ad-hoc signed build (runs on any Mac, never expires)
+#   ./build_release.sh --team       team-signed build (Apple Development + provisioning profile)
+#   ./build_release.sh --no-sign    unsigned build (what CI builds)
 #
 # Output: Release/SlipBoard.app, Release/SlipBoard.dmg, Release/SlipBoard.dmg.sha256
 #
@@ -21,11 +22,15 @@ APP_NAME="SlipBoard"
 BUILD_DIR="build"
 OUT_DIR="Release"
 
-SIGN=1
+# adhoc: signed with "-", no provisioning profile and no entitlements. macOS kills
+# an ad-hoc app that claims keychain-access-groups, so App Lock falls back to the
+# login keychain. team: needs a valid profile; a free team's profile lasts 7 days.
+SIGN_MODE=adhoc
 for arg in "$@"; do
   case "$arg" in
-    --no-sign) SIGN=0 ;;
-    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --team) SIGN_MODE=team ;;
+    --no-sign) SIGN_MODE=none ;;
+    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -48,24 +53,36 @@ rm -rf "$BUILD_DIR" "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 XCODEBUILD_ARGS=(-project "$PROJECT" -scheme "$SCHEME" -configuration Release -derivedDataPath "$BUILD_DIR")
-if [ "$SIGN" -eq 1 ]; then
-  XCODEBUILD_ARGS+=(-allowProvisioningUpdates)
-  if [ -n "${DEVELOPMENT_TEAM:-}" ]; then
-    XCODEBUILD_ARGS+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
-  fi
-else
-  XCODEBUILD_ARGS+=(CODE_SIGNING_ALLOWED=NO)
-fi
+case "$SIGN_MODE" in
+  team)
+    XCODEBUILD_ARGS+=(-allowProvisioningUpdates)
+    if [ -n "${DEVELOPMENT_TEAM:-}" ]; then
+      XCODEBUILD_ARGS+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
+    fi
+    ;;
+  adhoc)
+    # CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO keeps get-task-allow (debugger attach) out.
+    XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+      PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS= CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
+    ;;
+  none)
+    XCODEBUILD_ARGS+=(CODE_SIGNING_ALLOWED=NO)
+    ;;
+esac
 xcodebuild "${XCODEBUILD_ARGS[@]}" build
 
 APP_PATH="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
 [ -d "$APP_PATH" ] || { echo "Build did not produce $APP_PATH" >&2; exit 1; }
 cp -R "$APP_PATH" "$OUT_DIR/"
 
-if [ "$SIGN" -eq 1 ]; then
+if [ "$SIGN_MODE" != none ]; then
   say "Verifying signature"
   codesign --verify --deep --strict "$OUT_DIR/$APP_NAME.app"
-  codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Authority=|TeamIdentifier=' || true
+  codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Signature=|Authority=|TeamIdentifier=' || true
+fi
+if [ "$SIGN_MODE" = adhoc ] && codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null | grep -q keychain-access-groups; then
+  echo "Ad-hoc build carries keychain-access-groups; macOS would kill it at launch." >&2
+  exit 1
 fi
 
 say "Creating DMG"

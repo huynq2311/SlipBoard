@@ -286,14 +286,28 @@ Chi tiết xem [PRIVACY.md](PRIVACY.md).
 ### Cài từ Release
 
 Tải `SlipBoard.dmg` ở trang [Releases](../../releases), mở file và kéo
-**SlipBoard** vào thư mục **Applications**. Lần đầu mở, cấp quyền
-**Accessibility** khi được hỏi để SlipBoard dán được vào ứng dụng khác.
+**SlipBoard** vào thư mục **Applications**.
 
-> [!NOTE]
-> Các bản dựng hiện tại được ký bằng chứng chỉ phát triển (Apple Development),
-> chưa notarize, và chỉ chạy trên những máy có trong provisioning profile của
-> bản dựng đó. Nếu bản Release không mở được trên máy bạn, hãy build từ mã nguồn
-> bên dưới.
+Bản Release được ký ad-hoc và chưa notarize, nên macOS chặn lần mở đầu tiên:
+
+1. Mở SlipBoard. macOS báo không xác minh được ứng dụng; bấm **Xong**.
+2. Mở **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, cuộn tới mục **Bảo mật**
+   và bấm **Vẫn mở** cạnh SlipBoard, rồi xác nhận.
+
+Sau đó cấp quyền **Accessibility** khi được hỏi để SlipBoard dán được vào ứng
+dụng khác.
+
+> [!IMPORTANT]
+> **Sau mỗi lần cập nhật, cần cấp lại quyền Accessibility.** Bản ký ad-hoc không
+> có danh tính ký cố định, nên macOS gắn quyền với đúng bản dựng đó. Vào
+> **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng
+> nút **−**, rồi mở lại SlipBoard và cho phép khi được hỏi. Nếu đang bật App
+> Lock, macOS có thể hỏi một lần để SlipBoard dùng item trong keychain; nhập mật
+> khẩu đăng nhập và chọn **Luôn cho phép**.
+>
+> **Đã bật App Lock ở bản Release trước?** Khóa cũ gắn với chữ ký cũ, bản ký
+> ad-hoc không đọc được nên SlipBoard sẽ đứng ở trạng thái khóa. Tắt rồi bật lại
+> **Lock Slipboard** trong **Settings → Security** để tạo khóa mới.
 
 ### Build từ mã nguồn
 
@@ -308,10 +322,14 @@ xcodebuild \
   build
 ```
 
-Bản không ký chạy được, nhưng **không bật được App Lock**: lưu khóa bảo vệ cần
-entitlement keychain mà chỉ bản có ký mới có.
+Bản không ký chạy được. Muốn dùng App Lock, hãy build bản ký ad-hoc ở mục
+[Đóng gói bản phát hành](#đóng-gói-bản-phát-hành), cũng không cần tài khoản.
 
-**Build có ký (cần cho App Lock)**
+**Build ký bằng team**
+
+Bản ký bằng team giữ khóa App Lock trong Data Protection keychain, được bọc bởi
+một khóa Secure Enclave. Bản ký ad-hoc không mang được entitlement keychain nên
+giữ khóa trong login keychain.
 
 1. Mở `SlipBoard.xcodeproj` trong Xcode, chọn target **SlipBoard**, vào
    **Signing & Capabilities** và chọn team của bạn. Đổi bundle identifier thành
@@ -336,7 +354,8 @@ entitlement keychain mà chỉ bản có ký mới có.
 Script `build_release.sh` build bản Release và đóng gói thành DMG:
 
 ```bash
-./build_release.sh              # bản có ký (cần cho App Lock)
+./build_release.sh              # bản ký ad-hoc (mặc định, dùng cho Release)
+./build_release.sh --team       # bản ký bằng team, cần provisioning profile
 ./build_release.sh --no-sign    # bản không ký, như CI
 ```
 
@@ -371,8 +390,8 @@ flowchart LR
 lịch sử là nguồn dữ liệu duy nhất; projector biến nó thành trạng thái view cho
 popup, còn lưu trữ Core Data và chỉ mục toàn văn SQLite được đồng bộ từ đó. Khi
 bật App Lock, một bản sao nội dung và ghi chú của từng mục còn được ghi vào một
-kho mã hóa với khóa do Secure Enclave giữ. Bản thân kho Core Data không được mã
-hóa.
+kho mã hóa. Khóa của kho được Secure Enclave bọc ở bản ký bằng team, và nằm
+trong login keychain ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
 
 ## Cấu trúc dự án
 
