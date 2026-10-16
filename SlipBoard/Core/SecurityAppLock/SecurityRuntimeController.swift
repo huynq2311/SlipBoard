@@ -48,9 +48,10 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
     func bootstrap() {
         let settings = settingsStore.currentSettings
         // The key is only read when App Lock needs it, so a launch without App
-        // Lock never touches the keychain or the key file.
+        // Lock never touches the keychain or the key file. Nothing here may
+        // ask the user; Unlock tries again with prompts allowed.
         if settings.isAppLockEnabled {
-            payloadStore.loadAccessKeyIfNeeded()
+            payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: false)
         }
 
         // App Lock is on but this keychain has no key: it was made by a build of
@@ -218,6 +219,9 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
             )
         )
 
+        // A key that could not be loaded at launch gets another try here.
+        payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: true)
+
         // A session-only key unwraps without asking, so ask here first. An old
         // key asks for Touch ID itself while it is unwrapped.
         guard hasSessionOnlyKey else {
@@ -321,7 +325,9 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     private func ensureKeyProvisionedIfNeeded(settings: SecuritySettings, at date: Date) {
         // A key that exists but cannot be read may still protect notes, so a
-        // settings change never replaces it; turning App Lock off and on does.
+        // settings change never replaces it. Turning App Lock off and on keeps
+        // a readable key on ad-hoc builds and replaces only an unreadable key
+        // file; team-signed builds still make a new key.
         guard payloadStore.activeWrappedKey == nil, payloadStore.isKeyRecordMissing else {
             return
         }

@@ -112,7 +112,7 @@ struct PayloadKeyFile {
 
         let isWritten = fchmod(descriptor, 0o600) == 0
             && Self.writeAll(data, to: descriptor)
-            && fsync(descriptor) == 0
+            && Self.syncToDisk(descriptor)
         close(descriptor)
 
         guard isWritten, rename(temporaryPath, url.path) == 0 else {
@@ -122,11 +122,17 @@ struct PayloadKeyFile {
 
         // Makes the rename itself survive a crash or power loss.
         let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        if directoryDescriptor >= 0 {
-            fsync(directoryDescriptor)
-            close(directoryDescriptor)
+        guard directoryDescriptor >= 0 else {
+            return false
         }
-        return true
+        defer { close(directoryDescriptor) }
+        return Self.syncToDisk(directoryDescriptor)
+    }
+
+    /// On macOS fsync only reaches the drive's cache; F_FULLFSYNC flushes it.
+    /// Some file systems do not support it, so fsync is the fallback.
+    private static func syncToDisk(_ descriptor: Int32) -> Bool {
+        fcntl(descriptor, F_FULLFSYNC) == 0 || fsync(descriptor) == 0
     }
 
     private static func writeAll(_ data: Data, to descriptor: Int32) -> Bool {

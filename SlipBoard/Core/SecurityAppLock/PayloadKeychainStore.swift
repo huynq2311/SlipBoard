@@ -38,9 +38,14 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     /// out of casual view, and App Lock hides the window without encrypting the
     /// disk. The release before this one kept the key in the login keychain;
     /// that key is moved to the file on first unlock.
+    ///
+    /// A build with a Team ID that still lacks the entitlement is a broken
+    /// team or Developer ID build, not an ad-hoc one; it gets no key at all
+    /// rather than a plain file.
     private enum KeychainBackend {
         case dataProtection
         case file
+        case unavailable
     }
 
     private static let logger = Logger(subsystem: "huynq.SlipBoard", category: "AppLock")
@@ -53,8 +58,14 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     /// keychain nor the key file.
     private lazy var backend: KeychainBackend = {
         let backend = Self.resolveBackend()
-        let storageName = backend == .dataProtection ? "data protection keychain" : "key file"
-        Self.logger.info("App Lock key storage: \(storageName, privacy: .public)")
+        switch backend {
+        case .dataProtection:
+            Self.logger.info("App Lock key storage: data protection keychain")
+        case .file:
+            Self.logger.info("App Lock key storage: key file")
+        case .unavailable:
+            Self.logger.error("App Lock key storage unavailable: signed with a Team ID but no keychain entitlement")
+        }
         return backend
     }()
     private var hasLoadedKeyRecord = false
@@ -72,31 +83,41 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         isKeyRecordMissing = false
     }
 
-    func loadStoredKeyIfNeeded() {
+    /// Only a found record or a definite "not found" is final. Any other result
+    /// (an unreadable file, a locked keychain, a lookup that would have asked
+    /// the user) is tried again on the next unlock.
+    func loadStoredKeyIfNeeded(allowsUserInteraction: Bool) {
         guard hasLoadedKeyRecord == false else {
             return
         }
-        hasLoadedKeyRecord = true
 
         switch backend {
+        case .unavailable:
+            hasLoadedKeyRecord = true
         case .dataProtection:
             let lookup = Self.loadWrappedKeyRecord(decoder: decoder)
-            isKeyRecordMissing = lookup.status == errSecItemNotFound
             if let wrappedKey = lookup.wrappedKey {
                 keyMaterialState = .wrappedOnly(wrappedKey)
-            } else if lookup.status != errSecItemNotFound {
+                hasLoadedKeyRecord = true
+            } else if lookup.status == errSecItemNotFound {
+                isKeyRecordMissing = true
+                hasLoadedKeyRecord = true
+            } else {
                 Self.logger.error("App Lock key record unreadable: \(lookup.status, privacy: .public)")
             }
         case .file:
             switch keyFile.read() {
             case let .found(wrappedKey, _):
                 keyMaterialState = .wrappedOnly(wrappedKey)
+                hasLoadedKeyRecord = true
             case .missing:
-                let legacyLookup = Self.legacyLoginKeychainKey()
+                let legacyLookup = Self.legacyLoginKeychainKey(allowsUserInteraction: allowsUserInteraction)
                 if let legacyKey = legacyLookup.wrappedKey {
                     keyMaterialState = .wrappedOnly(legacyKey)
+                    hasLoadedKeyRecord = true
                 } else if legacyLookup.status == errSecItemNotFound {
                     isKeyRecordMissing = true
+                    hasLoadedKeyRecord = true
                 } else {
                     Self.logger.error("App Lock login keychain key unreadable: \(legacyLookup.status, privacy: .public)")
                 }
@@ -120,15 +141,22 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         authenticationMethod: SecurityUnlockMethod,
         at date: Date
     ) -> PayloadKeyMaterialState {
+        switch backend {
+        case .unavailable:
+            keyMaterialState = .absent
+            activeKeyData = nil
+            return keyMaterialState
+        case .file:
+            return provisionInKeyFile(at: date)
+        case .dataProtection:
+            break
+        }
+
         hasLoadedKeyRecord = true
         guard let payloadKeyData = Self.randomPayloadKeyData() else {
             keyMaterialState = .absent
             activeKeyData = nil
             return keyMaterialState
-        }
-
-        if backend == .file {
-            return storeInKeyFile(payloadKeyData, createdAt: date, at: date)
         }
 
         let wrappedKey: WrappedPayloadKey?
@@ -161,7 +189,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         authenticationMethod: SecurityUnlockMethod,
         at date: Date
     ) -> PayloadKeyMaterialState {
-        loadStoredKeyIfNeeded()
+        loadStoredKeyIfNeeded(allowsUserInteraction: true)
         guard let wrappedKey = activeWrappedKey else {
             keyMaterialState = .absent
             activeKeyData = nil
@@ -262,6 +290,32 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return keyMaterialState
     }
 
+    /// Turning App Lock off and on keeps an existing key, so notes saved under
+    /// it stay readable. A new key is written only when there is none, or when
+    /// the file exists but cannot be read (turning App Lock on again is the way
+    /// out of that). A key in the login keychain that could not be read is
+    /// never replaced: enabling fails and can be retried.
+    private func provisionInKeyFile(at date: Date) -> PayloadKeyMaterialState {
+        loadStoredKeyIfNeeded(allowsUserInteraction: true)
+        if let existingKey = activeWrappedKey {
+            let state = unwrapFromKeyFile(existingKey, at: date)
+            if state.hasUnwrappedKeyInMemory || existingKey.wrappingPolicy == .keychainThisDeviceOnly {
+                return state
+            }
+        } else if isKeyRecordMissing == false, case .missing = keyFile.read() {
+            Self.logger.error("App Lock key not replaced: login keychain key could not be checked")
+            return keyMaterialState
+        }
+
+        guard let payloadKeyData = Self.randomPayloadKeyData() else {
+            keyMaterialState = .absent
+            activeKeyData = nil
+            return keyMaterialState
+        }
+        hasLoadedKeyRecord = true
+        return storeInKeyFile(payloadKeyData, createdAt: date, at: date)
+    }
+
     /// The file holds the key and its record together, so one atomic write
     /// replaces both and there is no record without a key.
     private func storeInKeyFile(_ keyData: Data, createdAt: Date, at date: Date) -> PayloadKeyMaterialState {
@@ -327,7 +381,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         }
 
         let nextState = storeInKeyFile(keyData, createdAt: legacyKey.createdAt, at: date)
-        guard nextState.hasUnwrappedKeyInMemory else {
+        guard
+            nextState.hasUnwrappedKeyInMemory,
+            case let .found(_, storedKeyData) = keyFile.read(),
+            storedKeyData == keyData
+        else {
             // Keep the keychain copy and use the key for this session anyway.
             activeKeyData = keyData
             keyMaterialState = .unwrappedInMemory(legacyKey, unwrappedAt: date)
@@ -339,8 +397,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     /// Reads only the attributes of the previous release's key item, which
-    /// macOS allows without a prompt; the key itself is read on unlock.
-    private static func legacyLoginKeychainKey() -> (wrappedKey: WrappedPayloadKey?, status: OSStatus) {
+    /// macOS allows without a prompt unless the keychain is locked; the key
+    /// itself is read on unlock.
+    private static func legacyLoginKeychainKey(
+        allowsUserInteraction: Bool
+    ) -> (wrappedKey: WrappedPayloadKey?, status: OSStatus) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: Constants.fallbackKeyService,
@@ -349,7 +410,9 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             kSecMatchLimit: kSecMatchLimitOne
         ]
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        let status = withUserInteraction(allowed: allowsUserInteraction) {
+            SecItemCopyMatching(query as CFDictionary, &item)
+        }
         guard status == errSecSuccess, let attributes = item as? [CFString: Any] else {
             return (nil, status)
         }
@@ -367,19 +430,28 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return (wrappedKey, status)
     }
 
-    private static func deleteLegacyLoginKeychainItems() {
+    /// Only affects the login keychain; Data Protection items never prompt.
+    private static func withUserInteraction<T>(allowed: Bool, _ body: () -> T) -> T {
+        guard allowed == false else {
+            return body()
+        }
         var wasInteractionAllowed: DarwinBoolean = true
         SecKeychainGetUserInteractionAllowed(&wasInteractionAllowed)
         SecKeychainSetUserInteractionAllowed(false)
         defer { SecKeychainSetUserInteractionAllowed(wasInteractionAllowed.boolValue) }
+        return body()
+    }
 
+    private static func deleteLegacyLoginKeychainItems() {
         for account in [Constants.fallbackKeyAccount, Constants.metadataAccount] {
             let query: [CFString: Any] = [
                 kSecClass: kSecClassGenericPassword,
                 kSecAttrService: Constants.fallbackKeyService,
                 kSecAttrAccount: account
             ]
-            let status = SecItemDelete(query as CFDictionary)
+            let status = withUserInteraction(allowed: false) {
+                SecItemDelete(query as CFDictionary)
+            }
             if status != errSecSuccess, status != errSecItemNotFound {
                 logger.info("App Lock left login keychain item \(account, privacy: .public): \(status, privacy: .public)")
             }
@@ -613,10 +685,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         return (try? decoder.decode(WrappedPayloadKeyRecord.self, from: data).materialize(), status)
     }
 
-    /// Falls back to the key file only on errSecMissingEntitlement. Any other
-    /// status keeps the Data Protection keychain, so a team-signed build never
-    /// reads or writes key material outside it. Deleting an item that is never
-    /// written has no effect; only the status matters.
+    /// Falls back to the key file only on errSecMissingEntitlement, and only
+    /// when the app has no Team ID (ad-hoc or unsigned). Any other status keeps
+    /// the Data Protection keychain, so a team-signed build never reads or
+    /// writes key material outside it. Deleting an item that is never written
+    /// has no effect; only the status matters.
     private static func resolveBackend() -> KeychainBackend {
         let probe: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -624,7 +697,33 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             kSecAttrService: Constants.backendProbeService,
             kSecAttrAccount: Constants.backendProbeAccount
         ]
-        return SecItemDelete(probe as CFDictionary) == errSecMissingEntitlement ? .file : .dataProtection
+        guard SecItemDelete(probe as CFDictionary) == errSecMissingEntitlement else {
+            return .dataProtection
+        }
+        return hasNoTeamIdentifier() ? .file : .unavailable
+    }
+
+    /// Any failure to read the signature counts as having a Team ID, so the
+    /// key file is never used by mistake.
+    private static func hasNoTeamIdentifier() -> Bool {
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var information: CFDictionary?
+        guard
+            SecCodeCopySelf([], &code) == errSecSuccess,
+            let code,
+            SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess,
+            let staticCode,
+            SecCodeCopySigningInformation(
+                staticCode,
+                SecCSFlags(rawValue: kSecCSSigningInformation),
+                &information
+            ) == errSecSuccess,
+            let information = information as? [String: Any]
+        else {
+            return false
+        }
+        return information[kSecCodeInfoTeamIdentifier as String] == nil
     }
 
     /// Without `kSecUseDataProtectionKeychain`, macOS uses the login keychain.
