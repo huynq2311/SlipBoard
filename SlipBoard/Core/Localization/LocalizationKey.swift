@@ -750,7 +750,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .statusPinnedItem: "Pinned item."
         case .statusCommandUnavailable: "This command is not wired in the current runtime slice."
         case .statusPasteTargetUnavailable: "Could not return to the previous app. Focus its input, then open SlipBoard again."
-        case .statusPasteNeedsAccessibility: "Paste needs Accessibility access: System Settings → Privacy & Security → Accessibility."
+        case .statusPasteNeedsAccessibility: "Paste needs Accessibility access: System Settings → Privacy & Security → Accessibility, then add SlipBoard with + if it is not listed."
         case .statusNoEligibleApp: "No eligible app was available to add."
         case .statusAddedExcludedApp: "Added %{app} to excluded apps."
         case .statusPausedFifteenMinutes: "Capture paused for 15 minutes."
@@ -1300,7 +1300,7 @@ struct LocalizationCatalog: Sendable {
         .statusPinnedItem: "Đã ghim mục.",
         .statusCommandUnavailable: "Lệnh này chưa được nối trong runtime hiện tại.",
         .statusPasteTargetUnavailable: "Không thể quay lại ứng dụng trước. Hãy đặt con trỏ vào ô nhập rồi mở lại SlipBoard.",
-        .statusPasteNeedsAccessibility: "Cần quyền Trợ năng để dán: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng.",
+        .statusPasteNeedsAccessibility: "Cần quyền Trợ năng để dán: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng, rồi thêm SlipBoard bằng nút + nếu chưa có trong danh sách.",
         .statusNoEligibleApp: "Không có ứng dụng phù hợp để thêm.",
         .statusAddedExcludedApp: "Đã thêm %{app} vào ứng dụng loại trừ.",
         .statusPausedFifteenMinutes: "Đã tạm dừng ghi trong 15 phút.",

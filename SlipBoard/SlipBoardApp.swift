@@ -2582,16 +2582,17 @@ struct SlipBoardApp: App {
             alert.addButton(withTitle: runtime.localization.text(.alertOpenAccessibilitySettings))
             alert.addButton(withTitle: runtime.localization.text(.commonNotNow))
 
+            // The popup panel does not activate the app, so without this the
+            // alert can open behind the frontmost app while its modal session
+            // blocks the popup.
+            NSApp.activate(ignoringOtherApps: true)
             guard alert.runModal() == .alertFirstButtonReturn else {
                 didDeclineAccessibilityAlert = true
                 return
             }
+            // Listed first, so the settings page shows SlipBoard when it opens.
+            AccessibilityPermission.addToSystemList()
             NSWorkspace.shared.open(AccessibilityPermission.settingsURL)
-            // The stale entry from an earlier build already holds the list
-            // slot; the user replaces it with − and +.
-            if wasGrantedToEarlierBuild == false {
-                AccessibilityPermission.addToSystemList()
-            }
         }
     }
 
