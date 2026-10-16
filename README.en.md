@@ -487,3 +487,22 @@ design/                           design docs and UI contracts
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Third-party notices
+
+SlipBoard bundles no third-party code, fonts or artwork. It relies on these:
+
+- **SF Symbols** (© Apple Inc.). The interface draws icons from the SF Symbols
+  set that macOS provides, as allowed by Apple's SF Symbols license for apps on
+  Apple platforms. No symbol is used in the app icon or logo.
+- **San Francisco** (© Apple Inc.). Text, including the DMG background, uses the
+  macOS system font, which is not bundled.
+- **App icon and menu bar icon.** Made for SlipBoard with an AI image tool; they
+  contain no third-party artwork.
+- **Other apps' names and icons.** Cards show the name and icon of the app a
+  clip came from, read from your Mac at run time. The screenshots in this README
+  show some of them for illustration only. They are trademarks of their owners.
+- **Design mockups** in [`design/`](design) (not part of the app) load
+  [Geist](https://github.com/vercel/geist-font) and
+  [IBM Plex Mono](https://github.com/IBM/plex) (SIL Open Font License 1.1) and
+  [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT) from public CDNs.
