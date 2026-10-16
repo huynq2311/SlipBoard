@@ -463,16 +463,18 @@ Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
 description.
 
-**Releasing from GitHub Actions.** The **Release** workflow
-([`release.yml`](.github/workflows/release.yml)), run by hand on `main`, runs
-`./build_release.sh` with the signing certificate and the Sparkle key from the
+**Releasing from GitHub Actions.** Push a tag on a commit of `main`, e.g.
+`git tag v1.0-20261017 origin/main && git push origin v1.0-20261017` (or run the
+**Release** workflow by hand on `main`). The workflow
+([`release.yml`](.github/workflows/release.yml)) checks that the tag matches the
+app version, runs `./build_release.sh` with the signing certificate and the Sparkle key from the
 `release` environment's secrets, and leaves a draft release with the DMG,
 checksum and appcast. Write the **What's New** notes and publish the draft;
 publishing starts the [Homebrew tap](https://github.com/huynq2311/homebrew-tap)'s
 bump workflow. The secrets it needs are listed at the top of the workflow. These
 two keys can sign an app that keeps SlipBoard's Accessibility permission and an
-update every installed copy accepts, so keep the `release` environment limited
-to `main` with a required reviewer.
+update every installed copy accepts, so only admins may create `v*` tags (a tag
+ruleset) and the `release` environment only accepts `v*` tags and `main`.
 
 ---
 
