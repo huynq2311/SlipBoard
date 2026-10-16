@@ -47,7 +47,9 @@ struct PayloadKeyFile {
     /// instance takes before writing, replacing or moving the key file, so
     /// reading, moving aside and creating the file happen as one step. Nil if
     /// the lock could not be taken. Not reentrant: `body` must not take it again.
-    func withExclusiveLock<T>(_ body: () -> T) -> T? {
+    /// Gives up after `timeout` so a stopped or hung instance holding the lock
+    /// cannot freeze this one's main thread; that fails closed like any error.
+    func withExclusiveLock<T>(timeout: TimeInterval = 2, _ body: () -> T) -> T? {
         guard let directoryURL = makeDirectory() else {
             return nil
         }
@@ -57,9 +59,13 @@ struct PayloadKeyFile {
             return nil
         }
         defer { close(descriptor) }
-        while flock(descriptor, LOCK_EX) != 0 {
-            guard errno == EINTR else {
+        let deadline = Date().addingTimeInterval(timeout)
+        while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EINTR || errno == EWOULDBLOCK, Date() < deadline else {
                 return nil
+            }
+            if errno == EWOULDBLOCK {
+                usleep(20_000)
             }
         }
         defer { flock(descriptor, LOCK_UN) }

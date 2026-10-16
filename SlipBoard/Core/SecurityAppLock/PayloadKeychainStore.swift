@@ -387,12 +387,35 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
     /// The file holds the key and its record together, so one atomic write
     /// replaces both and there is no record without a key. Only for the key
-    /// already in use; a new key goes through `PayloadKeyFile.create`.
+    /// already in use (migration, rewrap); a new key goes through
+    /// `PayloadKeyFile.create`.
     private func storeInKeyFile(_ keyData: Data, createdAt: Date, at date: Date) -> PayloadKeyMaterialState {
         let wrappedKey = fileWrappedKey(createdAt: createdAt, at: date)
-        // Under the lock, so it cannot land between another instance's check
-        // of an unparsable file and its move aside.
-        guard keyFile.withExclusiveLock({ keyFile.write(wrappedKey, keyData: keyData) }) == true else {
+        // Decided under the lock: the file is created only if there is none,
+        // and rewritten only if it already holds this key. A different key
+        // (another instance may have just created one) or a file that cannot
+        // be read is never replaced.
+        let isStored = keyFile.withExclusiveLock { () -> Bool in
+            switch keyFile.read() {
+            case .missing:
+                switch keyFile.create(wrappedKey, keyData: keyData) {
+                case .created:
+                    return true
+                case .alreadyExists:
+                    if case let .found(_, existingKeyData) = keyFile.read() {
+                        return existingKeyData == keyData
+                    }
+                    return false
+                case .failed:
+                    return false
+                }
+            case let .found(_, existingKeyData) where existingKeyData == keyData:
+                return keyFile.write(wrappedKey, keyData: keyData)
+            default:
+                return false
+            }
+        }
+        guard isStored == true else {
             Self.logger.error("App Lock key file could not be saved")
             keyMaterialState = .absent
             activeKeyData = nil
