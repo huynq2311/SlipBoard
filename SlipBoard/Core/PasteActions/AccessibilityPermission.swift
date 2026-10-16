@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Foundation
 import Security
@@ -32,10 +33,19 @@ enum AccessibilityPermission {
         return trustedBuild != currentBuild
     }
 
-    /// Adds SlipBoard to the Accessibility list. There is no API that does
-    /// this without macOS showing its own prompt, so call it only after the
-    /// user asked for the settings.
-    static func addToSystemList() {
+    private static var didShowSystemPrompt = false
+
+    /// Call only after the user asked for it. The first time, macOS adds
+    /// SlipBoard to the Accessibility list and shows its own prompt, whose
+    /// button opens the settings; opening them here as well put a second
+    /// window on screen at the same time. macOS may not prompt again in the
+    /// same session, so later requests open the settings directly.
+    static func requestAccess() {
+        guard didShowSystemPrompt == false else {
+            NSWorkspace.shared.open(settingsURL)
+            return
+        }
+        didShowSystemPrompt = true
         AXIsProcessTrustedWithOptions(
             [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         )
