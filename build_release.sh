@@ -55,16 +55,17 @@ say "Building $APP_NAME $VERSION (build $BUILD_DATE)"
 rm -rf "$BUILD_DIR" "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+# CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO keeps get-task-allow (debugger attach) out of
+# every signed build; Apple Development signing adds it otherwise.
 XCODEBUILD_ARGS=(-project "$PROJECT" -scheme "$SCHEME" -configuration Release -derivedDataPath "$BUILD_DIR")
 case "$SIGN_MODE" in
   team)
-    XCODEBUILD_ARGS+=(-allowProvisioningUpdates)
+    XCODEBUILD_ARGS+=(-allowProvisioningUpdates CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     if [ -n "${DEVELOPMENT_TEAM:-}" ]; then
       XCODEBUILD_ARGS+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
     fi
     ;;
   adhoc)
-    # CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO keeps get-task-allow (debugger attach) out.
     XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
       PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS= CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
@@ -87,6 +88,12 @@ if [ "$SIGN_MODE" != none ]; then
   say "Verifying signature"
   codesign --verify --deep --strict "$OUT_DIR/$APP_NAME.app"
   codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Signature=|Authority=|TeamIdentifier=' || true
+  # get-task-allow lets any local process attach to the app and read decrypted history.
+  ENTITLEMENTS="$(codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true)"
+  if grep -q get-task-allow <<<"$ENTITLEMENTS"; then
+    echo "Release build carries com.apple.security.get-task-allow; refusing to package it." >&2
+    exit 1
+  fi
 fi
 if [ "$SIGN_MODE" = adhoc ] && codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null | grep -q keychain-access-groups; then
   echo "Build without a profile carries keychain-access-groups; macOS would kill it at launch." >&2
