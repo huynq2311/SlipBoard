@@ -270,11 +270,11 @@ Cài đặt → Phím tắt). Trong popup:
   (`Contents/PlugIns/SlipBoardUpdater.bundle`), SlipBoard chỉ nạp khi cần kiểm
   tra cập nhật, và chỉ sau khi xác nhận, ngay trước lúc nạp, rằng plug-in,
   Sparkle và mọi thành phần bên trong Sparkle được ký bằng đúng chứng chỉ của app
-  đang chạy. Kiểm tra thất bại thì không nạp gì và tắt cập nhật. Cách này chặn
-  được code bị thay từ trước, không chặn được tiến trình đổi file đúng lúc
-  SlipBoard nạp. Hardened runtime vẫn chặn chèn thư viện qua
-  `DYLD_*`, và macOS bảo vệ app trong `/Applications` khỏi bị app khác sửa, nên
-  hãy cài SlipBoard vào đó.
+  đang chạy. Kiểm tra thất bại thì không nạp gì và tắt cập nhật. Bản phát hành
+  còn được ký kèm library load constraint liệt kê đúng bản build của plug-in và
+  Sparkle, nên chính macOS từ chối file bị đổi giữa lúc kiểm và lúc nạp.
+  Hardened runtime vẫn chặn chèn thư viện qua `DYLD_*`, và macOS bảo vệ app
+  trong `/Applications` khỏi bị app khác sửa, nên hãy cài SlipBoard vào đó.
 - **Chỉ lưu trên máy.** Lịch sử, ghi chú, snippet và cài đặt nằm trong
   `~/Library/Application Support/SlipBoard/`.
 - **App Lock khóa cửa sổ, không mã hóa ổ đĩa.** Nó ẩn lịch sử cho tới khi bạn
@@ -436,7 +436,10 @@ ID thì macOS không cho nạp `Sparkle.framework`. Chỉ plug-in cập nhật l
 Sparkle, và app kiểm chữ ký của plug-in và Sparkle với chứng chỉ của chính nó
 trước khi nạp
 ([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
-Bản ad-hoc và bản không ký không có chứng chỉ để so, nên tắt cập nhật.
+Sau đó `build_release.sh` ký app với `--library-constraint`, liệt kê CDHash của
+mọi kiến trúc của plug-in và Sparkle, nên app phải được ký sau cùng: ký lại
+plug-in hay Sparkle sau đó sẽ khiến app không nạp được bộ cập nhật. Bản ad-hoc và
+bản không ký không có chứng chỉ để so, nên tắt cập nhật.
 
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.

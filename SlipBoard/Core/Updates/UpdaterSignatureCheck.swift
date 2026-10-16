@@ -14,10 +14,12 @@ import Security
 /// Updater.app) is covered by kSecCSCheckNestedCode: the framework's seal, made
 /// with the same certificate, records each nested item as it was when signed.
 ///
-/// This stops code that was replaced before the check. It cannot stop a
-/// process that swaps files between the check and the load, nor check the
-/// helpers Sparkle starts later from disk (Autoupdate, Updater.app), which run
-/// as separate processes.
+/// This stops code that was replaced before the check. In self-signed
+/// releases, a file swapped between the check and the load is refused by macOS
+/// at load time instead: build_release.sh signs the app with a library load constraint that
+/// lists the plug-in's and Sparkle's exact CDHashes. Neither covers the helpers
+/// Sparkle starts later from disk (Autoupdate, Updater.app), which run as
+/// separate processes.
 ///
 /// A build without a certificate (ad-hoc or unsigned) has nothing to compare
 /// against, so it never loads the plug-in and updates stay off.

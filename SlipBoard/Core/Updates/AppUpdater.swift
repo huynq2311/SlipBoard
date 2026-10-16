@@ -138,8 +138,9 @@ final class AppUpdater: ObservableObject {
         Task {
             // Hashing every file takes a moment, so check and load off the
             // main thread, one right after the other. Both read the files by
-            // path, so a process swapping them in between could still win;
-            // this keeps that window as short as it can be.
+            // path; in self-signed releases, a file swapped in between still
+            // fails to load, because the app's library load constraint
+            // (build_release.sh) lists the exact plug-in and Sparkle builds.
             let result = await Task.detached(priority: .userInitiated) {
                 Result { () throws -> Bundle in
                     try UpdaterSignatureCheck.verify(items)

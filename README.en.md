@@ -282,8 +282,9 @@ in Settings → Hotkeys). Inside the popup:
   update check needs it, and only after checking, right before loading, that
   the plug-in, Sparkle and everything nested in Sparkle are signed with the same
   certificate as the running app. If that check fails, nothing is loaded and
-  updates stay off. It catches code replaced beforehand, not a process that
-  swaps files at the moment SlipBoard loads them. The
+  updates stay off. The release is also signed with a library load constraint
+  that lists the exact builds of the plug-in and Sparkle, so macOS itself
+  refuses a file swapped between that check and the load. The
   hardened runtime still blocks `DYLD_*` injection, and macOS protects apps in
   `/Applications` from changes by other apps, so install SlipBoard there.
 - **Local storage only.** History, notes, snippets and settings live in
@@ -452,8 +453,11 @@ ID, macOS refuses to load `Sparkle.framework` otherwise. Only the updater
 plug-in links Sparkle, and the app checks the plug-in's and Sparkle's signatures
 against its own certificate before loading them
 ([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
-Ad-hoc and unsigned builds have no certificate to compare, so their updates are
-off.
+`build_release.sh` then signs the app with `--library-constraint`, listing the
+CDHash of every architecture of the plug-in and Sparkle, so the app must be
+signed last: re-signing the plug-in or Sparkle afterwards keeps the updater from
+loading. Ad-hoc and unsigned builds have no certificate to compare, so their
+updates are off.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
