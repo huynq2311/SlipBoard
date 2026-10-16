@@ -684,7 +684,8 @@ struct ContentView: View {
             hotkeys: hotkeysPaneState,
             snippets: snippetsPaneState,
             security: securityPaneState,
-            bridge: runtime.settingsState.bridge
+            bridge: runtime.settingsState.bridge,
+            about: runtime.settingsState.about
         )
     }
 
