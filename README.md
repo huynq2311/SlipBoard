@@ -471,3 +471,23 @@ design/                           tài liệu thiết kế
 ## Giấy phép
 
 Phát hành theo giấy phép [MIT](LICENSE).
+
+## Thông báo bên thứ ba
+
+SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ ba. Ứng dụng
+dựa vào các thành phần sau:
+
+- **SF Symbols** (© Apple Inc.). Giao diện dùng biểu tượng từ bộ SF Symbols có
+  sẵn trong macOS, theo giấy phép SF Symbols của Apple cho ứng dụng chạy trên
+  nền tảng Apple. Không biểu tượng nào được dùng làm icon ứng dụng hay logo.
+- **San Francisco** (© Apple Inc.). Chữ trong ứng dụng, kể cả ảnh nền DMG, dùng
+  font hệ thống của macOS, không được đóng gói kèm.
+- **Icon ứng dụng và icon thanh menu.** Được tạo riêng cho SlipBoard bằng công
+  cụ tạo ảnh AI; không chứa hình ảnh của bên thứ ba.
+- **Tên và icon của ứng dụng khác.** Thẻ hiển thị tên và icon của ứng dụng nguồn
+  của clip, lấy từ máy của bạn lúc chạy. Ảnh chụp màn hình trong README có hiện
+  một số icon này chỉ để minh họa. Chúng là nhãn hiệu của chủ sở hữu tương ứng.
+- **Bản mockup thiết kế** trong [`design/`](design) (không thuộc ứng dụng) nạp
+  font [Geist](https://github.com/vercel/geist-font) và
+  [IBM Plex Mono](https://github.com/IBM/plex) (SIL Open Font License 1.1) cùng
+  [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT) từ CDN công khai.
