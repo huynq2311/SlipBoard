@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import Combine
 import ServiceManagement
 import SwiftUI
@@ -934,7 +933,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
 
     func showPastePermissionRequired() {
         runtimeStatusOverride = RuntimeStatusOverride(
-            message: localization.text(.alertAccessibilityMessage),
+            message: localization.text(.statusPasteNeedsAccessibility),
             tone: .warning
         )
         publishCurrentProjection()
@@ -2473,6 +2472,8 @@ struct SlipBoardApp: App {
     @State private var didInitializeShellLifecycle = false
     @State private var wasPopupPresented = false
     @State private var openSettingsAction: OpenSettingsAction?
+    @State private var didDeclineAccessibilityAlert = false
+    @State private var isAccessibilityAlertPending = false
 
     var body: some Scene {
         MenuBarExtra {
@@ -2559,21 +2560,37 @@ struct SlipBoardApp: App {
 
     /// Shown when a paste actually fails for want of Accessibility access.
     /// At launch this ran a modal loop that blocked the whole app before the
-    /// user had asked it to do anything.
+    /// user had asked it to do anything. After "Not Now" only the popup's
+    /// status line asks again, until the next launch.
     func presentAccessibilityPermissionAlertIfNeeded() {
-        guard AXIsProcessTrusted() == false else { return }
+        guard AccessibilityPermission.isTrusted == false,
+              didDeclineAccessibilityAlert == false,
+              isAccessibilityAlertPending == false else { return }
+        isAccessibilityAlertPending = true
 
         DispatchQueue.main.async {
+            defer { isAccessibilityAlertPending = false }
+            let wasGrantedToEarlierBuild = AccessibilityPermission.wasGrantedToEarlierBuild
             let alert = NSAlert()
-            alert.messageText = runtime.localization.text(.alertAccessibilityTitle)
-            alert.informativeText = runtime.localization.text(.alertAccessibilityMessage)
+            alert.messageText = runtime.localization.text(
+                wasGrantedToEarlierBuild ? .alertAccessibilityRegrantTitle : .alertAccessibilityTitle
+            )
+            alert.informativeText = runtime.localization.text(
+                wasGrantedToEarlierBuild ? .alertAccessibilityRegrantMessage : .alertAccessibilityMessage
+            )
             alert.alertStyle = .informational
             alert.addButton(withTitle: runtime.localization.text(.alertOpenAccessibilitySettings))
             alert.addButton(withTitle: runtime.localization.text(.commonNotNow))
 
-            if alert.runModal() == .alertFirstButtonReturn,
-               let accessibilityURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                NSWorkspace.shared.open(accessibilityURL)
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                didDeclineAccessibilityAlert = true
+                return
+            }
+            NSWorkspace.shared.open(AccessibilityPermission.settingsURL)
+            // The stale entry from an earlier build already holds the list
+            // slot; the user replaces it with − and +.
+            if wasGrantedToEarlierBuild == false {
+                AccessibilityPermission.addToSystemList()
             }
         }
     }

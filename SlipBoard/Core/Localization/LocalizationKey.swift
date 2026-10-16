@@ -241,6 +241,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case statusPinnedItem
     case statusCommandUnavailable
     case statusPasteTargetUnavailable
+    case statusPasteNeedsAccessibility
     case statusNoEligibleApp
     case statusAddedExcludedApp
     case statusPausedFifteenMinutes
@@ -404,6 +405,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case alertClearClipboardHistoryMessage
     case alertAccessibilityTitle
     case alertAccessibilityMessage
+    case alertAccessibilityRegrantTitle
+    case alertAccessibilityRegrantMessage
     case alertOpenAccessibilitySettings
     case alertDeleteSnippet
     case alertDeleteSnippetMessage
@@ -747,6 +750,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .statusPinnedItem: "Pinned item."
         case .statusCommandUnavailable: "This command is not wired in the current runtime slice."
         case .statusPasteTargetUnavailable: "Could not return to the previous app. Focus its input, then open SlipBoard again."
+        case .statusPasteNeedsAccessibility: "Paste needs Accessibility access: System Settings → Privacy & Security → Accessibility."
         case .statusNoEligibleApp: "No eligible app was available to add."
         case .statusAddedExcludedApp: "Added %{app} to excluded apps."
         case .statusPausedFifteenMinutes: "Capture paused for 15 minutes."
@@ -909,7 +913,9 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .alertClearClipboardHistoryTitle: "Clear Clipboard History?"
         case .alertClearClipboardHistoryMessage: "This removes every clip from SlipBoard, including pinned items. This can't be undone."
         case .alertAccessibilityTitle: "Allow SlipBoard to paste for you"
-        case .alertAccessibilityMessage: "SlipBoard needs Accessibility permission to return focus and paste the selected clip into the app you were using."
+        case .alertAccessibilityMessage: "To paste a clip, SlipBoard sends ⌘V to the app you are working in. macOS calls this Accessibility access. SlipBoard uses it only for that keystroke and does not read your screen or other apps' data.\n\nNext, System Settings opens at Privacy & Security → Accessibility, and macOS shows its own standard prompt, worded the same for every app. Switch SlipBoard on in the list.\n\nIf SlipBoard is already on, that entry belongs to an earlier version: remove it with −, then add SlipBoard again with +."
+        case .alertAccessibilityRegrantTitle: "Switch SlipBoard on again in Accessibility"
+        case .alertAccessibilityRegrantMessage: "Paste worked before, but macOS treats each SlipBoard update as a new app. The SlipBoard entry in the list can stay switched on without applying to this version.\n\nIn Privacy & Security → Accessibility, select SlipBoard, remove it with −, then add SlipBoard again with + and switch it on.\n\nSlipBoard uses this permission only to send ⌘V to the app you are working in. It does not read your screen or other apps' data."
         case .alertOpenAccessibilitySettings: "Open Accessibility Settings"
         case .alertDeleteSnippet: "Delete Snippet"
         case .alertDeleteSnippetMessage: "Snippet deleted. Any assigned shortcut is removed with it."
@@ -1294,6 +1300,7 @@ struct LocalizationCatalog: Sendable {
         .statusPinnedItem: "Đã ghim mục.",
         .statusCommandUnavailable: "Lệnh này chưa được nối trong runtime hiện tại.",
         .statusPasteTargetUnavailable: "Không thể quay lại ứng dụng trước. Hãy đặt con trỏ vào ô nhập rồi mở lại SlipBoard.",
+        .statusPasteNeedsAccessibility: "Cần quyền Trợ năng để dán: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng.",
         .statusNoEligibleApp: "Không có ứng dụng phù hợp để thêm.",
         .statusAddedExcludedApp: "Đã thêm %{app} vào ứng dụng loại trừ.",
         .statusPausedFifteenMinutes: "Đã tạm dừng ghi trong 15 phút.",
@@ -1456,7 +1463,9 @@ struct LocalizationCatalog: Sendable {
         .alertClearClipboardHistoryTitle: "Xóa lịch sử clipboard?",
         .alertClearClipboardHistoryMessage: "Thao tác này xóa vĩnh viễn mọi clip khỏi SlipBoard, gồm cả mục đã ghim. Không thể hoàn tác.",
         .alertAccessibilityTitle: "Cho phép SlipBoard dán thay bạn",
-        .alertAccessibilityMessage: "SlipBoard cần quyền Trợ năng để trả tiêu điểm và dán clip đã chọn vào ứng dụng bạn đang dùng.",
+        .alertAccessibilityMessage: "Để dán clip, SlipBoard gửi phím ⌘V tới ứng dụng bạn đang dùng. macOS gọi đây là quyền Trợ năng. SlipBoard chỉ dùng quyền này để gửi phím đó, không đọc màn hình hay dữ liệu của ứng dụng khác.\n\nTiếp theo, Cài đặt hệ thống mở mục Quyền riêng tư & Bảo mật → Trợ năng, và macOS hiện hộp thoại chuẩn của nó, giống nhau cho mọi ứng dụng. Hãy bật SlipBoard trong danh sách.\n\nNếu SlipBoard đã bật sẵn, đó là mục của phiên bản cũ: xóa nó bằng nút −, rồi thêm lại SlipBoard bằng nút +.",
+        .alertAccessibilityRegrantTitle: "Bật lại SlipBoard trong Trợ năng",
+        .alertAccessibilityRegrantMessage: "Trước đây SlipBoard đã dán được, nhưng macOS coi mỗi bản cập nhật SlipBoard là một ứng dụng mới. Mục SlipBoard trong danh sách có thể vẫn đang bật nhưng không áp dụng cho phiên bản này.\n\nTrong Quyền riêng tư & Bảo mật → Trợ năng, chọn SlipBoard, xóa bằng nút −, rồi thêm lại SlipBoard bằng nút + và bật lên.\n\nSlipBoard chỉ dùng quyền này để gửi phím ⌘V tới ứng dụng bạn đang dùng, không đọc màn hình hay dữ liệu của ứng dụng khác.",
         .alertOpenAccessibilitySettings: "Mở cài đặt Trợ năng",
         .alertDeleteSnippet: "Xóa snippet",
         .alertDeleteSnippetMessage: "Đã xóa snippet. Mọi phím tắt được gán cũng bị xóa theo.",
