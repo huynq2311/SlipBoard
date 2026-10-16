@@ -7,7 +7,8 @@
 #   ./build_release.sh --team       team-signed build (Apple Development + provisioning profile)
 #   ./build_release.sh --no-sign    unsigned build (what CI builds)
 #
-# Output: Release/SlipBoard.app, Release/SlipBoard.dmg, Release/SlipBoard.dmg.sha256
+# Output: Release/SlipBoard.app, Release/SlipBoard.dmg, Release/SlipBoard.dmg.sha256,
+#         and Release/appcast.xml for signed releases
 #
 # Optional settings, read from a .env file next to this script (see .env.example):
 #   DEVELOPMENT_TEAM   Apple team ID used for signing. Defaults to the project's team.
@@ -26,15 +27,17 @@ APP_NAME="SlipBoard"
 BUILD_DIR="build"
 OUT_DIR="Release"
 
-# adhoc: signed with "-", no provisioning profile and no entitlements. macOS kills
-# an ad-hoc app that claims keychain-access-groups, so App Lock keeps its key in
-# a 0600 file instead. team: needs a valid profile; a free team's profile lasts 7 days.
+# adhoc: signed with "-", no provisioning profile. macOS kills an ad-hoc app that
+# claims keychain-access-groups, so App Lock keeps its key in a 0600 file instead.
+# Its only entitlement turns off library validation: without a Team ID, macOS
+# refuses to load Sparkle.framework into the app even when both share a certificate.
+# team: needs a valid profile; a free team's profile lasts 7 days.
 SIGN_MODE=adhoc
 for arg in "$@"; do
   case "$arg" in
     --team) SIGN_MODE=team ;;
     --no-sign) SIGN_MODE=none ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -69,7 +72,8 @@ case "$SIGN_MODE" in
     ;;
   adhoc)
     XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-      PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS= CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
+      PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS=SlipBoard-NoTeam.entitlements \
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
   none)
     XCODEBUILD_ARGS+=(CODE_SIGNING_ALLOWED=NO)
@@ -84,7 +88,15 @@ cp -R "$APP_PATH" "$OUT_DIR/"
 
 if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   say "Signing with $SIGN_IDENTITY"
-  codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$OUT_DIR/$APP_NAME.app"
+  sign() { codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$@"; }
+  # Inside out, as Sparkle's docs list it.
+  SPARKLE="$OUT_DIR/$APP_NAME.app/Contents/Frameworks/Sparkle.framework"
+  sign "$SPARKLE/Versions/B/XPCServices/Installer.xpc"
+  sign --preserve-metadata=entitlements "$SPARKLE/Versions/B/XPCServices/Downloader.xpc"
+  sign "$SPARKLE/Versions/B/Autoupdate"
+  sign "$SPARKLE/Versions/B/Updater.app"
+  sign "$SPARKLE"
+  sign --entitlements SlipBoard-NoTeam.entitlements "$OUT_DIR/$APP_NAME.app"
 fi
 
 if [ "$SIGN_MODE" != none ]; then
@@ -183,9 +195,25 @@ fi
 
 ( cd "$OUT_DIR" && shasum -a 256 "$APP_NAME.dmg" > "$APP_NAME.dmg.sha256" )
 
+TAG="v$VERSION-$BUILD_DATE"
+if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
+  # The app reads releases/latest/download/appcast.xml, so upload this file with the
+  # DMG. generate_appcast signs the DMG with the EdDSA key in the login keychain.
+  say "Writing appcast"
+  mkdir "$WORK/appcast"
+  cp "$OUT_DIR/$APP_NAME.dmg" "$WORK/appcast/"
+  "$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast" \
+    --download-url-prefix "https://github.com/huynq2311/SlipBoard/releases/download/$TAG/" \
+    -o "$OUT_DIR/appcast.xml" "$WORK/appcast"
+  # Without the private key the appcast is written unsigned, and every client rejects it.
+  grep -q 'sparkle:edSignature=' "$OUT_DIR/appcast.xml" \
+    || { echo "appcast.xml has no EdDSA signature; is the Sparkle key in the login keychain?" >&2; exit 1; }
+fi
+
 say "Done"
 echo "  App:      $OUT_DIR/$APP_NAME.app"
 echo "  DMG:      $OUT_DIR/$APP_NAME.dmg ($(du -h "$OUT_DIR/$APP_NAME.dmg" | cut -f1))"
 echo "  SHA-256:  $(cut -d' ' -f1 "$OUT_DIR/$APP_NAME.dmg.sha256")"
-echo "  Tag:      v$VERSION-$BUILD_DATE"
+[ -f "$OUT_DIR/appcast.xml" ] && echo "  Appcast:  $OUT_DIR/appcast.xml"
+echo "  Tag:      $TAG"
 echo "  Title:    $APP_NAME v$VERSION (Build $BUILD_DATE)"

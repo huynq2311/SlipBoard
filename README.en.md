@@ -12,7 +12,7 @@ Press a hotkey, pick what you copied recently, paste it.
 ![macOS](https://img.shields.io/badge/macOS-15%2B-1d1d1f?logo=apple&logoColor=white)
 ![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
-![Network](https://img.shields.io/badge/network-none-2ea44f)
+![Network](https://img.shields.io/badge/network-update%20checks%20only-2ea44f)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
 [![Tiếng Việt](https://img.shields.io/badge/Language-Ti%E1%BA%BFng_Vi%E1%BB%87t-red)](README.md)
@@ -36,8 +36,8 @@ with the keyboard and SlipBoard pastes it into the app you were just using.
 
 ### Why SlipBoard?
 
-- **Private by design:** no networking code, no analytics, no telemetry, no
-  account.
+- **Private by design:** no analytics, no telemetry, no account. The only
+  network connection is the update check.
 - **Fast and light:** a pure SwiftUI app that lives in the menu bar and opens
   with one hotkey.
 - **Paste it your way:** paste the original, or transform it on the way in
@@ -244,8 +244,8 @@ how long ago you copied it. To see only what came from one app:
 - A dedicated menu bar icon. Click it to see capture status, pause capture,
   change retention quickly, or open the popup or Settings.
 - Optional **launch at login** and customizable global hotkeys.
-- **Settings → About** shows the version and opens the Releases page to check
-  for updates. SlipBoard itself never goes online.
+- **Settings → About** shows the version and checks for updates. SlipBoard
+  downloads, verifies and installs a new version itself (Sparkle).
 
 ---
 
@@ -269,8 +269,17 @@ in Settings → Hotkeys). Inside the popup:
 
 ## Privacy and security
 
-- **Fully offline.** SlipBoard contains no networking code, no analytics, no
-  telemetry and no crash-reporting service. There is no account or sign-in.
+- **Offline except for update checks.** SlipBoard connects only to GitHub, to
+  check for updates: when you click **Check for Updates**, or daily if you
+  allow automatic checks when it asks on the second launch (change it in
+  Settings → About). Nothing about your
+  Mac or your clipboard is sent. No analytics, no telemetry, no crash-reporting
+  service, no account or sign-in.
+- **Library validation is off in releases.** Without an Apple Team ID, macOS
+  only loads `Sparkle.framework` into the app if library validation is turned
+  off. The hardened runtime still blocks `DYLD_*` injection, and macOS protects
+  apps in `/Applications` from changes by other apps, so install SlipBoard
+  there.
 - **Local storage only.** History, notes, snippets and settings live in
   `~/Library/Application Support/SlipBoard/` on your Mac.
 - **App Lock locks the window, not the disk.** It hides your history until you
@@ -422,6 +431,19 @@ SHA-1 hash in `SIGN_IDENTITY`.
 `BUILD_DATE` overrides the build number, for example `BUILD_DATE=20261016.2`
 for a second release on the same day.
 
+**In-app updates.** SlipBoard updates itself with
+[Sparkle](https://sparkle-project.org). A build signed with `SIGN_IDENTITY` also
+writes `Release/appcast.xml`, signing the DMG with the Sparkle EdDSA private key
+in your login keychain (`generate_keys` in
+`build/SourcePackages/artifacts/sparkle/Sparkle/bin/` creates one). Upload
+`appcast.xml` to the GitHub release next to the DMG: the app reads
+`releases/latest/download/appcast.xml`. Sparkle installs a release only when its
+build number is higher than the installed one, and only when the DMG matches the
+`SUPublicEDKey` in [`SlipBoard-Info.plist`](SlipBoard-Info.plist), so a fork must
+replace that key and `SUFeedURL` with its own. Self-signed builds carry the
+`com.apple.security.cs.disable-library-validation` entitlement: without a Team
+ID, macOS refuses to load `Sparkle.framework` otherwise.
+
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
 description.
@@ -489,7 +511,17 @@ Released under the [MIT License](LICENSE).
 
 ## Third-party notices
 
-SlipBoard bundles no third-party code, fonts or artwork. It relies on these:
+SlipBoard bundles one third-party library:
+
+- **[Sparkle](https://sparkle-project.org)** 2, the in-app update framework
+  (MIT License; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems GmbH,
+  © 2011-2014 Kornel Lesiński, © 2015-2017 Mayur Pawashe, © 2014 C.W. Betts,
+  © 2014 Petroules Corporation, © 2014 Big Nerd Ranch). Sparkle includes code
+  from bsdiff, sais-lite, ed25519 and SUSignatureVerifier under their own
+  licenses. Full text:
+  [Sparkle's LICENSE](https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE).
+
+It bundles no other third-party code, fonts or artwork, and relies on these:
 
 - **SF Symbols** (© Apple Inc.). The interface draws icons from the SF Symbols
   set that macOS provides, as allowed by Apple's SF Symbols license for apps on

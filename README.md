@@ -12,7 +12,7 @@ Nhấn phím tắt, chọn thứ bạn vừa sao chép, dán.
 ![macOS](https://img.shields.io/badge/macOS-15%2B-1d1d1f?logo=apple&logoColor=white)
 ![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
-![Offline](https://img.shields.io/badge/m%E1%BA%A1ng-kh%C3%B4ng%20d%C3%B9ng-2ea44f)
+![Offline](https://img.shields.io/badge/m%E1%BA%A1ng-ch%E1%BB%89%20ki%E1%BB%83m%20tra%20c%E1%BA%ADp%20nh%E1%BA%ADt-2ea44f)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 
 [![Tiếng Việt](https://img.shields.io/badge/Language-Ti%E1%BA%BFng_Vi%E1%BB%87t-red)](README.md)
@@ -37,8 +37,8 @@ vừa dùng.
 
 ### Vì sao chọn SlipBoard?
 
-- **Riêng tư tuyệt đối:** không có code kết nối mạng, không analytics, không
-  telemetry, không cần tài khoản.
+- **Riêng tư:** không analytics, không telemetry, không cần tài khoản. Kết nối
+  mạng duy nhất là kiểm tra cập nhật.
 - **Nhanh và gọn:** ứng dụng SwiftUI thuần, sống trên thanh menu, mở bằng một
   phím tắt.
 - **Dán đúng cách bạn muốn:** dán nguyên bản, hoặc chuyển đổi ngay lúc dán
@@ -234,8 +234,8 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 - Biểu tượng riêng trên thanh menu. Bấm vào để xem trạng thái ghi, tạm dừng
   ghi, đổi nhanh thời gian lưu giữ, mở popup hoặc Cài đặt.
 - Tùy chọn **mở khi đăng nhập**, phím tắt toàn cục tùy chỉnh.
-- **Cài đặt → Giới thiệu** hiện phiên bản và mở trang Releases để kiểm tra cập
-  nhật. Bản thân SlipBoard không bao giờ kết nối mạng.
+- **Cài đặt → Giới thiệu** hiện phiên bản và kiểm tra cập nhật. SlipBoard tự
+  tải, xác minh và cài bản mới (Sparkle).
 
 ---
 
@@ -259,8 +259,15 @@ Cài đặt → Phím tắt). Trong popup:
 
 ## Quyền riêng tư và bảo mật
 
-- **Hoàn toàn offline.** SlipBoard không chứa code kết nối mạng, không analytics,
-  không telemetry, không dịch vụ báo lỗi, không cần tài khoản.
+- **Offline, trừ kiểm tra cập nhật.** SlipBoard chỉ kết nối GitHub để kiểm tra
+  cập nhật: khi bạn bấm **Kiểm tra cập nhật**, hoặc mỗi ngày nếu bạn cho phép tự
+  kiểm tra khi app hỏi ở lần mở thứ hai (đổi lại trong Cài đặt → Giới thiệu). Không gửi thông tin gì về máy hay
+  clipboard của bạn. Không analytics, không telemetry, không dịch vụ báo lỗi,
+  không cần tài khoản.
+- **Bản phát hành tắt library validation.** Không có Apple Team ID thì macOS chỉ
+  nạp `Sparkle.framework` vào app khi tắt library validation. Hardened runtime
+  vẫn chặn chèn thư viện qua `DYLD_*`, và macOS bảo vệ app trong `/Applications`
+  khỏi bị app khác sửa, nên hãy cài SlipBoard vào đó.
 - **Chỉ lưu trên máy.** Lịch sử, ghi chú, snippet và cài đặt nằm trong
   `~/Library/Application Support/SlipBoard/`.
 - **App Lock khóa cửa sổ, không mã hóa ổ đĩa.** Nó ẩn lịch sử cho tới khi bạn
@@ -408,6 +415,18 @@ của nó vào `SIGN_IDENTITY`.
 `BUILD_DATE` ghi đè số build, ví dụ `BUILD_DATE=20261016.2` cho bản phát hành
 thứ hai trong cùng ngày.
 
+**Cập nhật trong app.** SlipBoard tự cập nhật bằng
+[Sparkle](https://sparkle-project.org). Bản build ký bằng `SIGN_IDENTITY` tạo
+thêm `Release/appcast.xml`, ký DMG bằng private key EdDSA của Sparkle trong login
+keychain (tạo bằng `generate_keys` trong
+`build/SourcePackages/artifacts/sparkle/Sparkle/bin/`). Upload `appcast.xml` lên
+GitHub release cùng DMG: app đọc `releases/latest/download/appcast.xml`. Sparkle
+chỉ cài bản có số build lớn hơn bản đang cài, và chỉ khi DMG khớp
+`SUPublicEDKey` trong [`SlipBoard-Info.plist`](SlipBoard-Info.plist), nên bản
+fork phải thay key đó và `SUFeedURL` bằng của mình. Bản ký self-signed mang
+entitlement `com.apple.security.cs.disable-library-validation`: không có Team
+ID thì macOS không cho nạp `Sparkle.framework`.
+
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
 
@@ -473,8 +492,18 @@ Phát hành theo giấy phép [MIT](LICENSE).
 
 ## Thông báo bên thứ ba
 
-SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ ba. Ứng dụng
-dựa vào các thành phần sau:
+SlipBoard đóng gói một thư viện của bên thứ ba:
+
+- **[Sparkle](https://sparkle-project.org)** 2, framework cập nhật trong ứng
+  dụng (giấy phép MIT; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems
+  GmbH, © 2011-2014 Kornel Lesiński, © 2015-2017 Mayur Pawashe, © 2014 C.W.
+  Betts, © 2014 Petroules Corporation, © 2014 Big Nerd Ranch). Sparkle có chứa
+  code từ bsdiff, sais-lite, ed25519 và SUSignatureVerifier theo giấy phép
+  riêng của từng thành phần. Toàn văn:
+  [LICENSE của Sparkle](https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE).
+
+Ngoài Sparkle, SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ
+ba. Ứng dụng dựa vào các thành phần sau:
 
 - **SF Symbols** (© Apple Inc.). Giao diện dùng biểu tượng từ bộ SF Symbols có
   sẵn trong macOS, theo giấy phép SF Symbols của Apple cho ứng dụng chạy trên
