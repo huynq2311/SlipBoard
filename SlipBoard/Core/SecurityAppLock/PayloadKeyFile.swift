@@ -20,7 +20,56 @@ struct PayloadKeyFile {
         case inaccessible
         /// The file is not a key file this build can parse. It may be moved
         /// aside, never deleted, before a new key is written.
-        case corrupt
+        case corrupt(FileIdentity)
+    }
+
+    /// Tells the file that was read apart from one another instance put at
+    /// the same path afterwards.
+    struct FileIdentity: Equatable {
+        let device: dev_t
+        let inode: ino_t
+
+        init(_ info: stat) {
+            device = info.st_dev
+            inode = info.st_ino
+        }
+    }
+
+    enum MoveAsideResult {
+        case moved
+        /// The file at the path is no longer the one that was read; it was
+        /// left in place.
+        case changed
+        case failed
+    }
+
+    /// Runs `body` while holding an exclusive lock that every SlipBoard
+    /// instance takes before writing, replacing or moving the key file, so
+    /// reading, moving aside and creating the file happen as one step. Nil if
+    /// the lock could not be taken. Not reentrant: `body` must not take it again.
+    /// Gives up after `timeout` so a stopped or hung instance holding the lock
+    /// cannot freeze this one's main thread; that fails closed like any error.
+    func withExclusiveLock<T>(timeout: TimeInterval = 2, _ body: () -> T) -> T? {
+        guard let directoryURL = makeDirectory() else {
+            return nil
+        }
+        let lockPath = directoryURL.appendingPathComponent(".\(url.lastPathComponent).lock").path
+        let descriptor = open(lockPath, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else {
+            return nil
+        }
+        defer { close(descriptor) }
+        let deadline = Date().addingTimeInterval(timeout)
+        while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EINTR || errno == EWOULDBLOCK, Date() < deadline else {
+                return nil
+            }
+            if errno == EWOULDBLOCK {
+                usleep(20_000)
+            }
+        }
+        defer { flock(descriptor, LOCK_UN) }
+        return body()
     }
 
     private struct FormatHeader: Codable {
@@ -68,7 +117,7 @@ struct PayloadKeyFile {
             return .inaccessible
         }
         guard info.st_size <= Self.maximumFileSize else {
-            return .corrupt
+            return .corrupt(FileIdentity(info))
         }
         if info.st_mode & 0o077 != 0, fchmod(descriptor, 0o600) != 0 {
             return .inaccessible
@@ -80,7 +129,7 @@ struct PayloadKeyFile {
         }
         let decoder = JSONDecoder()
         guard let header = try? decoder.decode(FormatHeader.self, from: data) else {
-            return .corrupt
+            return .corrupt(FileIdentity(info))
         }
         guard header.formatVersion <= Self.formatVersion else {
             return .inaccessible
@@ -90,24 +139,110 @@ struct PayloadKeyFile {
             let contents = try? decoder.decode(Contents.self, from: data),
             contents.keyData.count == keySize
         else {
-            return .corrupt
+            return .corrupt(FileIdentity(info))
         }
 
         return .found(contents.key.materialize(), keyData: contents.keyData)
     }
 
+    enum CreateResult {
+        case created
+        /// Another SlipBoard instance wrote a key file first; it was left as is.
+        case alreadyExists
+        case failed
+    }
+
     /// Writes a temporary file created with mode 0600 and renames it over the
-    /// key file, so a crash leaves either the old key or the new one.
+    /// key file, so a crash leaves either the old key or the new one. Only for
+    /// rewriting the key already in use.
     func write(_ wrappedKey: WrappedPayloadKey, keyData: Data) -> Bool {
+        publish(wrappedKey, keyData: keyData, replacingExisting: true) == .created
+    }
+
+    /// Writes a new key only if there is no key file yet. Two instances
+    /// creating a key at the same time would otherwise each encrypt notes with
+    /// their own key while only the last one written survives.
+    func create(_ wrappedKey: WrappedPayloadKey, keyData: Data) -> CreateResult {
+        publish(wrappedKey, keyData: keyData, replacingExisting: false)
+    }
+
+    private func publish(_ wrappedKey: WrappedPayloadKey, keyData: Data, replacingExisting: Bool) -> CreateResult {
         let contents = Contents(
             formatVersion: Self.formatVersion,
             key: WrappedPayloadKeyRecord(wrappedKey: wrappedKey),
             keyData: keyData
         )
         guard let data = try? JSONEncoder().encode(contents) else {
-            return false
+            return .failed
         }
 
+        guard let directoryURL = makeDirectory() else {
+            return .failed
+        }
+
+        let temporaryPath = directoryURL
+            .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+            .path
+        let descriptor = open(temporaryPath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else {
+            return .failed
+        }
+
+        let isWritten = fchmod(descriptor, 0o600) == 0
+            && Self.writeAll(data, to: descriptor)
+            && Self.syncToDisk(descriptor)
+        close(descriptor)
+
+        guard isWritten else {
+            unlink(temporaryPath)
+            return .failed
+        }
+        let isPublished = replacingExisting
+            ? rename(temporaryPath, url.path) == 0
+            : renamex_np(temporaryPath, url.path, UInt32(RENAME_EXCL)) == 0
+        guard isPublished else {
+            let isTaken = replacingExisting == false && errno == EEXIST
+            unlink(temporaryPath)
+            return isTaken ? .alreadyExists : .failed
+        }
+
+        // Makes the rename itself survive a crash or power loss.
+        let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard directoryDescriptor >= 0 else {
+            return .failed
+        }
+        defer { close(directoryDescriptor) }
+        return Self.syncToDisk(directoryDescriptor) ? .created : .failed
+    }
+
+    /// Keeps a file that could not be parsed as `PayloadKey.unreadable-<time>.json`
+    /// next to it, so writing a new key never destroys the old one.
+    ///
+    /// Only the file that was read is moved: another instance may have moved
+    /// it aside and written its new key there in the meantime. Call it under
+    /// `withExclusiveLock`, together with the read that returned `expected`.
+    func moveAside(_ expected: FileIdentity) -> MoveAsideResult {
+        guard Self.identity(at: url.path) == expected else {
+            return .changed
+        }
+
+        let directoryURL = url.deletingLastPathComponent()
+        let stamp = Int64(Date().timeIntervalSince1970 * 1000)
+        let destination = directoryURL
+            .appendingPathComponent("\(url.deletingPathExtension().lastPathComponent).unreadable-\(stamp).json")
+        guard renamex_np(url.path, destination.path, UInt32(RENAME_EXCL)) == 0 else {
+            return errno == ENOENT ? .changed : .failed
+        }
+
+        let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard directoryDescriptor >= 0 else {
+            return .failed
+        }
+        defer { close(directoryDescriptor) }
+        return Self.syncToDisk(directoryDescriptor) ? .moved : .failed
+    }
+
+    private func makeDirectory() -> URL? {
         let directoryURL = url.deletingLastPathComponent()
         do {
             try FileManager.default.createDirectory(
@@ -116,56 +251,17 @@ struct PayloadKeyFile {
                 attributes: [.posixPermissions: 0o700]
             )
         } catch {
-            return false
+            return nil
         }
-        guard chmod(directoryURL.path, 0o700) == 0 else {
-            return false
-        }
-
-        let temporaryPath = directoryURL
-            .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
-            .path
-        let descriptor = open(temporaryPath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
-        guard descriptor >= 0 else {
-            return false
-        }
-
-        let isWritten = fchmod(descriptor, 0o600) == 0
-            && Self.writeAll(data, to: descriptor)
-            && Self.syncToDisk(descriptor)
-        close(descriptor)
-
-        guard isWritten, rename(temporaryPath, url.path) == 0 else {
-            unlink(temporaryPath)
-            return false
-        }
-
-        // Makes the rename itself survive a crash or power loss.
-        let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        guard directoryDescriptor >= 0 else {
-            return false
-        }
-        defer { close(directoryDescriptor) }
-        return Self.syncToDisk(directoryDescriptor)
+        return chmod(directoryURL.path, 0o700) == 0 ? directoryURL : nil
     }
 
-    /// Keeps a file that could not be parsed as `PayloadKey.unreadable-<time>.json`
-    /// next to it, so writing a new key never destroys the old one.
-    func moveAside() -> Bool {
-        let directoryURL = url.deletingLastPathComponent()
-        let stamp = Int64(Date().timeIntervalSince1970 * 1000)
-        let destination = directoryURL
-            .appendingPathComponent("\(url.deletingPathExtension().lastPathComponent).unreadable-\(stamp).json")
-        guard renamex_np(url.path, destination.path, UInt32(RENAME_EXCL)) == 0 else {
-            return false
+    private static func identity(at path: String) -> FileIdentity? {
+        var info = stat()
+        guard lstat(path, &info) == 0 else {
+            return nil
         }
-
-        let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        guard directoryDescriptor >= 0 else {
-            return false
-        }
-        defer { close(directoryDescriptor) }
-        return Self.syncToDisk(directoryDescriptor)
+        return FileIdentity(info)
     }
 
     /// On macOS fsync only reaches the drive's cache; F_FULLFSYNC flushes it.

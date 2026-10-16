@@ -295,7 +295,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     /// the file cannot be parsed; that file is moved aside first. A key that
     /// could not be read (a file with other access rights or owner, a newer
     /// format, a login keychain key that was denied or could not be checked) is
-    /// never replaced: enabling fails and can be retried.
+    /// never replaced: enabling fails and can be retried. A new key is written
+    /// only where no key file exists; if another instance writes one first, its
+    /// key is used instead. The same holds when it replaced an unparsable file
+    /// this instance was about to move aside: instances take a lock on the key
+    /// file from reading it to writing the new key.
     private func provisionInKeyFile(at date: Date) -> PayloadKeyMaterialState {
         loadStoredKeyIfNeeded(allowsUserInteraction: true)
         if let existingKey = activeWrappedKey {
@@ -304,13 +308,37 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
                 return state
             }
         }
+        guard let state = keyFile.withExclusiveLock({ createKeyInKeyFile(at: date) }) else {
+            Self.logger.error("App Lock key file could not be locked")
+            activeKeyData = nil
+            return keyMaterialState
+        }
+        return state
+    }
+
+    private func createKeyInKeyFile(at date: Date) -> PayloadKeyMaterialState {
         if isKeyRecordMissing == false {
-            guard case .corrupt = keyFile.read(), keyFile.moveAside() else {
+            let identity: PayloadKeyFile.FileIdentity
+            switch keyFile.read() {
+            case .found:
+                return adoptKeyFromAnotherInstance(at: date)
+            case let .corrupt(readIdentity):
+                identity = readIdentity
+            case .missing, .inaccessible:
                 Self.logger.error("App Lock key not replaced: the existing key could not be read")
                 activeKeyData = nil
                 return keyMaterialState
             }
-            Self.logger.info("App Lock moved an unparsable key file aside")
+            switch keyFile.moveAside(identity) {
+            case .moved:
+                Self.logger.info("App Lock moved an unparsable key file aside")
+            case .changed:
+                return adoptKeyFromAnotherInstance(at: date)
+            case .failed:
+                Self.logger.error("App Lock key not replaced: the unparsable key file could not be moved aside")
+                activeKeyData = nil
+                return keyMaterialState
+            }
         }
 
         guard let payloadKeyData = Self.randomPayloadKeyData() else {
@@ -319,26 +347,84 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             return keyMaterialState
         }
         hasLoadedKeyRecord = true
-        return storeInKeyFile(payloadKeyData, createdAt: date, at: date)
+        let wrappedKey = fileWrappedKey(createdAt: date, at: date)
+        switch keyFile.create(wrappedKey, keyData: payloadKeyData) {
+        case .created:
+            return useStoredKey(wrappedKey, keyData: payloadKeyData, at: date)
+        case .alreadyExists:
+            return adoptKeyFromAnotherInstance(at: date)
+        case .failed:
+            Self.logger.error("App Lock key file could not be saved")
+            keyMaterialState = .absent
+            activeKeyData = nil
+            return keyMaterialState
+        }
     }
 
-    /// The file holds the key and its record together, so one atomic write
-    /// replaces both and there is no record without a key.
-    private func storeInKeyFile(_ keyData: Data, createdAt: Date, at date: Date) -> PayloadKeyMaterialState {
-        let wrappedKey = WrappedPayloadKey(
+    /// Another instance wrote its key first and may already use it.
+    private func adoptKeyFromAnotherInstance(at date: Date) -> PayloadKeyMaterialState {
+        guard case let .found(storedKey, keyData) = keyFile.read() else {
+            Self.logger.error("App Lock key not replaced: another instance wrote a key that could not be read")
+            hasLoadedKeyRecord = false
+            isKeyRecordMissing = false
+            keyMaterialState = .absent
+            activeKeyData = nil
+            return keyMaterialState
+        }
+        Self.logger.info("App Lock adopted the key another instance wrote")
+        return useStoredKey(storedKey, keyData: keyData, at: date)
+    }
+
+    private func fileWrappedKey(createdAt: Date, at date: Date) -> WrappedPayloadKey {
+        WrappedPayloadKey(
             keyVersion: Self.sessionOnlyKeyVersion,
             wrappingPolicy: .localFile,
             wrappedKeyData: Data(Constants.fileWrappedKeyMarker.utf8),
             createdAt: createdAt,
             lastWrappedAt: date
         )
-        guard keyFile.write(wrappedKey, keyData: keyData) else {
+    }
+
+    /// The file holds the key and its record together, so one atomic write
+    /// replaces both and there is no record without a key. Only for the key
+    /// already in use (migration, rewrap); a new key goes through
+    /// `PayloadKeyFile.create`.
+    private func storeInKeyFile(_ keyData: Data, createdAt: Date, at date: Date) -> PayloadKeyMaterialState {
+        let wrappedKey = fileWrappedKey(createdAt: createdAt, at: date)
+        // Decided under the lock: the file is created only if there is none,
+        // and rewritten only if it already holds this key. A different key
+        // (another instance may have just created one) or a file that cannot
+        // be read is never replaced.
+        let isStored = keyFile.withExclusiveLock { () -> Bool in
+            switch keyFile.read() {
+            case .missing:
+                switch keyFile.create(wrappedKey, keyData: keyData) {
+                case .created:
+                    return true
+                case .alreadyExists:
+                    if case let .found(_, existingKeyData) = keyFile.read() {
+                        return existingKeyData == keyData
+                    }
+                    return false
+                case .failed:
+                    return false
+                }
+            case let .found(_, existingKeyData) where existingKeyData == keyData:
+                return keyFile.write(wrappedKey, keyData: keyData)
+            default:
+                return false
+            }
+        }
+        guard isStored == true else {
             Self.logger.error("App Lock key file could not be saved")
             keyMaterialState = .absent
             activeKeyData = nil
             return keyMaterialState
         }
+        return useStoredKey(wrappedKey, keyData: keyData, at: date)
+    }
 
+    private func useStoredKey(_ wrappedKey: WrappedPayloadKey, keyData: Data, at date: Date) -> PayloadKeyMaterialState {
         isKeyRecordMissing = false
         activeKeyData = keyData
         keyMaterialState = .unwrappedInMemory(wrappedKey, unwrappedAt: date)
