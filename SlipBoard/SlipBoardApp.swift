@@ -2521,6 +2521,16 @@ struct SlipBoardApp: App {
             if runtime.isPopupPresented != isVisible {
                 runtime.setPopupPresented(isVisible)
             }
+            // The popup never activates the app, so a deferred update shows
+            // after it closes. Sparkle activates SlipBoard at once, so wait out
+            // a paste: restoring the target app and sending Cmd+V take up to ~1.7 s.
+            if isVisible == false {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if runtime.isPopupPresented == false {
+                        AppUpdater.shared.showDeferredUpdate()
+                    }
+                }
+            }
         }
         runtime.onAccessibilityPermissionRequired = {
             presentAccessibilityPermissionAlertIfNeeded()

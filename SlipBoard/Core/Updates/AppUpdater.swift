@@ -38,8 +38,9 @@ final class AppUpdater: NSObject, ObservableObject, SPUStandardUserDriverDelegat
     }
 
     // A menu bar app is rarely active, so a scheduled update alert would open
-    // behind other windows. Show it when the user next opens SlipBoard instead
-    // of taking focus from what they are doing.
+    // behind other windows. Show it after the user next closes the popup, or
+    // when SlipBoard becomes active, instead of taking focus from what they
+    // are doing.
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
     func standardUserDriverShouldHandleShowingScheduledUpdate(
@@ -64,7 +65,7 @@ final class AppUpdater: NSObject, ObservableObject, SPUStandardUserDriverDelegat
         }
     }
 
-    private func showDeferredUpdate() {
+    func showDeferredUpdate() {
         guard hasDeferredUpdate else { return }
         hasDeferredUpdate = false
         checkForUpdates()
