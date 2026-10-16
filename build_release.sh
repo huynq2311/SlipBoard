@@ -2,7 +2,8 @@
 #
 # Build SlipBoard in Release configuration and package it as a DMG.
 #
-#   ./build_release.sh              ad-hoc signed build (runs on any Mac, never expires)
+#   ./build_release.sh              signed with SIGN_IDENTITY if set (releases), else ad-hoc;
+#                                   runs on any Mac, never expires
 #   ./build_release.sh --team       team-signed build (Apple Development + provisioning profile)
 #   ./build_release.sh --no-sign    unsigned build (what CI builds)
 #
@@ -49,7 +50,8 @@ say() { printf '\n==> %s\n' "$*"; }
 
 VERSION="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null \
   | awk -F' = ' '/^ *MARKETING_VERSION/ {print $2; exit}')"
-BUILD_DATE="$(date +%Y%m%d)"
+# Override for a second release on the same day, e.g. BUILD_DATE=20261016.2.
+BUILD_DATE="${BUILD_DATE:-$(date +%Y%m%d)}"
 
 say "Building $APP_NAME $VERSION (build $BUILD_DATE)"
 rm -rf "$BUILD_DIR" "$OUT_DIR"

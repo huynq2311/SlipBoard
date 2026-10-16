@@ -279,7 +279,8 @@ in Settings → Hotkeys). Inside the popup:
   to protect them at rest.
 - **Notes are encrypted, but on release builds the key sits next to them.**
   With App Lock on, notes and a copy of clip content are encrypted. Release
-  (ad-hoc) builds keep that key in `PayloadKey.json` in the same folder,
+  builds (signed with SlipBoard's own certificate, or ad-hoc) keep that key
+  in `PayloadKey.json` in the same folder,
   readable only by your user account, so anyone who can read your files can
   read the key too: this only keeps notes out of casual view. Team-signed
   builds keep the key in the keychain instead.
@@ -306,7 +307,8 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 Download `SlipBoard.dmg` from [Releases](../../releases), open it and drag
 **SlipBoard** into **Applications**.
 
-Releases are ad-hoc signed and not notarized, so macOS blocks the first launch:
+Releases are signed with SlipBoard's own self-signed certificate and are not
+notarized, so macOS blocks the first launch:
 
 1. Open SlipBoard. macOS says it cannot verify the app; click **Done**.
 2. Open **System Settings → Privacy & Security**, scroll to **Security** and
@@ -315,13 +317,17 @@ Releases are ad-hoc signed and not notarized, so macOS blocks the first launch:
 Then grant **Accessibility** access when asked so SlipBoard can paste into
 other apps.
 
+Updates keep the Accessibility permission: every release since
+v1.0-20261016.2 is signed with the same certificate, so macOS sees an update as
+the same app. App Lock does not ask for keychain access after an update either:
+release builds keep its key in a file (see
+[Privacy and security](#privacy-and-security)).
+
 > [!IMPORTANT]
-> **After each update, grant Accessibility again.** An ad-hoc build has no
-> stable signing identity, so macOS ties the permission to that exact build.
-> In **System Settings → Privacy & Security → Accessibility**, remove SlipBoard
-> with **−**, then reopen SlipBoard and allow it when asked. App Lock does not
-> ask for keychain access after an update: release builds keep its key in a
-> file (see [Privacy and security](#privacy-and-security)).
+> **Updating from v1.0-20261016 or earlier?** Those builds were signed
+> differently, so grant Accessibility one last time: in **System Settings →
+> Privacy & Security → Accessibility**, remove SlipBoard with **−**, then
+> reopen SlipBoard and allow it when asked.
 >
 > **Updating from v1.0-20261016 with App Lock on?** That release kept the App
 > Lock key in the login keychain. The first launch of a newer release asks
@@ -385,7 +391,7 @@ next to the encrypted data.
 `build_release.sh` builds the Release configuration and packages it as a DMG:
 
 ```bash
-./build_release.sh              # ad-hoc signed build (default, what releases use)
+./build_release.sh              # signed with SIGN_IDENTITY if set (releases), else ad-hoc
 ./build_release.sh --team       # team-signed build, needs a provisioning profile
 ./build_release.sh --no-sign    # unsigned build, like CI
 ```
@@ -399,20 +405,22 @@ to let your terminal control Finder. The background comes from
 Notarization only runs when the app is signed with a **Developer ID**
 certificate.
 
-**Keep Accessibility across updates (optional).** Sign every release with the
-same self-signed certificate instead of ad-hoc, so macOS keeps the
-Accessibility permission after an update:
+**Release signing.** Official releases are signed with the maintainer's
+self-signed code signing certificate, set as `SIGN_IDENTITY` in `.env`, so
+macOS keeps the Accessibility permission across updates. Only a Mac that holds
+that certificate and its private key can build a release; CI and forks build
+ad-hoc. A release signed with any other certificate counts as a new app, and
+every user has to grant Accessibility again, so keep a backup of the
+certificate with its private key. Gatekeeper still asks for **Open Anyway** on
+first launch.
 
-1. In **Keychain Access**, choose **Keychain Access → Certificate Assistant →
-   Create a Certificate…**. Name it (for example `SlipBoard Signing`), set
-   **Identity Type** to **Self-Signed Root** and **Certificate Type** to
-   **Code Signing**, then create it.
-2. Put `SIGN_IDENTITY=SlipBoard Signing` in `.env` and run `./build_release.sh`.
+To sign your own builds the same way, create a certificate in **Keychain
+Access → Certificate Assistant → Create a Certificate…** (**Identity Type**:
+Self-Signed Root, **Certificate Type**: Code Signing) and put its name or
+SHA-1 hash in `SIGN_IDENTITY`.
 
-Keep that certificate (export it with its private key as a backup): a release
-signed with a different one counts as a new app again. Gatekeeper still asks
-for **Open Anyway** on first launch. If you sign releases this way, update the
-install notes above.
+`BUILD_DATE` overrides the build number, for example `BUILD_DATE=20261016.2`
+for a second release on the same day.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
@@ -443,7 +451,8 @@ view state the popup renders, while Core Data persistence and the SQLite
 full-text index are kept in sync from it. With App Lock on, a copy of the
 content and notes of each item is additionally written to an encrypted store.
 Its key is wrapped by the Secure Enclave in team-signed builds (when the Mac
-has one) and kept in a file readable only by your user in ad-hoc builds. The Core Data store itself is not encrypted.
+has one) and kept in a file readable only by your user in release and ad-hoc
+builds. The Core Data store itself is not encrypted.
 
 ## Project layout
 
