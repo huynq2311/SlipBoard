@@ -1276,6 +1276,11 @@ private struct ClipNoteFooterEditor: View {
     let onSave: () -> Void
     let onCancel: () -> Void
     @FocusState private var isFocused: Bool
+    // Edited locally so text past the limit is cut in the field itself; a
+    // binding to the stored draft would not push the shortened value back.
+    @State private var text = ""
+
+    private static let counterThreshold = ClipNoteEditorState.characterLimit - 30
 
     // Styled like the popup's search field.
     var body: some View {
@@ -1283,10 +1288,7 @@ private struct ClipNoteFooterEditor: View {
             if state.isEditable {
                 // The system placeholder draws almost invisibly in the
                 // non-key popup panel, so it is drawn here instead.
-                TextField("", text: Binding(
-                    get: { state.draftText },
-                    set: onUpdateDraft
-                ))
+                TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.palette.textPrimary)
@@ -1295,8 +1297,16 @@ private struct ClipNoteFooterEditor: View {
                 .onChange(of: isFocused) { wasFocused, isFocused in
                     if wasFocused, isFocused == false { onCancel() }
                 }
+                .onChange(of: text) { _, newText in
+                    let limited = String(newText.prefix(ClipNoteEditorState.characterLimit))
+                    if limited != newText {
+                        text = limited
+                        return
+                    }
+                    onUpdateDraft(limited)
+                }
                 .overlay(alignment: .leading) {
-                    if state.draftText.isEmpty {
+                    if text.isEmpty {
                         Text(state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote))
                             .font(theme.typography.chip)
                             .foregroundStyle(theme.palette.textTertiary)
@@ -1305,6 +1315,7 @@ private struct ClipNoteFooterEditor: View {
                     }
                 }
                 .onAppear {
+                    text = String(state.draftText.prefix(ClipNoteEditorState.characterLimit))
                     isFocused = true
                     // Focusing selects the whole note; put the caret at the
                     // end so the first key press does not replace it.
@@ -1312,6 +1323,17 @@ private struct ClipNoteFooterEditor: View {
                         guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
                         editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
                     }
+                }
+
+                if text.count >= Self.counterThreshold {
+                    Text("\(text.count)/\(ClipNoteEditorState.characterLimit)")
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
+                        .foregroundStyle(
+                            text.count >= ClipNoteEditorState.characterLimit
+                                ? theme.accent(for: .warning)
+                                : theme.palette.textTertiary
+                        )
+                        .fixedSize()
                 }
             } else {
                 Text(copy.text(.popupNotesLocked))
