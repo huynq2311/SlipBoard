@@ -54,6 +54,19 @@ fi
 
 say() { printf '\n==> %s\n' "$*"; }
 
+# CDHash of every architecture slice of each signed bundle's executable, one per line.
+library_cdhashes() {
+  local bundle executable arch cdhash
+  for bundle in "$@"; do
+    executable="$(codesign -dv "$bundle" 2>&1 | awk -F= '/^Executable=/{print $2}')"
+    for arch in $(lipo -archs "$executable"); do
+      cdhash="$(codesign -dvvv --arch "$arch" "$bundle" 2>&1 | awk -F= '/^CDHash=/{print $2}')"
+      [ -n "$cdhash" ] || { echo "No CDHash for the $arch slice of $bundle." >&2; return 1; }
+      echo "$cdhash"
+    done
+  done
+}
+
 VERSION="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null \
   | awk -F' = ' '/^ *MARKETING_VERSION/ {print $2; exit}')"
 # Override for a second release on the same day, e.g. BUILD_DATE=20261016.2.
@@ -102,7 +115,20 @@ if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   sign "$SPARKLE/Versions/B/Updater.app"
   sign "$SPARKLE"
   sign "$PLUGIN"
-  sign --entitlements SlipBoard-NoTeam.entitlements "$OUT_DIR/$APP_NAME.app"
+  # With library validation off, dyld would load any validly signed code once the
+  # app's check has passed, so a file swapped between the check and Bundle.load()
+  # could still run. This constraint lets the app load only these exact builds of
+  # the plug-in and Sparkle; OS libraries are exempt. Team builds keep library
+  # validation, which already limits loads to their own team, and get none.
+  LIBRARY_CONSTRAINT="$(mktemp -d)/library-constraint.plist"
+  plutil -create xml1 "$LIBRARY_CONSTRAINT"
+  plutil -insert cdhash -dictionary "$LIBRARY_CONSTRAINT"
+  plutil -insert 'cdhash.$in' -array "$LIBRARY_CONSTRAINT"
+  library_cdhashes "$PLUGIN" "$SPARKLE" | while read -r cdhash; do
+    plutil -insert 'cdhash.$in' -data "$(xxd -r -p <<<"$cdhash" | base64)" -append "$LIBRARY_CONSTRAINT"
+  done
+  sign --entitlements SlipBoard-NoTeam.entitlements --library-constraint "$LIBRARY_CONSTRAINT" \
+    "$OUT_DIR/$APP_NAME.app"
 fi
 
 # Sparkle must reach the app only through the plug-in, after its signature check.
@@ -130,6 +156,25 @@ if [ "$SIGN_MODE" != none ]; then
       -R="identifier \"huynq.SlipBoard.Updater\" and certificate leaf = H\"$LEAF\"" "$PLUGIN"
   fi
   rm -rf "$CERT_DIR"
+  if [ -n "${LIBRARY_CONSTRAINT:-}" ]; then
+    # Every slice must carry the constraint, and it must list the plug-in and
+    # Sparkle as they are now: a stale CDHash would keep updates from loading.
+    for arch in $(lipo -archs "$OUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME"); do
+      SIGNATURE="$(codesign -dvvv --arch "$arch" "$OUT_DIR/$APP_NAME.app" 2>&1)"
+      grep -q 'Has Library Load Constraints' <<<"$SIGNATURE" \
+        || { echo "The $arch slice of the app has no library load constraint." >&2; exit 1; }
+    done
+    LISTED="$(count="$(plutil -extract 'cdhash.$in' raw -o - "$LIBRARY_CONSTRAINT")"
+      for ((i = 0; i < count; i++)); do
+        plutil -extract "cdhash.\$in.$i" raw -o - "$LIBRARY_CONSTRAINT" | base64 -d | xxd -p
+      done)"
+    CURRENT="$(library_cdhashes "$PLUGIN" "$PLUGIN/Contents/Frameworks/Sparkle.framework")"
+    if [ "$LISTED" != "$CURRENT" ]; then
+      echo "The library constraint does not list the plug-in and Sparkle as signed." >&2
+      exit 1
+    fi
+    rm -rf "$(dirname "$LIBRARY_CONSTRAINT")"
+  fi
   codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Signature=|Authority=|TeamIdentifier=' || true
   # get-task-allow lets any local process attach to the app and read decrypted history.
   ENTITLEMENTS="$(codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true)"
