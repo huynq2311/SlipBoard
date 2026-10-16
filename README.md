@@ -264,10 +264,17 @@ Cài đặt → Phím tắt). Trong popup:
   kiểm tra khi app hỏi ở lần mở thứ hai (đổi lại trong Cài đặt → Giới thiệu). Không gửi thông tin gì về máy hay
   clipboard của bạn. Không analytics, không telemetry, không dịch vụ báo lỗi,
   không cần tài khoản.
-- **Bản phát hành tắt library validation.** Không có Apple Team ID thì macOS chỉ
-  nạp `Sparkle.framework` vào app khi tắt library validation. Hardened runtime
-  vẫn chặn chèn thư viện qua `DYLD_*`, và macOS bảo vệ app trong `/Applications`
-  khỏi bị app khác sửa, nên hãy cài SlipBoard vào đó.
+- **Bản phát hành tắt library validation; SlipBoard tự kiểm Sparkle.** Không có
+  Apple Team ID thì macOS chỉ nạp `Sparkle.framework` vào app khi tắt library
+  validation. Vì vậy Sparkle nằm trong một plug-in riêng
+  (`Contents/PlugIns/SlipBoardUpdater.bundle`), SlipBoard chỉ nạp khi cần kiểm
+  tra cập nhật, và chỉ sau khi xác nhận, ngay trước lúc nạp, rằng plug-in,
+  Sparkle và mọi thành phần bên trong Sparkle được ký bằng đúng chứng chỉ của app
+  đang chạy. Kiểm tra thất bại thì không nạp gì và tắt cập nhật. Cách này chặn
+  được code bị thay từ trước, không chặn được tiến trình đổi file đúng lúc
+  SlipBoard nạp. Hardened runtime vẫn chặn chèn thư viện qua
+  `DYLD_*`, và macOS bảo vệ app trong `/Applications` khỏi bị app khác sửa, nên
+  hãy cài SlipBoard vào đó.
 - **Chỉ lưu trên máy.** Lịch sử, ghi chú, snippet và cài đặt nằm trong
   `~/Library/Application Support/SlipBoard/`.
 - **App Lock khóa cửa sổ, không mã hóa ổ đĩa.** Nó ẩn lịch sử cho tới khi bạn
@@ -425,7 +432,11 @@ chỉ cài bản có số build lớn hơn bản đang cài, và chỉ khi DMG k
 `SUPublicEDKey` trong [`SlipBoard-Info.plist`](SlipBoard-Info.plist), nên bản
 fork phải thay key đó và `SUFeedURL` bằng của mình. Bản ký self-signed mang
 entitlement `com.apple.security.cs.disable-library-validation`: không có Team
-ID thì macOS không cho nạp `Sparkle.framework`.
+ID thì macOS không cho nạp `Sparkle.framework`. Chỉ plug-in cập nhật link tới
+Sparkle, và app kiểm chữ ký của plug-in và Sparkle với chứng chỉ của chính nó
+trước khi nạp
+([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
+Bản ad-hoc và bản không ký không có chứng chỉ để so, nên tắt cập nhật.
 
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.

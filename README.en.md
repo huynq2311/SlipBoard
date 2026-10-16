@@ -275,11 +275,17 @@ in Settings → Hotkeys). Inside the popup:
   Settings → About). Nothing about your
   Mac or your clipboard is sent. No analytics, no telemetry, no crash-reporting
   service, no account or sign-in.
-- **Library validation is off in releases.** Without an Apple Team ID, macOS
-  only loads `Sparkle.framework` into the app if library validation is turned
-  off. The hardened runtime still blocks `DYLD_*` injection, and macOS protects
-  apps in `/Applications` from changes by other apps, so install SlipBoard
-  there.
+- **Library validation is off in releases; SlipBoard checks Sparkle itself.**
+  Without an Apple Team ID, macOS only loads `Sparkle.framework` into the app if
+  library validation is turned off. So Sparkle sits inside a separate plug-in
+  (`Contents/PlugIns/SlipBoardUpdater.bundle`) that SlipBoard loads only when an
+  update check needs it, and only after checking, right before loading, that
+  the plug-in, Sparkle and everything nested in Sparkle are signed with the same
+  certificate as the running app. If that check fails, nothing is loaded and
+  updates stay off. It catches code replaced beforehand, not a process that
+  swaps files at the moment SlipBoard loads them. The
+  hardened runtime still blocks `DYLD_*` injection, and macOS protects apps in
+  `/Applications` from changes by other apps, so install SlipBoard there.
 - **Local storage only.** History, notes, snippets and settings live in
   `~/Library/Application Support/SlipBoard/` on your Mac.
 - **App Lock locks the window, not the disk.** It hides your history until you
@@ -442,7 +448,12 @@ build number is higher than the installed one, and only when the DMG matches the
 `SUPublicEDKey` in [`SlipBoard-Info.plist`](SlipBoard-Info.plist), so a fork must
 replace that key and `SUFeedURL` with its own. Self-signed builds carry the
 `com.apple.security.cs.disable-library-validation` entitlement: without a Team
-ID, macOS refuses to load `Sparkle.framework` otherwise.
+ID, macOS refuses to load `Sparkle.framework` otherwise. Only the updater
+plug-in links Sparkle, and the app checks the plug-in's and Sparkle's signatures
+against its own certificate before loading them
+([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
+Ad-hoc and unsigned builds have no certificate to compare, so their updates are
+off.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the

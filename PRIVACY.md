@@ -37,6 +37,11 @@ request carries SlipBoard's and Sparkle's version numbers; system
 profiling is off, so nothing about your Mac or your clipboard is sent.
 GitHub sees your IP address as it does for any download.
 
+SlipBoard loads Sparkle only when a check, or that one-time question,
+is due, and only after checking that Sparkle is signed with the same
+certificate as SlipBoard itself; if that check fails, Sparkle is never
+loaded and no update check happens.
+
 ## Where your data lives
 
 Everything SlipBoard stores — clipboard history, snippets, settings — is

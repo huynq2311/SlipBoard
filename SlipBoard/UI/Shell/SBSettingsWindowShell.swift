@@ -1151,6 +1151,12 @@ struct SBSettingsWindowShell: View {
             Text(copy.text(.aboutUpdatesNote))
                 .font(theme.typography.meta)
                 .foregroundStyle(theme.palette.textTertiary)
+
+            UpdatesUnavailableNote(
+                text: copy.text(.aboutUpdatesUnavailable),
+                theme: theme,
+                updater: .shared
+            )
         }
 
         SBPaneSection(title: copy.text(.aboutLinks), theme: theme) {
@@ -2369,7 +2375,23 @@ private struct AutomaticUpdateChecksToggle: View {
             )
         )
         .toggleStyle(.switch)
+        .disabled(updater.isUnavailable)
         .font(theme.typography.rowSecondary)
         .foregroundStyle(theme.palette.textPrimary)
+    }
+}
+
+private struct UpdatesUnavailableNote: View {
+    let text: String
+    let theme: SBTheme
+    @ObservedObject var updater: AppUpdater
+
+    var body: some View {
+        if updater.isUnavailable {
+            Text(text)
+                .font(theme.typography.meta)
+                .foregroundStyle(theme.palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

@@ -8,10 +8,39 @@
 
 /* Begin PBXBuildFile section */
 		5BA1E0012FBA200000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA1E0032FBA200000000003 /* Sparkle */; };
+		5BA1E1042FBA300000000004 /* SlipBoardUpdater.bundle in Embed PlugIns */ = {isa = PBXBuildFile; fileRef = 5BA1E1052FBA300000000005 /* SlipBoardUpdater.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5BA1E1062FBA300000000006 /* UpdaterPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA1E1082FBA300000000008 /* UpdaterPlugin.swift */; };
+		5BA1E1072FBA300000000007 /* UpdaterPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA1E1082FBA300000000008 /* UpdaterPlugin.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5BA1E1132FBA300000000013 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52FA1D192FBA13A200B48B7E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5BA1E1102FBA300000000010;
+			remoteInfo = SlipBoardUpdater;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5BA1E10C2FBA30000000000C /* Embed PlugIns */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5BA1E1042FBA300000000004 /* SlipBoardUpdater.bundle in Embed PlugIns */,
+			);
+			name = "Embed PlugIns";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		52FA1D212FBA13A200B48B7E /* SlipBoard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlipBoard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BA1E1052FBA300000000005 /* SlipBoardUpdater.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SlipBoardUpdater.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BA1E1082FBA300000000008 /* UpdaterPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -20,10 +49,22 @@
 			path = SlipBoard;
 			sourceTree = "<group>";
 		};
+		5BA1E10A2FBA30000000000A /* SlipBoardUpdater */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SlipBoardUpdater;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		52FA1D1E2FBA13A200B48B7E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BA1E10D2FBA30000000000D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -38,6 +79,8 @@
 			isa = PBXGroup;
 			children = (
 				52FA1D232FBA13A200B48B7E /* SlipBoard */,
+				5BA1E10A2FBA30000000000A /* SlipBoardUpdater */,
+				5BA1E1092FBA300000000009 /* SlipBoardUpdaterInterface */,
 				52FA1D222FBA13A200B48B7E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -46,8 +89,17 @@
 			isa = PBXGroup;
 			children = (
 				52FA1D212FBA13A200B48B7E /* SlipBoard.app */,
+				5BA1E1052FBA300000000005 /* SlipBoardUpdater.bundle */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5BA1E1092FBA300000000009 /* SlipBoardUpdaterInterface */ = {
+			isa = PBXGroup;
+			children = (
+				5BA1E1082FBA300000000008 /* UpdaterPlugin.swift */,
+			);
+			path = SlipBoardUpdaterInterface;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -60,21 +112,43 @@
 				52FA1D1D2FBA13A200B48B7E /* Sources */,
 				52FA1D1E2FBA13A200B48B7E /* Frameworks */,
 				52FA1D1F2FBA13A200B48B7E /* Resources */,
+				5BA1E10C2FBA30000000000C /* Embed PlugIns */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5BA1E1122FBA300000000012 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				52FA1D232FBA13A200B48B7E /* SlipBoard */,
+			);
+			name = SlipBoard;
+			productName = SlipBoard;
+			productReference = 52FA1D212FBA13A200B48B7E /* SlipBoard.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5BA1E1102FBA300000000010 /* SlipBoardUpdater */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5BA1E1112FBA300000000011 /* Build configuration list for PBXNativeTarget "SlipBoardUpdater" */;
+			buildPhases = (
+				5BA1E10E2FBA30000000000E /* Sources */,
+				5BA1E10D2FBA30000000000D /* Frameworks */,
+				5BA1E10F2FBA30000000000F /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				52FA1D232FBA13A200B48B7E /* SlipBoard */,
+				5BA1E10A2FBA30000000000A /* SlipBoardUpdater */,
 			);
-			name = SlipBoard;
+			name = SlipBoardUpdater;
 			packageProductDependencies = (
 				5BA1E0032FBA200000000003 /* Sparkle */,
 			);
-			productName = SlipBoard;
-			productReference = 52FA1D212FBA13A200B48B7E /* SlipBoard.app */;
-			productType = "com.apple.product-type.application";
+			productName = SlipBoardUpdater;
+			productReference = 5BA1E1052FBA300000000005 /* SlipBoardUpdater.bundle */;
+			productType = "com.apple.product-type.bundle";
 		};
 /* End PBXNativeTarget section */
 
@@ -87,6 +161,9 @@
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					52FA1D202FBA13A200B48B7E = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					5BA1E1102FBA300000000010 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 				};
@@ -109,12 +186,20 @@
 			projectRoot = "";
 			targets = (
 				52FA1D202FBA13A200B48B7E /* SlipBoard */,
+				5BA1E1102FBA300000000010 /* SlipBoardUpdater */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		52FA1D1F2FBA13A200B48B7E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BA1E10F2FBA30000000000F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -128,10 +213,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5BA1E1062FBA300000000006 /* UpdaterPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BA1E10E2FBA30000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5BA1E1072FBA300000000007 /* UpdaterPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5BA1E1122FBA300000000012 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5BA1E1102FBA300000000010 /* SlipBoardUpdater */;
+			targetProxy = 5BA1E1132FBA300000000013 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		52FA1D2A2FBA13A300B48B7E /* Debug */ = {
@@ -330,6 +432,56 @@
 			};
 			name = Release;
 		};
+		5BA1E1142FBA300000000014 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = C43H6NW2K6;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Ngô Quang Huy";
+				INFOPLIST_KEY_NSPrincipalClass = SBSparkleUpdaterPlugin;
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = huynq.SlipBoard.Updater;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		5BA1E1152FBA300000000015 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = C43H6NW2K6;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Ngô Quang Huy";
+				INFOPLIST_KEY_NSPrincipalClass = SBSparkleUpdaterPlugin;
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = huynq.SlipBoard.Updater;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -347,6 +499,15 @@
 			buildConfigurations = (
 				52FA1D2D2FBA13A300B48B7E /* Debug */,
 				52FA1D2E2FBA13A300B48B7E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5BA1E1112FBA300000000011 /* Build configuration list for PBXNativeTarget "SlipBoardUpdater" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5BA1E1142FBA300000000014 /* Debug */,
+				5BA1E1152FBA300000000015 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
