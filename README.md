@@ -267,6 +267,12 @@ Cài đặt → Phím tắt). Trong popup:
   mở khóa bằng Touch ID hoặc mật khẩu hệ thống. Nội dung clip, file văn bản dài
   và ảnh đã copy vẫn lưu không mã hóa trong thư mục trên, nên hãy bật FileVault
   để bảo vệ dữ liệu khi máy tắt.
+- **Ghi chú được mã hóa, nhưng ở bản phát hành khóa nằm ngay cạnh.** Khi bật
+  App Lock, ghi chú và một bản sao nội dung clip được mã hóa. Bản phát hành (ký
+  ad-hoc) giữ khóa đó trong `PayloadKey.json` ở cùng thư mục, chỉ tài khoản của
+  bạn đọc được, nên ai đọc được file của bạn cũng đọc được khóa: việc mã hóa
+  này chỉ giúp ghi chú không bị xem lướt qua. Bản ký bằng team giữ khóa trong
+  keychain.
 - **Mọi thứ bạn copy đều được ghi lại,** kể cả mật khẩu copy từ trình quản lý
   mật khẩu. Hãy loại trừ ứng dụng đó trong Cài đặt, hoặc tạm dừng ghi, nếu
   không muốn chúng nằm trong lịch sử.
@@ -303,10 +309,18 @@ dụng khác.
 > **Sau mỗi lần cập nhật, cần cấp lại quyền Accessibility.** Bản ký ad-hoc không
 > có danh tính ký cố định, nên macOS gắn quyền với đúng bản dựng đó. Vào
 > **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng
-> nút **−**, rồi mở lại SlipBoard và cho phép khi được hỏi. Nếu đang bật App
-> Lock, macOS còn hỏi để SlipBoard dùng các item trong keychain (tối đa hai lần);
-> mỗi lần nhập mật khẩu đăng nhập và chọn **Luôn cho phép**. Nếu bấm từ chối,
-> SlipBoard sẽ đứng ở trạng thái khóa: thoát rồi mở lại để được hỏi lại.
+> nút **−**, rồi mở lại SlipBoard và cho phép khi được hỏi. App Lock không hỏi
+> quyền keychain sau khi cập nhật: bản phát hành giữ khóa của nó trong một file
+> (xem [Quyền riêng tư và bảo mật](#quyền-riêng-tư-và-bảo-mật)).
+>
+> **Cập nhật từ v1.0-20261016 khi đang bật App Lock?** Bản đó giữ khóa App Lock
+> trong login keychain. Lần mở đầu tiên của bản mới hơn sẽ hỏi một lần để dùng
+> “com.slipboard.security.payload-key”: nhập mật khẩu đăng nhập và cho phép,
+> SlipBoard sẽ chuyển khóa sang file của nó để ghi chú vẫn đọc được. Các lần cập
+> nhật sau không hỏi nữa. Nếu bấm từ chối, SlipBoard đứng ở trạng thái khóa;
+> chọn Mở khóa để được hỏi lại. macOS có thể không cho SlipBoard xóa các item
+> keychain cũ; sau khi chuyển xong, bạn có thể tự xóa các item
+> `com.slipboard.security.payload-key` trong **Keychain Access**.
 >
 > **Đã bật App Lock ở bản Release trước?** Khóa cũ gắn với chữ ký cũ, bản ký
 > ad-hoc không đọc được, nên SlipBoard tự tạo khóa mới ở lần mở đầu tiên. Ghi
@@ -333,7 +347,8 @@ Bản không ký chạy được. Muốn dùng App Lock, hãy build bản ký ad
 
 Bản ký bằng team giữ khóa App Lock trong Data Protection keychain, được bọc bởi
 một khóa Secure Enclave nếu máy có. Bản ký ad-hoc không mang được entitlement
-keychain nên giữ khóa trong login keychain.
+keychain nên giữ khóa trong một file chỉ tài khoản của bạn đọc được, cạnh dữ
+liệu đã mã hóa.
 
 1. Mở `SlipBoard.xcodeproj` trong Xcode, chọn target **SlipBoard**, vào
    **Signing & Capabilities** và chọn team của bạn. Đổi bundle identifier thành
@@ -373,8 +388,7 @@ chỉ chạy khi app được ký bằng chứng chỉ **Developer ID**.
 
 **Giữ quyền Trợ năng qua các bản cập nhật (tùy chọn).** Ký mọi bản phát hành
 bằng cùng một chứng chỉ self-signed thay vì ad-hoc, để macOS giữ quyền Trợ năng
-sau khi cập nhật. Hộp thoại keychain của App Lock vẫn hiện, vì macOS gắn các item
-đó với đúng bản dựng:
+sau khi cập nhật:
 
 1. Trong **Keychain Access**, chọn **Keychain Access → Certificate Assistant →
    Create a Certificate…**. Đặt tên (ví dụ `SlipBoard Signing`), chọn
@@ -413,7 +427,7 @@ lịch sử là nguồn dữ liệu duy nhất; projector biến nó thành tr�
 popup, còn lưu trữ Core Data và chỉ mục toàn văn SQLite được đồng bộ từ đó. Khi
 bật App Lock, một bản sao nội dung và ghi chú của từng mục còn được ghi vào một
 kho mã hóa. Khóa của kho được Secure Enclave bọc ở bản ký bằng team (nếu máy
-có), và nằm trong login keychain ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
+có), và nằm trong một file chỉ tài khoản của bạn đọc được ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
 
 ## Cấu trúc dự án
 

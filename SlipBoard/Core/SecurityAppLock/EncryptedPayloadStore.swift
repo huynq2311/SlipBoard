@@ -228,6 +228,10 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
         return existingPayload
     }
 
+    func loadAccessKeyIfNeeded(allowsUserInteraction: Bool) {
+        keyStore.loadStoredKeyIfNeeded(allowsUserInteraction: allowsUserInteraction)
+    }
+
     @discardableResult
     func provisionAccessKey(
         preferredPolicy: SecurityKeyWrappingPolicy,

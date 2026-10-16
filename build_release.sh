@@ -26,8 +26,8 @@ BUILD_DIR="build"
 OUT_DIR="Release"
 
 # adhoc: signed with "-", no provisioning profile and no entitlements. macOS kills
-# an ad-hoc app that claims keychain-access-groups, so App Lock falls back to the
-# login keychain. team: needs a valid profile; a free team's profile lasts 7 days.
+# an ad-hoc app that claims keychain-access-groups, so App Lock keeps its key in
+# a 0600 file instead. team: needs a valid profile; a free team's profile lasts 7 days.
 SIGN_MODE=adhoc
 for arg in "$@"; do
   case "$arg" in

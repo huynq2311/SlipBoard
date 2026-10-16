@@ -174,6 +174,7 @@ struct SecuritySettings: Hashable {
 enum SecurityKeyWrappingPolicy: String, CaseIterable, Identifiable, Hashable {
     case secureEnclaveWrapped
     case keychainThisDeviceOnly
+    case localFile
 
     var id: String { rawValue }
 }

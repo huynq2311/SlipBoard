@@ -25,8 +25,7 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
         now: @escaping () -> Date = Date.init
     ) {
         self.settingsStore = settingsStore
-        // Only build a key store when none is passed in: each one reads the
-        // keychain, which an ad-hoc build may have to ask the user about.
+        // Only build a key store when none is passed in.
         let resolvedPayloadStore = payloadStore ?? EncryptedPayloadStore(keyStore: keyStore ?? PayloadKeychainStore())
         self.payloadStore = resolvedPayloadStore
         self.decryptedPayloadCache = decryptedPayloadCache
@@ -48,6 +47,14 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     func bootstrap() {
         let settings = settingsStore.currentSettings
+        // The key is only read when App Lock needs it, so a launch without App
+        // Lock never touches the keychain or the key file. The lookup never
+        // asks the user; Unlock tries again with prompts allowed. Unwrapping a
+        // key the previous release left in the login keychain asks once, below,
+        // because that key is the only way to read existing notes.
+        if settings.isAppLockEnabled {
+            payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: false)
+        }
 
         // App Lock is on but this keychain has no key: it was made by a build of
         // the other signing type, or removed. Make a new one instead of staying
@@ -214,6 +221,17 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
             )
         )
 
+        // A key that could not be loaded at launch gets another try here. If
+        // there turns out to be none, make one, as launch would have.
+        payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: true)
+        if payloadStore.activeWrappedKey == nil, payloadStore.isKeyRecordMissing {
+            _ = payloadStore.provisionAccessKey(
+                preferredPolicy: .secureEnclaveWrapped,
+                authenticationMethod: method,
+                at: now()
+            )
+        }
+
         // A session-only key unwraps without asking, so ask here first. An old
         // key asks for Touch ID itself while it is unwrapped.
         guard hasSessionOnlyKey else {
@@ -316,7 +334,11 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
     }
 
     private func ensureKeyProvisionedIfNeeded(settings: SecuritySettings, at date: Date) {
-        guard payloadStore.activeWrappedKey == nil else {
+        // A key that exists but cannot be read may still protect notes, so a
+        // settings change never replaces it. Turning App Lock off and on keeps
+        // a readable key on ad-hoc builds and replaces only an unreadable key
+        // file; team-signed builds still make a new key.
+        guard payloadStore.activeWrappedKey == nil, payloadStore.isKeyRecordMissing else {
             return
         }
 
