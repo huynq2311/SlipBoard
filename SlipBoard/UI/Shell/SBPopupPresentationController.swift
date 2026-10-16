@@ -21,6 +21,9 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         static let overlayHeadroom: CGFloat = 420
         static let presentationDuration: TimeInterval = 0.18
         static let dismissalDuration: TimeInterval = 0.14
+        /// Points the content travels while the window fades; negative y is
+        /// down in the window's layer space.
+        static let riseDistance: CGFloat = 14
     }
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -347,12 +350,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         transitionGeneration += 1
         isDismissing = false
 
-        // The window only fades; the shell's slide is a SwiftUI animation on
-        // `isPresented`, which runs on the display link instead of moving the
-        // whole window frame by frame.
         panel.alphaValue = 0
         panel.setFrame(targetFrame(for: screen), display: true)
         panel.makeKeyAndOrderFront(nil)
+        slideContent(of: panel, fromY: -Layout.riseDistance, toY: 0, duration: Layout.presentationDuration, timing: .easeOut)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.presentationDuration
@@ -376,6 +377,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
             onVisibilityChange?(false)
         }
 
+        slideContent(of: panel, fromY: 0, toY: -Layout.riseDistance, duration: Layout.dismissalDuration, timing: .easeIn)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.dismissalDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -392,7 +394,35 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
 
         panel.orderOut(nil)
         panel.alphaValue = 1
+        panel.contentViewController?.view.layer?.removeAnimation(forKey: Self.slideAnimationKey)
         isDismissing = false
+    }
+
+    private static let slideAnimationKey = "SlipBoard.popupSlide"
+
+    /// Moves the popup content up into place (or down out of it) with Core
+    /// Animation, which runs off the main thread. Animating the SwiftUI shell
+    /// instead re-ran every card's scroll-geometry callbacks on each frame and
+    /// stalled the main thread for up to a few hundred milliseconds.
+    private func slideContent(
+        of panel: NSPanel,
+        fromY: CGFloat,
+        toY: CGFloat,
+        duration: TimeInterval,
+        timing: CAMediaTimingFunctionName
+    ) {
+        guard let view = panel.contentViewController?.view else { return }
+        view.wantsLayer = true
+        guard let layer = view.layer else { return }
+        let animation = CABasicAnimation(keyPath: "transform.translation.y")
+        animation.fromValue = fromY
+        animation.toValue = toY
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: timing)
+        // Holds the end offset until finishDismissal removes it.
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+        layer.add(animation, forKey: Self.slideAnimationKey)
     }
 
     private func installEscapeKeyMonitorIfNeeded() {

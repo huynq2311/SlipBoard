@@ -11,8 +11,6 @@ enum SBHeaderMenuKind: Equatable {
 
 /// Shared timing for popup motion.
 enum SBMotion {
-    static let present = Animation.spring(response: 0.34, dampingFraction: 0.86)
-    static let dismiss = Animation.easeIn(duration: 0.14)
     static let menu = Animation.easeOut(duration: 0.14)
     static let rail = Animation.spring(response: 0.32, dampingFraction: 0.86)
     static let list = Animation.easeOut(duration: 0.22)
@@ -595,10 +593,6 @@ struct SBPopupShell: View {
             .animation(SBMotion.menu, value: showPasteOverlay)
             }
         }
-        // The panel window only fades; the shell itself rises into place.
-        .offset(y: isPresented ? 0 : 14)
-        .scaleEffect(isPresented ? 1 : 0.985, anchor: .bottom)
-        .animation(isPresented ? SBMotion.present : SBMotion.dismiss, value: isPresented)
     }
 
     private var listTransitionKey: String {
