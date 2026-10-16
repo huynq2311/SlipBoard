@@ -933,9 +933,15 @@ struct SBHorizontalClipRail: View {
         // Clips copied or removed while the popup is hidden just appear on
         // the next open.
         guard isPopupPresented else { return nil }
-        let changedCount = Set(clipIDs).symmetricDifference(lastClipIDs).count
+        let previousIDs = Set(lastClipIDs)
+        let changedCount = Set(clipIDs).symmetricDifference(previousIDs).count
         let isBurst = Date().timeIntervalSince(lastClipIDsChangeAt) < 0.4
         guard isBurst == false else { return nil }
+        // An inserted card starts at zero width, so every one of them fits on
+        // screen in the first frame and the lazy stack builds them all;
+        // widening a search by hundreds of cards froze the popup.
+        let insertedCount = clipIDs.lazy.filter { previousIDs.contains($0) == false }.count
+        guard insertedCount <= Self.maxAnimatedInsertions else { return nil }
         // A filter or search swaps most cards; a quick fade reads better than
         // springing a whole row.
         return changedCount <= 2 ? SBMotion.rail : .easeOut(duration: 0.16)
@@ -1077,6 +1083,9 @@ struct SBHorizontalClipRail: View {
     }
 
     private static let scrollbarTrackHeight: CGFloat = 16
+    /// Wider than a 3000 pt screen at 216 pt per card; any more could not be
+    /// seen growing in anyway.
+    private static let maxAnimatedInsertions = 16
 
     private func scrollToSelectionIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
         guard let selectedClipID,

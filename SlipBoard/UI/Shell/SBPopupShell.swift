@@ -86,6 +86,14 @@ struct SBPopupTopBar: View {
     @Binding var activeMenu: SBHeaderMenuKind?
 
     @State private var searchText: String
+    /// Queries handed to `onSearchQueryChange` whose results have not come
+    /// back yet, oldest first. The last one is the query last sent.
+    @State private var sentSearchQueries: [String]
+    @State private var pendingSearch: Task<Void, Never>?
+
+    /// Each query reprojects and redraws the whole list, so typing only
+    /// searches once the keys stop for this long.
+    private static let searchDebounce: Duration = .milliseconds(200)
 
     init(
         theme: SBTheme,
@@ -118,6 +126,7 @@ struct SBPopupTopBar: View {
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
         _searchText = State(initialValue: state.searchQuery)
+        _sentSearchQueries = State(initialValue: [state.searchQuery])
     }
 
     var body: some View {
@@ -214,13 +223,39 @@ struct SBPopupTopBar: View {
                 .frame(height: theme.border.hairline)
         }
         .onChange(of: searchText) { _, newValue in
-            onSearchQueryChange(newValue)
-        }
-        .onChange(of: state.searchQuery) { _, newValue in
-            if searchText != newValue {
-                searchText = newValue
+            pendingSearch?.cancel()
+            pendingSearch = nil
+            guard newValue != sentSearchQueries.last else { return }
+            // Clearing the field shows the full list at once.
+            guard newValue.isEmpty == false else {
+                sendSearchQuery(newValue)
+                return
+            }
+            pendingSearch = Task { @MainActor in
+                try? await Task.sleep(for: Self.searchDebounce)
+                guard Task.isCancelled == false else { return }
+                sendSearchQuery(newValue)
             }
         }
+        .onChange(of: state.searchQuery) { _, newValue in
+            // A query this field sent comes back with its results, possibly
+            // after more keys were typed; copying it back would undo them.
+            if let index = sentSearchQueries.firstIndex(of: newValue) {
+                sentSearchQueries.removeFirst(index)
+                return
+            }
+            // Set by the runtime (type-to-search, clearing on close).
+            pendingSearch?.cancel()
+            pendingSearch = nil
+            sentSearchQueries = [newValue]
+            searchText = newValue
+        }
+    }
+
+    private func sendSearchQuery(_ query: String) {
+        pendingSearch = nil
+        sentSearchQueries.append(query)
+        onSearchQueryChange(query)
     }
 
     /// "All" first, then each source app with how many clips it has. The "All"
@@ -480,10 +515,11 @@ struct SBPopupShell: View {
                     .padding(.vertical, theme.spacing.control12)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        // Keyed by filter and source so switching either
-                        // crossfades the whole list instead of cards popping
-                        // in place. The ZStack overlaps the outgoing and
-                        // incoming lists rather than stacking them.
+                        // Keyed by filter, source and whether a search is
+                        // active, so switching any of them crossfades the
+                        // whole list instead of cards popping in place. The
+                        // ZStack overlaps the outgoing and incoming lists
+                        // rather than stacking them.
                         ZStack(alignment: .topLeading) {
                             VStack(spacing: theme.spacing.control8) {
                                 ClipboardHistoryRailSection(
@@ -595,8 +631,13 @@ struct SBPopupShell: View {
         }
     }
 
+    // Starting or clearing a search also swaps the list. Updated in place,
+    // clearing a search put hundreds of cards back into the rail, and the
+    // lazy stack built every card up to where the old results moved to
+    // (about 0.5 s with 700 clips); a new list only builds what is on screen.
     private var listTransitionKey: String {
-        "\(state.activeFilterID)|\(state.activeSourceID ?? "")"
+        let isSearching = state.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        return "\(state.activeFilterID)|\(state.activeSourceID ?? "")|\(isSearching)"
     }
 
     private var activeFilterLabel: String? {
