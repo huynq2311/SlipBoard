@@ -1,6 +1,6 @@
 # SlipBoard Privacy Policy
 
-_Last updated: 2026-10-12_
+_Last updated: 2026-10-16_
 
 SlipBoard is a local clipboard manager for macOS. This policy describes
 what it does with your data, in plain terms.
@@ -20,10 +20,22 @@ Settings, or pause capture before you copy.
 
 ## What SlipBoard never does
 
-- **No network access.** SlipBoard does not contain any networking code.
-  Nothing you copy, paste, or type into SlipBoard is ever sent anywhere.
+- **Nothing you copy, paste, or type into SlipBoard is ever sent anywhere.**
 - **No analytics, no telemetry, no crash reporting services.**
 - **No account, no sign-in.**
+
+## Update checks
+
+SlipBoard's only network connection is the update check, done by the
+open-source [Sparkle](https://sparkle-project.org) framework. It runs when
+you click **Check for Updates** in Settings → About, and on a daily
+schedule only if you allow automatic checks when SlipBoard asks on its
+second launch; turn them on or off later in Settings → About. It downloads
+`https://github.com/huynq2311/SlipBoard/releases/latest/download/appcast.xml`
+from GitHub, and the new version from GitHub when you install one. The
+request carries SlipBoard's and Sparkle's version numbers; system
+profiling is off, so nothing about your Mac or your clipboard is sent.
+GitHub sees your IP address as it does for any download.
 
 ## Where your data lives
 

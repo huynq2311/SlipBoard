@@ -1142,6 +1142,12 @@ struct SBSettingsWindowShell: View {
                 action: { onSelectAction("about.check-updates") }
             )
 
+            AutomaticUpdateChecksToggle(
+                title: copy.text(.aboutAutomaticUpdateChecks),
+                theme: theme,
+                updater: .shared
+            )
+
             Text(copy.text(.aboutUpdatesNote))
                 .font(theme.typography.meta)
                 .foregroundStyle(theme.palette.textTertiary)
@@ -2346,5 +2352,24 @@ private struct InteractiveActionRow: View {
         case .standard:
             return theme.palette.textSecondary
         }
+    }
+}
+
+private struct AutomaticUpdateChecksToggle: View {
+    let title: String
+    let theme: SBTheme
+    @ObservedObject var updater: AppUpdater
+
+    var body: some View {
+        Toggle(
+            title,
+            isOn: Binding(
+                get: { updater.automaticallyChecksForUpdates },
+                set: { updater.setAutomaticallyChecksForUpdates($0) }
+            )
+        )
+        .toggleStyle(.switch)
+        .font(theme.typography.rowSecondary)
+        .foregroundStyle(theme.palette.textPrimary)
     }
 }

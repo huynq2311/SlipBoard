@@ -504,6 +504,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case aboutUpdates
     case aboutCheckForUpdates
     case aboutUpdatesNote
+    case aboutAutomaticUpdateChecks
     case aboutLinks
     case aboutGitHub
     case aboutPrivacyPolicy
@@ -1012,7 +1013,8 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .aboutSummary: "SlipBoard keeps a local, offline history of everything you copy, right in the menu bar. Search past clips, pin the ones you need, add notes, save snippets, and protect your history with App Lock."
         case .aboutUpdates: "Updates"
         case .aboutCheckForUpdates: "Check for Updates"
-        case .aboutUpdatesNote: "SlipBoard does not connect to the internet. This button opens the Releases page in your browser."
+        case .aboutAutomaticUpdateChecks: "Check for updates automatically"
+        case .aboutUpdatesNote: "SlipBoard connects to GitHub only to check for updates: when you click this button, or daily if automatic checks are on. It sends nothing about your Mac or your clipboard."
         case .aboutLinks: "Links"
         case .aboutGitHub: "GitHub"
         case .aboutPrivacyPolicy: "Privacy Policy"
@@ -1562,7 +1564,8 @@ struct LocalizationCatalog: Sendable {
         .aboutSummary: "SlipBoard lưu lịch sử mọi thứ bạn sao chép ngay trên thanh menu, cục bộ và không cần mạng. Tìm lại clip cũ, ghim những mục cần dùng, thêm ghi chú, lưu snippet và bảo vệ lịch sử bằng Khóa ứng dụng.",
         .aboutUpdates: "Cập nhật",
         .aboutCheckForUpdates: "Kiểm tra cập nhật",
-        .aboutUpdatesNote: "SlipBoard không kết nối internet. Nút này mở trang Releases trong trình duyệt của bạn.",
+        .aboutAutomaticUpdateChecks: "Tự động kiểm tra cập nhật",
+        .aboutUpdatesNote: "SlipBoard chỉ kết nối GitHub để kiểm tra cập nhật: khi bạn bấm nút này, hoặc mỗi ngày nếu bật tự động kiểm tra. Không gửi thông tin gì về máy hay clipboard của bạn.",
         .aboutLinks: "Liên kết",
         .aboutGitHub: "GitHub",
         .aboutPrivacyPolicy: "Chính sách quyền riêng tư"

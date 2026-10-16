@@ -526,9 +526,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             } else {
                 securityRuntime.beginUnlock(using: securitySnapshot.settings.unlockMethod)
             }
-        // SlipBoard has no networking code; these only open pages in the browser.
         case "about.check-updates":
-            openInBrowser("https://github.com/huynq2311/SlipBoard/releases/latest")
+            AppUpdater.shared.checkForUpdates()
         case "about.github":
             openInBrowser("https://github.com/huynq2311/SlipBoard")
         case "about.privacy-policy":
@@ -2515,6 +2514,8 @@ struct SlipBoardApp: App {
             syncPopupPresentation()
             return
         }
+
+        _ = AppUpdater.shared
 
         popupPresentationController.onVisibilityChange = { isVisible in
             if runtime.isPopupPresented != isVisible {
