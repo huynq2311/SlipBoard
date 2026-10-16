@@ -40,9 +40,10 @@ your Mac is off or locked out.
 **App Lock is not disk encryption.** It locks the SlipBoard window and
 hides previews until you unlock with Touch ID or your system password,
 and it clears clip text from the search index while locked. It also
-keeps an encrypted copy of clip content and notes, with a key held by
-the Secure Enclave, but the unencrypted copies described above stay
-on disk.
+keeps an encrypted copy of clip content and notes, with a key wrapped
+by the Secure Enclave (team-signed builds, when the Mac has one) or
+stored in your login keychain (ad-hoc builds), but the unencrypted
+copies described above stay on disk.
 
 **App Lock only locks within a session.** SlipBoard opens unlocked when
 it launches, including after a restart or reinstall, and locks when you

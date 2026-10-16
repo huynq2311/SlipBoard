@@ -244,6 +244,8 @@ how long ago you copied it. To see only what came from one app:
 - A dedicated menu bar icon. Click it to see capture status, pause capture,
   change retention quickly, or open the popup or Settings.
 - Optional **launch at login** and customizable global hotkeys.
+- **Settings → About** shows the version and opens the Releases page to check
+  for updates. SlipBoard itself never goes online.
 
 ---
 
@@ -296,14 +298,30 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 ### Install from a release
 
 Download `SlipBoard.dmg` from [Releases](../../releases), open it and drag
-**SlipBoard** into **Applications**. On first launch, grant **Accessibility**
-access when asked so SlipBoard can paste into other apps.
+**SlipBoard** into **Applications**.
 
-> [!NOTE]
-> Current builds are signed with a development certificate (Apple Development),
-> are not notarized, and only run on the devices listed in that build's
-> provisioning profile. If a release will not open on your Mac, build from
-> source below.
+Releases are ad-hoc signed and not notarized, so macOS blocks the first launch:
+
+1. Open SlipBoard. macOS says it cannot verify the app; click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll to **Security** and
+   click **Open Anyway** next to SlipBoard, then confirm.
+
+Then grant **Accessibility** access when asked so SlipBoard can paste into
+other apps.
+
+> [!IMPORTANT]
+> **After each update, grant Accessibility again.** An ad-hoc build has no
+> stable signing identity, so macOS ties the permission to that exact build.
+> In **System Settings → Privacy & Security → Accessibility**, remove SlipBoard
+> with **−**, then reopen SlipBoard and allow it when asked. If App Lock is on,
+> macOS also asks to let SlipBoard use its keychain items (up to two prompts);
+> enter your login password and choose **Always Allow** each time. If you deny
+> one, SlipBoard stays locked: quit it and reopen it to be asked again.
+>
+> **Coming from an earlier release with App Lock on?** Its key belongs to the
+> old signature and cannot be read by an ad-hoc build, so SlipBoard creates a
+> new one on first launch. Notes saved under the old key cannot be read
+> anymore; clip history is not affected.
 
 ### Build from source
 
@@ -319,10 +337,14 @@ xcodebuild \
   build
 ```
 
-An unsigned build runs, but **App Lock cannot be enabled in it**: storing the
-protection key needs the keychain entitlement, which only a signed build has.
+An unsigned build runs. For App Lock, use the ad-hoc build from
+[Packaging a release](#packaging-a-release), which needs no account either.
 
-**Signed build (needed for App Lock)**
+**Team-signed build**
+
+A team-signed build keeps the App Lock key in the Data Protection keychain,
+wrapped by a Secure Enclave key when the Mac has one. Ad-hoc builds keep it in
+the login keychain instead, because they cannot carry the keychain entitlement.
 
 1. In Xcode, open `SlipBoard.xcodeproj`, select the **SlipBoard** target and
    set **Signing & Capabilities** to your own team. Change the bundle
@@ -348,14 +370,35 @@ protection key needs the keychain entitlement, which only a signed build has.
 `build_release.sh` builds the Release configuration and packages it as a DMG:
 
 ```bash
-./build_release.sh              # signed build (needed for App Lock)
+./build_release.sh              # ad-hoc signed build (default, what releases use)
+./build_release.sh --team       # team-signed build, needs a provisioning profile
 ./build_release.sh --no-sign    # unsigned build, like CI
 ```
 
 Output goes to `Release/`: `SlipBoard.app`, `SlipBoard.dmg` and
-`SlipBoard.dmg.sha256`. You can set `DEVELOPMENT_TEAM` and `NOTARY_PROFILE` in
-a `.env` file (see [`.env.example`](.env.example)). Notarization only runs when
-the app is signed with a **Developer ID** certificate.
+`SlipBoard.dmg.sha256`. The DMG opens a window that shows dragging SlipBoard
+onto Applications; the script asks Finder to lay it out, so the first run asks
+to let your terminal control Finder. The background comes from
+`Tools/dmg/make-background.swift`. You can set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and
+`NOTARY_PROFILE` in a `.env` file (see [`.env.example`](.env.example)).
+Notarization only runs when the app is signed with a **Developer ID**
+certificate.
+
+**Keep Accessibility across updates (optional).** Sign every release with the
+same self-signed certificate instead of ad-hoc, so macOS keeps the
+Accessibility permission after an update. The App Lock keychain prompts still
+appear, because macOS ties those items to the exact build:
+
+1. In **Keychain Access**, choose **Keychain Access → Certificate Assistant →
+   Create a Certificate…**. Name it (for example `SlipBoard Signing`), set
+   **Identity Type** to **Self-Signed Root** and **Certificate Type** to
+   **Code Signing**, then create it.
+2. Put `SIGN_IDENTITY=SlipBoard Signing` in `.env` and run `./build_release.sh`.
+
+Keep that certificate (export it with its private key as a backup): a release
+signed with a different one counts as a new app again. Gatekeeper still asks
+for **Open Anyway** on first launch. If you sign releases this way, update the
+install notes above.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
@@ -384,9 +427,9 @@ The app is a SwiftUI menu-bar app with an AppKit panel for the popup. The
 history store is the single source of truth. The projector turns it into the
 view state the popup renders, while Core Data persistence and the SQLite
 full-text index are kept in sync from it. With App Lock on, a copy of the
-content and notes of each item is additionally written to an encrypted store
-whose key is held by the Secure Enclave. The Core Data store itself is not
-encrypted.
+content and notes of each item is additionally written to an encrypted store.
+Its key is wrapped by the Secure Enclave in team-signed builds (when the Mac
+has one) and kept in the login keychain in ad-hoc builds. The Core Data store itself is not encrypted.
 
 ## Project layout
 

@@ -79,7 +79,8 @@ enum MockFoundationFixtures {
         hotkeys: hotkeysPane,
         snippets: snippetsPane,
         security: securityPane,
-        bridge: bridgePane
+        bridge: bridgePane,
+        about: aboutPane
     )
 
     static let pinnedClips: [ClipPreviewSummary] = [
@@ -614,6 +615,12 @@ enum MockFoundationFixtures {
                 )
             )
         ]
+    )
+
+    static let aboutPane = SettingsPaneModel(
+        id: .about,
+        title: "About",
+        subtitle: "Version, links, and privacy information for SlipBoard."
     )
 }
 

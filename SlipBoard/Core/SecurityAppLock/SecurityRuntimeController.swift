@@ -18,14 +18,16 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     init(
         settingsStore: SecuritySettingsStoring = SecuritySettingsStore(),
-        keyStore: PayloadKeyWrapping = PayloadKeychainStore(),
+        keyStore: PayloadKeyWrapping? = nil,
         payloadStore: ProtectedPayloadManaging? = nil,
         decryptedPayloadCache: DecryptedPayloadCache = DecryptedPayloadCache(),
         searchNotesStore: SearchNotesOrganizationStoring? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.settingsStore = settingsStore
-        let resolvedPayloadStore = payloadStore ?? EncryptedPayloadStore(keyStore: keyStore)
+        // Only build a key store when none is passed in: each one reads the
+        // keychain, which an ad-hoc build may have to ask the user about.
+        let resolvedPayloadStore = payloadStore ?? EncryptedPayloadStore(keyStore: keyStore ?? PayloadKeychainStore())
         self.payloadStore = resolvedPayloadStore
         self.decryptedPayloadCache = decryptedPayloadCache
         self.searchNotesStore = searchNotesStore
@@ -46,6 +48,24 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     func bootstrap() {
         let settings = settingsStore.currentSettings
+
+        // App Lock is on but this keychain has no key: it was made by a build of
+        // the other signing type, or removed. Make a new one instead of staying
+        // locked for good; what the old key encrypted stays unreadable either
+        // way. The app opens unlocked after launch anyway, so this shows nothing
+        // a relaunch would not. A key that exists but cannot be read is kept.
+        if settings.isAppLockEnabled,
+           payloadStore.activeWrappedKey == nil,
+           payloadStore.isKeyRecordMissing,
+           case .unwrappedInMemory = payloadStore.provisionAccessKey(
+               preferredPolicy: .secureEnclaveWrapped,
+               authenticationMethod: settings.unlockMethod,
+               at: now()
+           )
+        {
+            completeUnlock(at: now())
+            return
+        }
 
         // App Lock only locks within a session: open unlocked when the key can
         // be unwrapped without Touch ID. An old key still needs it, so the app
