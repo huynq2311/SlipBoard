@@ -43,7 +43,8 @@ and it clears clip text from the search index while locked. It also
 keeps an encrypted copy of clip content and notes, with a key wrapped
 by the Secure Enclave (team-signed builds, when the Mac has one) or
 stored in `PayloadKey.json`, a file only your user account can read
-(ad-hoc builds, which is what releases are). On ad-hoc builds that key
+(release builds, signed with SlipBoard's self-signed certificate, and ad-hoc
+builds). On those builds that key
 sits next to the encrypted data, so anyone who can read your files can
 read the notes too; the encryption only keeps them out of casual view.
 The unencrypted copies described above stay on disk either way.

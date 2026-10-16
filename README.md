@@ -269,7 +269,8 @@ Cài đặt → Phím tắt). Trong popup:
   để bảo vệ dữ liệu khi máy tắt.
 - **Ghi chú được mã hóa, nhưng ở bản phát hành khóa nằm ngay cạnh.** Khi bật
   App Lock, ghi chú và một bản sao nội dung clip được mã hóa. Bản phát hành (ký
-  ad-hoc) giữ khóa đó trong `PayloadKey.json` ở cùng thư mục, chỉ tài khoản của
+  bằng chứng chỉ riêng của SlipBoard, hoặc ad-hoc) giữ khóa đó trong
+  `PayloadKey.json` ở cùng thư mục, chỉ tài khoản của
   bạn đọc được, nên ai đọc được file của bạn cũng đọc được khóa: việc mã hóa
   này chỉ giúp ghi chú không bị xem lướt qua. Bản ký bằng team giữ khóa trong
   keychain.
@@ -296,7 +297,8 @@ Chi tiết xem [PRIVACY.md](PRIVACY.md).
 Tải `SlipBoard.dmg` ở trang [Releases](../../releases), mở file và kéo
 **SlipBoard** vào thư mục **Applications**.
 
-Bản Release được ký ad-hoc và chưa notarize, nên macOS chặn lần mở đầu tiên:
+Bản Release được ký bằng chứng chỉ tự tạo của SlipBoard và chưa notarize, nên
+macOS chặn lần mở đầu tiên:
 
 1. Mở SlipBoard. macOS báo không xác minh được ứng dụng; bấm **Xong**.
 2. Mở **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, cuộn tới mục **Bảo mật**
@@ -305,13 +307,17 @@ Bản Release được ký ad-hoc và chưa notarize, nên macOS chặn lần m�
 Sau đó cấp quyền **Accessibility** khi được hỏi để SlipBoard dán được vào ứng
 dụng khác.
 
+Cập nhật không làm mất quyền Accessibility: mọi bản phát hành từ
+v1.0-20261016.2 được ký bằng cùng một chứng chỉ, nên macOS coi bản cập nhật là
+cùng một app. App Lock cũng không hỏi quyền keychain sau khi cập nhật: bản phát
+hành giữ khóa của nó trong một file (xem
+[Quyền riêng tư và bảo mật](#quyền-riêng-tư-và-bảo-mật)).
+
 > [!IMPORTANT]
-> **Sau mỗi lần cập nhật, cần cấp lại quyền Accessibility.** Bản ký ad-hoc không
-> có danh tính ký cố định, nên macOS gắn quyền với đúng bản dựng đó. Vào
-> **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng
-> nút **−**, rồi mở lại SlipBoard và cho phép khi được hỏi. App Lock không hỏi
-> quyền keychain sau khi cập nhật: bản phát hành giữ khóa của nó trong một file
-> (xem [Quyền riêng tư và bảo mật](#quyền-riêng-tư-và-bảo-mật)).
+> **Cập nhật từ v1.0-20261016 hoặc cũ hơn?** Các bản đó được ký theo cách khác,
+> nên cần cấp quyền Accessibility lần cuối: vào **Cài đặt hệ thống → Quyền riêng
+> tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng nút **−**, rồi mở lại SlipBoard
+> và cho phép khi được hỏi.
 >
 > **Cập nhật từ v1.0-20261016 khi đang bật App Lock?** Bản đó giữ khóa App Lock
 > trong login keychain. Lần mở đầu tiên của bản mới hơn sẽ hỏi một lần để dùng
@@ -373,7 +379,7 @@ liệu đã mã hóa.
 Script `build_release.sh` build bản Release và đóng gói thành DMG:
 
 ```bash
-./build_release.sh              # bản ký ad-hoc (mặc định, dùng cho Release)
+./build_release.sh              # ký bằng SIGN_IDENTITY nếu có (bản phát hành), không thì ad-hoc
 ./build_release.sh --team       # bản ký bằng team, cần provisioning profile
 ./build_release.sh --no-sign    # bản không ký, như CI
 ```
@@ -386,19 +392,21 @@ cho phép terminal điều khiển Finder. Ảnh nền được tạo bởi
 `NOTARY_PROFILE` trong file `.env` (xem [`.env.example`](.env.example)). Notarize
 chỉ chạy khi app được ký bằng chứng chỉ **Developer ID**.
 
-**Giữ quyền Trợ năng qua các bản cập nhật (tùy chọn).** Ký mọi bản phát hành
-bằng cùng một chứng chỉ self-signed thay vì ad-hoc, để macOS giữ quyền Trợ năng
-sau khi cập nhật:
+**Ký bản phát hành.** Bản phát hành chính thức được ký bằng chứng chỉ ký code
+tự tạo của người bảo trì, khai báo qua `SIGN_IDENTITY` trong `.env`, để macOS
+giữ quyền Trợ năng qua các lần cập nhật. Chỉ máy có chứng chỉ đó kèm private key
+mới build được bản phát hành; CI và các bản fork build ad-hoc. Bản ký bằng chứng
+chỉ khác sẽ bị coi là app mới và mọi người dùng phải cấp lại quyền Trợ năng, nên
+hãy sao lưu chứng chỉ kèm private key. Gatekeeper vẫn hỏi **Vẫn mở** ở lần mở
+đầu tiên.
 
-1. Trong **Keychain Access**, chọn **Keychain Access → Certificate Assistant →
-   Create a Certificate…**. Đặt tên (ví dụ `SlipBoard Signing`), chọn
-   **Identity Type** là **Self-Signed Root** và **Certificate Type** là
-   **Code Signing**, rồi tạo.
-2. Ghi `SIGN_IDENTITY=SlipBoard Signing` vào `.env` và chạy `./build_release.sh`.
+Muốn tự ký bản build của mình theo cách này, tạo chứng chỉ trong **Keychain
+Access → Certificate Assistant → Create a Certificate…** (**Identity Type**:
+Self-Signed Root, **Certificate Type**: Code Signing) rồi ghi tên hoặc mã SHA-1
+của nó vào `SIGN_IDENTITY`.
 
-Giữ lại chứng chỉ đó (export kèm private key để sao lưu): bản ký bằng chứng chỉ
-khác sẽ bị coi là app mới. Gatekeeper vẫn hỏi **Vẫn mở** ở lần mở đầu tiên. Nếu
-phát hành theo cách này, hãy sửa lại phần hướng dẫn cài đặt ở trên.
+`BUILD_DATE` ghi đè số build, ví dụ `BUILD_DATE=20261016.2` cho bản phát hành
+thứ hai trong cùng ngày.
 
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
@@ -427,7 +435,8 @@ lịch sử là nguồn dữ liệu duy nhất; projector biến nó thành tr�
 popup, còn lưu trữ Core Data và chỉ mục toàn văn SQLite được đồng bộ từ đó. Khi
 bật App Lock, một bản sao nội dung và ghi chú của từng mục còn được ghi vào một
 kho mã hóa. Khóa của kho được Secure Enclave bọc ở bản ký bằng team (nếu máy
-có), và nằm trong một file chỉ tài khoản của bạn đọc được ở bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
+có), và nằm trong một file chỉ tài khoản của bạn đọc được ở bản phát hành và
+bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
 
 ## Cấu trúc dự án
 
