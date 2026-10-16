@@ -2592,9 +2592,7 @@ struct SlipBoardApp: App {
                 didDeclineAccessibilityAlert = true
                 return
             }
-            // Listed first, so the settings page shows SlipBoard when it opens.
-            AccessibilityPermission.addToSystemList()
-            NSWorkspace.shared.open(AccessibilityPermission.settingsURL)
+            AccessibilityPermission.requestAccess()
         }
     }
 
