@@ -183,7 +183,10 @@ if [ "$SIGN_MODE" != none ]; then
     exit 1
   fi
 fi
-if [ "$SIGN_MODE" = adhoc ] && codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null | grep -q keychain-access-groups; then
+# Output is captured before grep: with pipefail, `codesign … | grep -q` fails when
+# grep exits at the match and codesign then dies writing the rest (SIGPIPE).
+if [ "$SIGN_MODE" = adhoc ] \
+  && grep -q keychain-access-groups <<<"$(codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true)"; then
   echo "Build without a profile carries keychain-access-groups; macOS would kill it at launch." >&2
   exit 1
 fi
@@ -257,7 +260,7 @@ MOUNT_DIR=""
 hdiutil convert "$WORK/rw.dmg" -format UDZO -imagekey zlib-level=9 -ov -o "$OUT_DIR/$APP_NAME.dmg" >/dev/null
 
 if [ -n "${NOTARY_PROFILE:-}" ]; then
-  if codesign -dvv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -q 'Authority=Developer ID Application'; then
+  if grep -q 'Authority=Developer ID Application' <<<"$(codesign -dvv "$OUT_DIR/$APP_NAME.app" 2>&1 || true)"; then
     say "Notarizing (profile: $NOTARY_PROFILE)"
     xcrun notarytool submit "$OUT_DIR/$APP_NAME.dmg" --keychain-profile "$NOTARY_PROFILE" --wait
     xcrun stapler staple "$OUT_DIR/$APP_NAME.dmg"
