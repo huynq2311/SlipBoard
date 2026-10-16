@@ -28,10 +28,7 @@ final class PasteActionExecutor: PasteActionExecuting {
             )
         }
 
-        guard AXIsProcessTrusted() else {
-            AXIsProcessTrustedWithOptions(
-                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            )
+        guard AccessibilityPermission.isTrusted else {
             return PasteActionExecutionResult(
                 actionID: request.actionID,
                 closeBehavior: request.closeBehavior,

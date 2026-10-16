@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import SwiftUI
 
 private final class SBPopupPanel: NSPanel {
@@ -208,10 +207,8 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         onPermissionDenied: () -> Void,
         onTargetUnavailable: @escaping () -> Void
     ) {
-        guard AXIsProcessTrusted() else {
-            AXIsProcessTrustedWithOptions(
-                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            )
+        // No system prompt here: SlipBoard explains the permission first.
+        guard AccessibilityPermission.isTrusted else {
             onPermissionDenied()
             return
         }
