@@ -228,6 +228,10 @@ final class EncryptedPayloadStore: ProtectedPayloadManaging {
         return existingPayload
     }
 
+    func loadAccessKeyIfNeeded() {
+        keyStore.loadStoredKeyIfNeeded()
+    }
+
     @discardableResult
     func provisionAccessKey(
         preferredPolicy: SecurityKeyWrappingPolicy,

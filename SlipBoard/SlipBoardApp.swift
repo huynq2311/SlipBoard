@@ -2349,6 +2349,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             return "Secure Enclave"
         case .keychainThisDeviceOnly:
             return "ThisDeviceOnly"
+        case .localFile:
+            return "Local file"
         }
     }
 

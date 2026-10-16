@@ -37,6 +37,9 @@ protocol PayloadKeyWrapping: AnyObject {
     var isKeyRecordMissing: Bool { get }
     var unwrappedPayloadKeyData: Data? { get }
 
+    /// Reads the stored key record. Until then the state is `.absent`.
+    func loadStoredKeyIfNeeded()
+
     @discardableResult
     func provisionPayloadKey(
         preferredPolicy: SecurityKeyWrappingPolicy,
@@ -83,6 +86,8 @@ protocol ProtectedPayloadManaging: ProtectedPayloadStoring {
     var isKeyRecordMissing: Bool { get }
 
     func protectedPayload(for itemID: String) -> ProtectedClipPayload?
+
+    func loadAccessKeyIfNeeded()
 
     @discardableResult
     func saveProtectedPayload(_ payload: ProtectedClipPayload) -> ProtectedClipPayload?

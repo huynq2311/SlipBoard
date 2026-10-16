@@ -277,6 +277,12 @@ in Settings → Hotkeys). Inside the popup:
   unlock with Touch ID or your system password. Clip text, long-text files and
   copied images are stored unencrypted in the folder above, so use FileVault
   to protect them at rest.
+- **Notes are encrypted, but on release builds the key sits next to them.**
+  With App Lock on, notes and a copy of clip content are encrypted. Release
+  (ad-hoc) builds keep that key in `PayloadKey.json` in the same folder,
+  readable only by your user account, so anyone who can read your files can
+  read the key too: this only keeps notes out of casual view. Team-signed
+  builds keep the key in the keychain instead.
 - **Everything you copy is recorded,** including passwords copied from a
   password manager. Exclude that app in Settings, or pause capture, to keep
   them out of the history.
@@ -313,10 +319,18 @@ other apps.
 > **After each update, grant Accessibility again.** An ad-hoc build has no
 > stable signing identity, so macOS ties the permission to that exact build.
 > In **System Settings → Privacy & Security → Accessibility**, remove SlipBoard
-> with **−**, then reopen SlipBoard and allow it when asked. If App Lock is on,
-> macOS also asks to let SlipBoard use its keychain items (up to two prompts);
-> enter your login password and choose **Always Allow** each time. If you deny
-> one, SlipBoard stays locked: quit it and reopen it to be asked again.
+> with **−**, then reopen SlipBoard and allow it when asked. App Lock does not
+> ask for keychain access after an update: release builds keep its key in a
+> file (see [Privacy and security](#privacy-and-security)).
+>
+> **Updating from v1.0-20261016 with App Lock on?** That release kept the App
+> Lock key in the login keychain. The first launch of a newer release asks
+> once to use “com.slipboard.security.payload-key”: enter your login password
+> and allow it, and SlipBoard moves the key into its file so your notes stay
+> readable. Later updates do not ask again. If you deny it, SlipBoard stays
+> locked; choose Unlock to be asked again. macOS may not let SlipBoard delete
+> the old keychain items; after the move you can delete the
+> `com.slipboard.security.payload-key` items in **Keychain Access** yourself.
 >
 > **Coming from an earlier release with App Lock on?** Its key belongs to the
 > old signature and cannot be read by an ad-hoc build, so SlipBoard creates a
@@ -343,8 +357,9 @@ An unsigned build runs. For App Lock, use the ad-hoc build from
 **Team-signed build**
 
 A team-signed build keeps the App Lock key in the Data Protection keychain,
-wrapped by a Secure Enclave key when the Mac has one. Ad-hoc builds keep it in
-the login keychain instead, because they cannot carry the keychain entitlement.
+wrapped by a Secure Enclave key when the Mac has one. Ad-hoc builds cannot carry
+the keychain entitlement, so they keep it in a file only your user can read,
+next to the encrypted data.
 
 1. In Xcode, open `SlipBoard.xcodeproj`, select the **SlipBoard** target and
    set **Signing & Capabilities** to your own team. Change the bundle
@@ -386,8 +401,7 @@ certificate.
 
 **Keep Accessibility across updates (optional).** Sign every release with the
 same self-signed certificate instead of ad-hoc, so macOS keeps the
-Accessibility permission after an update. The App Lock keychain prompts still
-appear, because macOS ties those items to the exact build:
+Accessibility permission after an update:
 
 1. In **Keychain Access**, choose **Keychain Access → Certificate Assistant →
    Create a Certificate…**. Name it (for example `SlipBoard Signing`), set
@@ -429,7 +443,7 @@ view state the popup renders, while Core Data persistence and the SQLite
 full-text index are kept in sync from it. With App Lock on, a copy of the
 content and notes of each item is additionally written to an encrypted store.
 Its key is wrapped by the Secure Enclave in team-signed builds (when the Mac
-has one) and kept in the login keychain in ad-hoc builds. The Core Data store itself is not encrypted.
+has one) and kept in a file readable only by your user in ad-hoc builds. The Core Data store itself is not encrypted.
 
 ## Project layout
 

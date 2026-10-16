@@ -25,8 +25,7 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
         now: @escaping () -> Date = Date.init
     ) {
         self.settingsStore = settingsStore
-        // Only build a key store when none is passed in: each one reads the
-        // keychain, which an ad-hoc build may have to ask the user about.
+        // Only build a key store when none is passed in.
         let resolvedPayloadStore = payloadStore ?? EncryptedPayloadStore(keyStore: keyStore ?? PayloadKeychainStore())
         self.payloadStore = resolvedPayloadStore
         self.decryptedPayloadCache = decryptedPayloadCache
@@ -48,6 +47,11 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
     func bootstrap() {
         let settings = settingsStore.currentSettings
+        // The key is only read when App Lock needs it, so a launch without App
+        // Lock never touches the keychain or the key file.
+        if settings.isAppLockEnabled {
+            payloadStore.loadAccessKeyIfNeeded()
+        }
 
         // App Lock is on but this keychain has no key: it was made by a build of
         // the other signing type, or removed. Make a new one instead of staying
@@ -316,7 +320,9 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
     }
 
     private func ensureKeyProvisionedIfNeeded(settings: SecuritySettings, at date: Date) {
-        guard payloadStore.activeWrappedKey == nil else {
+        // A key that exists but cannot be read may still protect notes, so a
+        // settings change never replaces it; turning App Lock off and on does.
+        guard payloadStore.activeWrappedKey == nil, payloadStore.isKeyRecordMissing else {
             return
         }
 
