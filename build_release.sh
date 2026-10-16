@@ -118,6 +118,8 @@ tiffutil -cathidpicheck Tools/dmg/background.png Tools/dmg/background@2x.png \
 
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW -ov "$WORK/rw.dmg" >/dev/null
 MOUNT_DIR="$(hdiutil attach "$WORK/rw.dmg" -readwrite -noverify -noautoopen | awk -F'\t' '/\/Volumes\// {print $NF}')"
+# Without this, a failed attach would leave the paths below pointing at /.
+[ -n "$MOUNT_DIR" ] && [ -d "$MOUNT_DIR" ] || { echo "Could not mount the writable DMG." >&2; exit 1; }
 
 # Window size and icon positions match Tools/dmg/make-background.swift.
 # Finder needs Automation permission for the app running this script.
