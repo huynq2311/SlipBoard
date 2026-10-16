@@ -1,0 +1,139 @@
+name: Release
+
+# Run by hand from main: builds and signs with ./build_release.sh and leaves a
+# draft release with the DMG, checksum and appcast. Edit the notes and publish
+# the draft; publishing starts the Homebrew tap's bump workflow.
+#
+# Secrets live in the "release" environment (add required reviewers and limit
+# it to main in Settings → Environments):
+#   SIGNING_CERTIFICATE_P12       base64 of the self-signed certificate + key (.p12)
+#   SIGNING_CERTIFICATE_PASSWORD  password of that .p12
+#   SPARKLE_ED_PRIVATE_KEY        Sparkle EdDSA private key (generate_keys -x)
+# and, as a repository secret:
+#   HOMEBREW_TAP_TOKEN            fine-grained token, huynq2311/homebrew-tap only,
+#                                 Actions: read and write
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_date:
+        description: "Build number, e.g. 20261017 or 20261017.2 (default: today)"
+        required: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    # Same runner and Xcode as ci.yml.
+    runs-on: macos-26
+    environment: release
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Check the build number
+        env:
+          BUILD_DATE_INPUT: ${{ inputs.build_date }}
+        run: |
+          BUILD_DATE="${BUILD_DATE_INPUT:-$(TZ=Asia/Ho_Chi_Minh date +%Y%m%d)}"
+          if ! [[ "$BUILD_DATE" =~ ^[0-9]{8}(\.[0-9]+)?$ ]]; then
+            echo "Build number must look like 20261017 or 20261017.2, not: $BUILD_DATE" >&2
+            exit 1
+          fi
+          echo "BUILD_DATE=$BUILD_DATE" >> "$GITHUB_ENV"
+
+      # A throwaway keychain holds the certificate for this job only; the runner
+      # is discarded afterwards, and the last step deletes it anyway.
+      - name: Import the signing certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          (umask 077; base64 --decode <<<"$SIGNING_CERTIFICATE_P12" > "$RUNNER_TEMP/signing.p12")
+          security import "$RUNNER_TEMP/signing.p12" -k "$KEYCHAIN" \
+            -P "$SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          # A self-signed certificate is not trusted, so it is not listed as valid; take it by hash.
+          IDENTITY="$(security find-identity -p codesigning "$KEYCHAIN" \
+            | awk '/"SlipBoard Self-Signed Code Signing"/ {print $2; exit}')"
+          [ -n "$IDENTITY" ] || { echo "The .p12 has no SlipBoard Self-Signed Code Signing identity." >&2; exit 1; }
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Write the Sparkle key
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          [ -n "$SPARKLE_ED_PRIVATE_KEY" ] || { echo "SPARKLE_ED_PRIVATE_KEY is not set." >&2; exit 1; }
+          (umask 077; printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_ed_key")
+          echo "SPARKLE_ED_KEY_FILE=$RUNNER_TEMP/sparkle_ed_key" >> "$GITHUB_ENV"
+
+      # The same script as local releases: signing order, library constraint,
+      # get-task-allow and updater gates, DMG and EdDSA-signed appcast.
+      - name: Build, sign and package
+        run: ./build_release.sh
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PLIST=Release/SlipBoard.app/Contents/Info.plist
+          VERSION="$(plutil -extract CFBundleShortVersionString raw "$PLIST")"
+          TAG="v$VERSION-$BUILD_DATE"
+          SHA256="$(cut -d' ' -f1 Release/SlipBoard.dmg.sha256)"
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          ## What's New
+
+          - …
+
+          ## Checksum
+
+          \`SlipBoard.dmg\` SHA-256: \`$SHA256\`
+
+          Built from \`${GITHUB_SHA:0:7}\`, the head of \`main\`, by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).
+          EOF
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+            --title "SlipBoard v$VERSION (Build $BUILD_DATE)" --notes-file "$RUNNER_TEMP/notes.md" \
+            Release/SlipBoard.dmg Release/SlipBoard.dmg.sha256 Release/appcast.xml
+          echo "Draft: $TAG. Edit the notes and publish it on the Releases page." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the keychain and key
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/sparkle_ed_key" "$RUNNER_TEMP/signing.p12"
+
+  bump-homebrew-tap:
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    steps:
+      # The tap checks the release's checksum and opens a pull request there.
+      - name: Start the tap's bump workflow
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: gh workflow run bump-slipboard.yml --repo huynq2311/homebrew-tap

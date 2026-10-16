@@ -444,6 +444,16 @@ bản không ký không có chứng chỉ để so, nên tắt cập nhật.
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
 
+**Phát hành từ GitHub Actions.** Workflow **Release**
+([`release.yml`](.github/workflows/release.yml)), chạy tay trên `main`, gọi
+`./build_release.sh` với chứng chỉ ký và khóa Sparkle lấy từ secret của
+environment `release`, rồi để lại một bản release nháp kèm DMG, checksum và
+appcast. Viết phần **What's New** rồi publish bản nháp; publish sẽ chạy workflow
+bump của [Homebrew tap](https://github.com/huynq2311/homebrew-tap). Danh sách
+secret cần có ghi ở đầu workflow. Hai khóa này ký được app giữ nguyên quyền
+Accessibility của SlipBoard và bản cập nhật mà mọi máy đã cài đều chấp nhận, nên
+giới hạn environment `release` chỉ cho `main` và bắt buộc có người duyệt.
+
 ---
 
 ## Cách hoạt động
