@@ -96,16 +96,35 @@ struct PayloadKeyFile {
         return .found(contents.key.materialize(), keyData: contents.keyData)
     }
 
+    enum CreateResult {
+        case created
+        /// Another SlipBoard instance wrote a key file first; it was left as is.
+        case alreadyExists
+        case failed
+    }
+
     /// Writes a temporary file created with mode 0600 and renames it over the
-    /// key file, so a crash leaves either the old key or the new one.
+    /// key file, so a crash leaves either the old key or the new one. Only for
+    /// rewriting the key already in use.
     func write(_ wrappedKey: WrappedPayloadKey, keyData: Data) -> Bool {
+        publish(wrappedKey, keyData: keyData, replacingExisting: true) == .created
+    }
+
+    /// Writes a new key only if there is no key file yet. Two instances
+    /// creating a key at the same time would otherwise each encrypt notes with
+    /// their own key while only the last one written survives.
+    func create(_ wrappedKey: WrappedPayloadKey, keyData: Data) -> CreateResult {
+        publish(wrappedKey, keyData: keyData, replacingExisting: false)
+    }
+
+    private func publish(_ wrappedKey: WrappedPayloadKey, keyData: Data, replacingExisting: Bool) -> CreateResult {
         let contents = Contents(
             formatVersion: Self.formatVersion,
             key: WrappedPayloadKeyRecord(wrappedKey: wrappedKey),
             keyData: keyData
         )
         guard let data = try? JSONEncoder().encode(contents) else {
-            return false
+            return .failed
         }
 
         let directoryURL = url.deletingLastPathComponent()
@@ -116,10 +135,10 @@ struct PayloadKeyFile {
                 attributes: [.posixPermissions: 0o700]
             )
         } catch {
-            return false
+            return .failed
         }
         guard chmod(directoryURL.path, 0o700) == 0 else {
-            return false
+            return .failed
         }
 
         let temporaryPath = directoryURL
@@ -127,7 +146,7 @@ struct PayloadKeyFile {
             .path
         let descriptor = open(temporaryPath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else {
-            return false
+            return .failed
         }
 
         let isWritten = fchmod(descriptor, 0o600) == 0
@@ -135,18 +154,26 @@ struct PayloadKeyFile {
             && Self.syncToDisk(descriptor)
         close(descriptor)
 
-        guard isWritten, rename(temporaryPath, url.path) == 0 else {
+        guard isWritten else {
             unlink(temporaryPath)
-            return false
+            return .failed
+        }
+        let isPublished = replacingExisting
+            ? rename(temporaryPath, url.path) == 0
+            : renamex_np(temporaryPath, url.path, UInt32(RENAME_EXCL)) == 0
+        guard isPublished else {
+            let isTaken = replacingExisting == false && errno == EEXIST
+            unlink(temporaryPath)
+            return isTaken ? .alreadyExists : .failed
         }
 
         // Makes the rename itself survive a crash or power loss.
         let directoryDescriptor = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard directoryDescriptor >= 0 else {
-            return false
+            return .failed
         }
         defer { close(directoryDescriptor) }
-        return Self.syncToDisk(directoryDescriptor)
+        return Self.syncToDisk(directoryDescriptor) ? .created : .failed
     }
 
     /// Keeps a file that could not be parsed as `PayloadKey.unreadable-<time>.json`
