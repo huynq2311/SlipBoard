@@ -511,7 +511,17 @@ Released under the [MIT License](LICENSE).
 
 ## Third-party notices
 
-SlipBoard bundles no third-party code, fonts or artwork. It relies on these:
+SlipBoard bundles one third-party library:
+
+- **[Sparkle](https://sparkle-project.org)** 2, the in-app update framework
+  (MIT License; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems GmbH,
+  © 2011-2014 Kornel Lesiński, © 2015-2017 Mayur Pawashe, © 2014 C.W. Betts,
+  © 2014 Petroules Corporation, © 2014 Big Nerd Ranch). Sparkle includes code
+  from bsdiff, sais-lite, ed25519 and SUSignatureVerifier under their own
+  licenses. Full text:
+  [Sparkle's LICENSE](https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE).
+
+It bundles no other third-party code, fonts or artwork, and relies on these:
 
 - **SF Symbols** (© Apple Inc.). The interface draws icons from the SF Symbols
   set that macOS provides, as allowed by Apple's SF Symbols license for apps on

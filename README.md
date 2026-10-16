@@ -492,8 +492,18 @@ Phát hành theo giấy phép [MIT](LICENSE).
 
 ## Thông báo bên thứ ba
 
-SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ ba. Ứng dụng
-dựa vào các thành phần sau:
+SlipBoard đóng gói một thư viện của bên thứ ba:
+
+- **[Sparkle](https://sparkle-project.org)** 2, framework cập nhật trong ứng
+  dụng (giấy phép MIT; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems
+  GmbH, © 2011-2014 Kornel Lesiński, © 2015-2017 Mayur Pawashe, © 2014 C.W.
+  Betts, © 2014 Petroules Corporation, © 2014 Big Nerd Ranch). Sparkle có chứa
+  code từ bsdiff, sais-lite, ed25519 và SUSignatureVerifier theo giấy phép
+  riêng của từng thành phần. Toàn văn:
+  [LICENSE của Sparkle](https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE).
+
+Ngoài Sparkle, SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ
+ba. Ứng dụng dựa vào các thành phần sau:
 
 - **SF Symbols** (© Apple Inc.). Giao diện dùng biểu tượng từ bộ SF Symbols có
   sẵn trong macOS, theo giấy phép SF Symbols của Apple cho ứng dụng chạy trên
