@@ -461,7 +461,10 @@ updates are off.
 
 Release naming: tag `v<version>-<yyyymmdd>`, title
 `SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
-description.
+description. `Tools/publish_release.sh <notes.md>` publishes `Release/` that way
+from the clean, pushed commit it was built from, then starts the
+[Homebrew tap](https://github.com/huynq2311/homebrew-tap)'s bump workflow, which
+otherwise runs every 6 hours.
 
 ---
 

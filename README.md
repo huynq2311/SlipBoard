@@ -443,6 +443,10 @@ bản không ký không có chứng chỉ để so, nên tắt cập nhật.
 
 Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
 `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
+`Tools/publish_release.sh <notes.md>` phát hành `Release/` theo đúng quy ước đó,
+từ commit sạch đã push mà bản build được tạo ra, rồi chạy workflow bump của
+[Homebrew tap](https://github.com/huynq2311/homebrew-tap) (bình thường 6 giờ mới
+chạy một lần).
 
 ---
 
