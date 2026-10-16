@@ -50,6 +50,8 @@ struct SBClipCardShell: View {
     @State private var loadedPixelSize: CGSize?
     @State private var loadedFileBytes: Int64?
     @State private var loadedCharacterCount: Int?
+    @State private var isNotePreviewVisible = false
+    @State private var notePreviewTask: Task<Void, Never>?
 
     private static let footerHeight: CGFloat = 27
 
@@ -82,6 +84,7 @@ struct SBClipCardShell: View {
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
+            .overlay(alignment: .bottom) { notePreviewOverlay }
             .overlay(alignment: .bottom) { noteEditorOverlay }
         }
         // Keyed on visibility too, so a card hidden by App Lock loads its
@@ -460,6 +463,57 @@ struct SBClipCardShell: View {
         showsFooter ? Self.footerHeight : 0
     }
 
+    /// The footer shows one line; hovering it shows the whole note above it.
+    /// A tooltip would not appear, because the popup panel never activates
+    /// the app.
+    @ViewBuilder
+    private var notePreviewOverlay: some View {
+        if isNotePreviewVisible, isInlineEditorVisible == false,
+           let noteText = clip.noteText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           noteText.isEmpty == false, footerNoteText != nil {
+            Text(noteText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.palette.textPrimary)
+                .lineLimit(8)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // Opaque, so the preview text under it does not show through
+                // on translucent themes.
+                .background {
+                    ZStack {
+                        Color(nsColor: .windowBackgroundColor)
+                        theme.palette.canvas
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(theme.palette.border, lineWidth: theme.border.hairline)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+                .padding(.horizontal, 8)
+                .padding(.bottom, Self.footerHeight)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+
+    private func updateNotePreviewHover(_ isHovering: Bool) {
+        notePreviewTask?.cancel()
+        guard isHovering else {
+            withAnimation(.easeOut(duration: 0.12)) { isNotePreviewVisible = false }
+            return
+        }
+        notePreviewTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard Task.isCancelled == false else { return }
+            withAnimation(.easeOut(duration: 0.12)) { isNotePreviewVisible = true }
+        }
+    }
+
     // Drawn over the card's bottom edge rather than in the footer's slot, so
     // opening it does not shrink the preview above.
     @ViewBuilder
@@ -492,11 +546,17 @@ struct SBClipCardShell: View {
                     .truncationMode(.tail)
             }
             .foregroundStyle(theme.palette.accentPrimary)
-            .help(footerNoteText)
             .padding(.horizontal, 12)
             .padding(.bottom, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: Self.footerHeight)
+            // A click edits the note in place; no need for the right-click menu.
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard noteInteractionsEnabled else { return }
+                onToggleNoteEditor()
+            }
+            .onHover(perform: updateNotePreviewHover)
         } else {
             metricsFooter
         }
@@ -1216,6 +1276,11 @@ private struct ClipNoteFooterEditor: View {
     let onSave: () -> Void
     let onCancel: () -> Void
     @FocusState private var isFocused: Bool
+    // Edited locally so text past the limit is cut in the field itself; a
+    // binding to the stored draft would not push the shortened value back.
+    @State private var text = ""
+
+    private static let counterThreshold = ClipNoteEditorState.characterLimit - 30
 
     // Styled like the popup's search field.
     var body: some View {
@@ -1223,10 +1288,7 @@ private struct ClipNoteFooterEditor: View {
             if state.isEditable {
                 // The system placeholder draws almost invisibly in the
                 // non-key popup panel, so it is drawn here instead.
-                TextField("", text: Binding(
-                    get: { state.draftText },
-                    set: onUpdateDraft
-                ))
+                TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(theme.palette.textPrimary)
@@ -1235,8 +1297,16 @@ private struct ClipNoteFooterEditor: View {
                 .onChange(of: isFocused) { wasFocused, isFocused in
                     if wasFocused, isFocused == false { onCancel() }
                 }
+                .onChange(of: text) { _, newText in
+                    let limited = String(newText.prefix(ClipNoteEditorState.characterLimit))
+                    if limited != newText {
+                        text = limited
+                        return
+                    }
+                    onUpdateDraft(limited)
+                }
                 .overlay(alignment: .leading) {
-                    if state.draftText.isEmpty {
+                    if text.isEmpty {
                         Text(state.hasPersistedNote ? copy.text(.popupUpdateNote) : copy.text(.popupAddNote))
                             .font(theme.typography.chip)
                             .foregroundStyle(theme.palette.textTertiary)
@@ -1245,6 +1315,7 @@ private struct ClipNoteFooterEditor: View {
                     }
                 }
                 .onAppear {
+                    text = String(state.draftText.prefix(ClipNoteEditorState.characterLimit))
                     isFocused = true
                     // Focusing selects the whole note; put the caret at the
                     // end so the first key press does not replace it.
@@ -1252,6 +1323,17 @@ private struct ClipNoteFooterEditor: View {
                         guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
                         editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
                     }
+                }
+
+                if text.count >= Self.counterThreshold {
+                    Text("\(text.count)/\(ClipNoteEditorState.characterLimit)")
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
+                        .foregroundStyle(
+                            text.count >= ClipNoteEditorState.characterLimit
+                                ? theme.accent(for: .warning)
+                                : theme.palette.textTertiary
+                        )
+                        .fixedSize()
                 }
             } else {
                 Text(copy.text(.popupNotesLocked))

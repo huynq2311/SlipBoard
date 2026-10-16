@@ -170,7 +170,7 @@ final class SearchNotesRuntimeController: SearchNotesRuntimeProviding {
     }
 
     func updateNoteDraft(_ draftText: String) {
-        _ = store.updateActiveDraft(draftText)
+        _ = store.updateActiveDraft(String(draftText.prefix(ClipNoteEditorState.characterLimit)))
         refreshProjection()
     }
 

@@ -18,6 +18,31 @@ struct SBSectionHeader: View {
 
     var body: some View {
         HStack(spacing: theme.spacing.control8) {
+            // With a disclosure, the whole title cluster toggles, not just the
+            // small chevron.
+            if let onDisclosure {
+                Button(action: onDisclosure) {
+                    titleCluster
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(disclosureAccessibilityLabel ?? title)
+            } else {
+                titleCluster
+            }
+
+            if style == .compact {
+                Rectangle()
+                    .fill(theme.palette.border)
+                    .frame(height: theme.border.hairline)
+            } else {
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var titleCluster: some View {
+        HStack(spacing: theme.spacing.control8) {
             HStack(spacing: 4) {
                 if let symbolName {
                     Image(systemName: symbolName)
@@ -40,24 +65,11 @@ struct SBSectionHeader: View {
                 }
             }
 
-            if let disclosureSymbolName, let onDisclosure {
-                Button(action: onDisclosure) {
-                    Image(systemName: disclosureSymbolName)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(theme.palette.textTertiary)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(disclosureAccessibilityLabel ?? disclosureSymbolName)
-            }
-
-            if style == .compact {
-                Rectangle()
-                    .fill(theme.palette.border)
-                    .frame(height: theme.border.hairline)
-            } else {
-                Spacer(minLength: 0)
+            if let disclosureSymbolName, onDisclosure != nil {
+                Image(systemName: disclosureSymbolName)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .frame(width: 22, height: 22)
             }
         }
     }
