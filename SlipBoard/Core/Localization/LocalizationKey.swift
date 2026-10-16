@@ -504,6 +504,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case aboutUpdates
     case aboutCheckForUpdates
     case aboutUpdatesNote
+    case aboutUpdatesUnavailable
     case aboutAutomaticUpdateChecks
     case aboutLinks
     case aboutGitHub
@@ -1015,6 +1016,7 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .aboutCheckForUpdates: "Check for Updates"
         case .aboutAutomaticUpdateChecks: "Check for updates automatically"
         case .aboutUpdatesNote: "SlipBoard connects to GitHub only to check for updates: when you click this button, or daily if automatic checks are on. It sends nothing about your Mac or your clipboard."
+        case .aboutUpdatesUnavailable: "Updates are off in this copy of SlipBoard because its update component could not be verified. Download the latest version from GitHub."
         case .aboutLinks: "Links"
         case .aboutGitHub: "GitHub"
         case .aboutPrivacyPolicy: "Privacy Policy"
@@ -1566,6 +1568,7 @@ struct LocalizationCatalog: Sendable {
         .aboutCheckForUpdates: "Kiểm tra cập nhật",
         .aboutAutomaticUpdateChecks: "Tự động kiểm tra cập nhật",
         .aboutUpdatesNote: "SlipBoard chỉ kết nối GitHub để kiểm tra cập nhật: khi bạn bấm nút này, hoặc mỗi ngày nếu bật tự động kiểm tra. Không gửi thông tin gì về máy hay clipboard của bạn.",
+        .aboutUpdatesUnavailable: "Bản SlipBoard này đã tắt cập nhật vì không xác minh được thành phần cập nhật. Hãy tải bản mới nhất từ GitHub.",
         .aboutLinks: "Liên kết",
         .aboutGitHub: "GitHub",
         .aboutPrivacyPolicy: "Chính sách quyền riêng tư"

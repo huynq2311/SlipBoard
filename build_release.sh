@@ -31,6 +31,9 @@ OUT_DIR="Release"
 # claims keychain-access-groups, so App Lock keeps its key in a 0600 file instead.
 # Its only entitlement turns off library validation: without a Team ID, macOS
 # refuses to load Sparkle.framework into the app even when both share a certificate.
+# The app makes up for it: Sparkle lives inside PlugIns/SlipBoardUpdater.bundle, which
+# the app loads only after checking that the plug-in and the framework carry its own
+# certificate (SlipBoard/Core/Updates/UpdaterSignatureCheck.swift).
 # team: needs a valid profile; a free team's profile lasts 7 days.
 SIGN_MODE=adhoc
 for arg in "$@"; do
@@ -89,19 +92,44 @@ cp -R "$APP_PATH" "$OUT_DIR/"
 if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   say "Signing with $SIGN_IDENTITY"
   sign() { codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$@"; }
-  # Inside out, as Sparkle's docs list it.
-  SPARKLE="$OUT_DIR/$APP_NAME.app/Contents/Frameworks/Sparkle.framework"
+  # Inside out, as Sparkle's docs list it, then the plug-in that holds Sparkle.
+  # The app loads them only if they carry this same certificate.
+  PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipBoardUpdater.bundle"
+  SPARKLE="$PLUGIN/Contents/Frameworks/Sparkle.framework"
   sign "$SPARKLE/Versions/B/XPCServices/Installer.xpc"
   sign --preserve-metadata=entitlements "$SPARKLE/Versions/B/XPCServices/Downloader.xpc"
   sign "$SPARKLE/Versions/B/Autoupdate"
   sign "$SPARKLE/Versions/B/Updater.app"
   sign "$SPARKLE"
+  sign "$PLUGIN"
   sign --entitlements SlipBoard-NoTeam.entitlements "$OUT_DIR/$APP_NAME.app"
+fi
+
+# Sparkle must reach the app only through the plug-in, after its signature check.
+LINKED="$(otool -L "$OUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME")"
+if grep -q Sparkle <<<"$LINKED"; then
+  echo "The app executable links Sparkle; only SlipBoardUpdater.bundle may." >&2
+  exit 1
 fi
 
 if [ "$SIGN_MODE" != none ]; then
   say "Verifying signature"
   codesign --verify --deep --strict "$OUT_DIR/$APP_NAME.app"
+  # The app loads the updater only if it matches the app's own certificate
+  # (UpdaterSignatureCheck); check the same here so a release never ships with
+  # updates silently off. Ad-hoc builds have no certificate and no updates.
+  CERT_DIR="$(mktemp -d)"
+  codesign -d --extract-certificates="$CERT_DIR/cert" "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true
+  if [ -f "$CERT_DIR/cert0" ]; then
+    LEAF="$(shasum -a 1 "$CERT_DIR/cert0" | cut -d' ' -f1)"
+    PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipBoardUpdater.bundle"
+    codesign --verify --deep --strict \
+      -R="identifier \"org.sparkle-project.Sparkle\" and certificate leaf = H\"$LEAF\"" \
+      "$PLUGIN/Contents/Frameworks/Sparkle.framework"
+    codesign --verify --deep --strict \
+      -R="identifier \"huynq.SlipBoard.Updater\" and certificate leaf = H\"$LEAF\"" "$PLUGIN"
+  fi
+  rm -rf "$CERT_DIR"
   codesign -dv "$OUT_DIR/$APP_NAME.app" 2>&1 | grep -E 'Signature=|Authority=|TeamIdentifier=' || true
   # get-task-allow lets any local process attach to the app and read decrypted history.
   ENTITLEMENTS="$(codesign -d --entitlements - "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true)"
