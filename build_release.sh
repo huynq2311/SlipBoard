@@ -17,6 +17,8 @@
 #                      across updates; without it each build is ad-hoc signed.
 #   NOTARY_PROFILE     notarytool keychain profile. When set, and the app is signed
 #                      with a Developer ID certificate, the DMG is notarized and stapled.
+#   SPARKLE_ED_KEY_FILE  File holding the Sparkle EdDSA private key that signs the
+#                      appcast. Without it, the key is read from the login keychain.
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -40,7 +42,7 @@ for arg in "$@"; do
   case "$arg" in
     --team) SIGN_MODE=team ;;
     --no-sign) SIGN_MODE=none ;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -274,16 +276,22 @@ fi
 TAG="v$VERSION-$BUILD_DATE"
 if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   # The app reads releases/latest/download/appcast.xml, so upload this file with the
-  # DMG. generate_appcast signs the DMG with the EdDSA key in the login keychain.
+  # DMG. generate_appcast signs the DMG with the EdDSA key from SPARKLE_ED_KEY_FILE
+  # (release.yml) or the login keychain.
   say "Writing appcast"
   mkdir "$WORK/appcast"
   cp "$OUT_DIR/$APP_NAME.dmg" "$WORK/appcast/"
-  "$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast" \
+  # bash 3.2 (macOS) treats an empty array as unset under set -u, hence the + form.
+  ED_KEY_ARGS=()
+  if [ -n "${SPARKLE_ED_KEY_FILE:-}" ]; then
+    ED_KEY_ARGS=(--ed-key-file "$SPARKLE_ED_KEY_FILE")
+  fi
+  "$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast" ${ED_KEY_ARGS[@]+"${ED_KEY_ARGS[@]}"} \
     --download-url-prefix "https://github.com/huynq2311/SlipBoard/releases/download/$TAG/" \
     -o "$OUT_DIR/appcast.xml" "$WORK/appcast"
   # Without the private key the appcast is written unsigned, and every client rejects it.
   grep -q 'sparkle:edSignature=' "$OUT_DIR/appcast.xml" \
-    || { echo "appcast.xml has no EdDSA signature; is the Sparkle key in the login keychain?" >&2; exit 1; }
+    || { echo "appcast.xml has no EdDSA signature; is the Sparkle key matching SUPublicEDKey in SPARKLE_ED_KEY_FILE or the login keychain?" >&2; exit 1; }
 fi
 
 say "Done"
