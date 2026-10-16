@@ -457,7 +457,6 @@ SlipBoard/
 Tools/
 └── LocalizationHarness/          chương trình kiểm tra danh mục chuỗi
 build_release.sh                  build và đóng gói DMG
-design/                           tài liệu thiết kế
 ```
 
 ## Giới hạn đã biết
@@ -487,7 +486,3 @@ dựa vào các thành phần sau:
 - **Tên và icon của ứng dụng khác.** Thẻ hiển thị tên và icon của ứng dụng nguồn
   của clip, lấy từ máy của bạn lúc chạy. Ảnh chụp màn hình trong README có hiện
   một số icon này chỉ để minh họa. Chúng là nhãn hiệu của chủ sở hữu tương ứng.
-- **Bản mockup thiết kế** trong [`design/`](design) (không thuộc ứng dụng) nạp
-  font [Geist](https://github.com/vercel/geist-font) và
-  [IBM Plex Mono](https://github.com/IBM/plex) (SIL Open Font License 1.1) cùng
-  [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT) từ CDN công khai.

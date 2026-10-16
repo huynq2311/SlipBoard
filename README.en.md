@@ -473,7 +473,6 @@ SlipBoard/
 Tools/
 └── LocalizationHarness/          standalone harness to test the string catalog
 build_release.sh                  build and package a DMG
-design/                           design docs and UI contracts
 ```
 
 ## Known limitations
@@ -502,7 +501,3 @@ SlipBoard bundles no third-party code, fonts or artwork. It relies on these:
 - **Other apps' names and icons.** Cards show the name and icon of the app a
   clip came from, read from your Mac at run time. The screenshots in this README
   show some of them for illustration only. They are trademarks of their owners.
-- **Design mockups** in [`design/`](design) (not part of the app) load
-  [Geist](https://github.com/vercel/geist-font) and
-  [IBM Plex Mono](https://github.com/IBM/plex) (SIL Open Font License 1.1) and
-  [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT) from public CDNs.
