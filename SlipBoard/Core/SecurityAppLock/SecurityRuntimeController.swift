@@ -48,8 +48,10 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
     func bootstrap() {
         let settings = settingsStore.currentSettings
         // The key is only read when App Lock needs it, so a launch without App
-        // Lock never touches the keychain or the key file. Nothing here may
-        // ask the user; Unlock tries again with prompts allowed.
+        // Lock never touches the keychain or the key file. The lookup never
+        // asks the user; Unlock tries again with prompts allowed. Unwrapping a
+        // key the previous release left in the login keychain asks once, below,
+        // because that key is the only way to read existing notes.
         if settings.isAppLockEnabled {
             payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: false)
         }
@@ -219,8 +221,16 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
             )
         )
 
-        // A key that could not be loaded at launch gets another try here.
+        // A key that could not be loaded at launch gets another try here. If
+        // there turns out to be none, make one, as launch would have.
         payloadStore.loadAccessKeyIfNeeded(allowsUserInteraction: true)
+        if payloadStore.activeWrappedKey == nil, payloadStore.isKeyRecordMissing {
+            _ = payloadStore.provisionAccessKey(
+                preferredPolicy: .secureEnclaveWrapped,
+                authenticationMethod: method,
+                at: now()
+            )
+        }
 
         // A session-only key unwraps without asking, so ask here first. An old
         // key asks for Touch ID itself while it is unwrapped.

@@ -39,9 +39,9 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     /// disk. The release before this one kept the key in the login keychain;
     /// that key is moved to the file on first unlock.
     ///
-    /// A build with a Team ID that still lacks the entitlement is a broken
-    /// team or Developer ID build, not an ad-hoc one; it gets no key at all
-    /// rather than a plain file.
+    /// A build whose signature claims the keychain entitlement but still gets
+    /// errSecMissingEntitlement (a missing or expired profile) is
+    /// misconfigured; it gets no key at all rather than a plain file.
     private enum KeychainBackend {
         case dataProtection
         case file
@@ -64,7 +64,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         case .file:
             Self.logger.info("App Lock key storage: key file")
         case .unavailable:
-            Self.logger.error("App Lock key storage unavailable: signed with a Team ID but no keychain entitlement")
+            Self.logger.error("App Lock key storage unavailable: keychain entitlement claimed but not granted")
         }
         return backend
     }()
@@ -121,7 +121,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
                 } else {
                     Self.logger.error("App Lock login keychain key unreadable: \(legacyLookup.status, privacy: .public)")
                 }
-            case .unreadable:
+            case .inaccessible, .corrupt:
                 Self.logger.error("App Lock key file unreadable")
             }
         }
@@ -292,8 +292,9 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
 
     /// Turning App Lock off and on keeps an existing key, so notes saved under
     /// it stay readable. A new key is written only when there is none, or when
-    /// the file exists but cannot be read (turning App Lock on again is the way
-    /// out of that). A key in the login keychain that could not be read is
+    /// the file cannot be parsed; that file is moved aside first. A key that
+    /// could not be read (a file with other access rights or owner, a newer
+    /// format, a login keychain key that was denied or could not be checked) is
     /// never replaced: enabling fails and can be retried.
     private func provisionInKeyFile(at date: Date) -> PayloadKeyMaterialState {
         loadStoredKeyIfNeeded(allowsUserInteraction: true)
@@ -302,9 +303,14 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             if state.hasUnwrappedKeyInMemory || existingKey.wrappingPolicy == .keychainThisDeviceOnly {
                 return state
             }
-        } else if isKeyRecordMissing == false, case .missing = keyFile.read() {
-            Self.logger.error("App Lock key not replaced: login keychain key could not be checked")
-            return keyMaterialState
+        }
+        if isKeyRecordMissing == false {
+            guard case .corrupt = keyFile.read(), keyFile.moveAside() else {
+                Self.logger.error("App Lock key not replaced: the existing key could not be read")
+                activeKeyData = nil
+                return keyMaterialState
+            }
+            Self.logger.info("App Lock moved an unparsable key file aside")
         }
 
         guard let payloadKeyData = Self.randomPayloadKeyData() else {
@@ -402,6 +408,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     private static func legacyLoginKeychainKey(
         allowsUserInteraction: Bool
     ) -> (wrappedKey: WrappedPayloadKey?, status: OSStatus) {
+        // A locked keychain might answer "not found" without asking, which
+        // would let a new key shadow the old one. Ask again on Unlock instead.
+        if allowsUserInteraction == false, isLoginKeychainUnlocked() == false {
+            return (nil, errSecInteractionNotAllowed)
+        }
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: Constants.fallbackKeyService,
@@ -428,6 +439,19 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             lastWrappedAt: createdAt
         )
         return (wrappedKey, status)
+    }
+
+    private static func isLoginKeychainUnlocked() -> Bool {
+        var keychain: SecKeychain?
+        var status = SecKeychainStatus()
+        guard
+            SecKeychainCopyDefault(&keychain) == errSecSuccess,
+            let keychain,
+            SecKeychainGetStatus(keychain, &status) == errSecSuccess
+        else {
+            return false
+        }
+        return status & SecKeychainStatus(kSecUnlockStateStatus) != 0
     }
 
     /// Only affects the login keychain; Data Protection items never prompt.
@@ -686,10 +710,12 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
     }
 
     /// Falls back to the key file only on errSecMissingEntitlement, and only
-    /// when the app has no Team ID (ad-hoc or unsigned). Any other status keeps
-    /// the Data Protection keychain, so a team-signed build never reads or
-    /// writes key material outside it. Deleting an item that is never written
-    /// has no effect; only the status matters.
+    /// when the signature claims no keychain entitlement (ad-hoc builds, and
+    /// Developer ID builds re-signed without entitlements). A build that claims
+    /// it and still gets errSecMissingEntitlement is misconfigured and gets no
+    /// key. Any other status keeps the Data Protection keychain, so such a
+    /// build never reads or writes key material outside it. Deleting an item
+    /// that is never written has no effect; only the status matters.
     private static func resolveBackend() -> KeychainBackend {
         let probe: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -700,12 +726,12 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         guard SecItemDelete(probe as CFDictionary) == errSecMissingEntitlement else {
             return .dataProtection
         }
-        return hasNoTeamIdentifier() ? .file : .unavailable
+        return signatureClaimsKeychainAccess() == false ? .file : .unavailable
     }
 
-    /// Any failure to read the signature counts as having a Team ID, so the
-    /// key file is never used by mistake.
-    private static func hasNoTeamIdentifier() -> Bool {
+    /// Nil when the signature cannot be read, which counts as claiming it, so
+    /// the key file is never used by mistake.
+    private static func signatureClaimsKeychainAccess() -> Bool? {
         var code: SecCode?
         var staticCode: SecStaticCode?
         var information: CFDictionary?
@@ -721,9 +747,11 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
             ) == errSecSuccess,
             let information = information as? [String: Any]
         else {
-            return false
+            return nil
         }
-        return information[kSecCodeInfoTeamIdentifier as String] == nil
+        let entitlements = information[kSecCodeInfoEntitlementsDict as String] as? [String: Any] ?? [:]
+        return entitlements["keychain-access-groups"] != nil
+            || entitlements["com.apple.application-identifier"] != nil
     }
 
     /// Without `kSecUseDataProtectionKeychain`, macOS uses the login keychain.
