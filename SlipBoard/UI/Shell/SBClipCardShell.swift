@@ -50,8 +50,6 @@ struct SBClipCardShell: View {
     @State private var loadedPixelSize: CGSize?
     @State private var loadedFileBytes: Int64?
     @State private var loadedCharacterCount: Int?
-    @State private var isNotePreviewVisible = false
-    @State private var notePreviewTask: Task<Void, Never>?
 
     private static let footerHeight: CGFloat = 27
 
@@ -84,7 +82,6 @@ struct SBClipCardShell: View {
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(alignment: .bottom) { notePreviewOverlay }
             .overlay(alignment: .bottom) { noteEditorOverlay }
         }
         // Keyed on visibility too, so a card hidden by App Lock loads its
@@ -102,6 +99,16 @@ struct SBClipCardShell: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay { cardRim }
         .shadow(color: restingShadowColor, radius: 6, x: 0, y: 2)
+        // Themes without a glass rim had no depth at all. The shadow follows
+        // a plain shape behind the card, not the card's content, so it stays
+        // cheap to redraw.
+        .background {
+            if theme.glassRim == nil {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(theme.palette.cardBase)
+                    .shadow(color: .black.opacity(theme.mode == .dark ? 0.45 : 0.17), radius: 9, x: 0, y: 4)
+            }
+        }
         .shadow(color: selectionGlowColor, radius: isSelected ? 10 : 0, x: 0, y: isSelected ? 2 : 0)
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture(count: 2) {
@@ -463,59 +470,8 @@ struct SBClipCardShell: View {
         showsFooter ? Self.footerHeight : 0
     }
 
-    /// The footer shows one line; hovering it shows the whole note above it.
-    /// A tooltip would not appear, because the popup panel never activates
-    /// the app.
-    @ViewBuilder
-    private var notePreviewOverlay: some View {
-        if isNotePreviewVisible, isInlineEditorVisible == false,
-           let noteText = clip.noteText?.trimmingCharacters(in: .whitespacesAndNewlines),
-           noteText.isEmpty == false, footerNoteText != nil {
-            Text(noteText)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(theme.palette.textPrimary)
-                .lineLimit(8)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // Opaque, so the preview text under it does not show through
-                // on translucent themes.
-                .background {
-                    ZStack {
-                        Color(nsColor: .windowBackgroundColor)
-                        theme.palette.canvas
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(theme.palette.border, lineWidth: theme.border.hairline)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
-                .padding(.horizontal, 8)
-                .padding(.bottom, Self.footerHeight)
-                .allowsHitTesting(false)
-                .transition(.opacity)
-        }
-    }
-
-    private func updateNotePreviewHover(_ isHovering: Bool) {
-        notePreviewTask?.cancel()
-        guard isHovering else {
-            withAnimation(.easeOut(duration: 0.12)) { isNotePreviewVisible = false }
-            return
-        }
-        notePreviewTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard Task.isCancelled == false else { return }
-            withAnimation(.easeOut(duration: 0.12)) { isNotePreviewVisible = true }
-        }
-    }
-
-    // Drawn over the card's bottom edge rather than in the footer's slot, so
-    // opening it does not shrink the preview above.
+    // Drawn over the footer's slot, so opening it does not shrink the preview
+    // above.
     @ViewBuilder
     private var noteEditorOverlay: some View {
         if isInlineEditorVisible, let noteEditorState {
@@ -526,8 +482,6 @@ struct SBClipCardShell: View {
                 onSave: onSaveNote,
                 onCancel: onCancelNoteEditing
             )
-            .padding(.horizontal, 8)
-            .padding(.bottom, 9)
         }
     }
 
@@ -536,29 +490,32 @@ struct SBClipCardShell: View {
         if isInlineEditorVisible {
             // The editor overlay covers this slot.
             Color.clear.frame(height: Self.footerHeight)
-        } else if let footerNoteText {
-            HStack(spacing: 4) {
-                Image(systemName: "note.text")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(footerNoteText)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+        } else {
+            Group {
+                if let footerNoteText {
+                    HStack(spacing: 4) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(footerNoteText)
+                            .font(.system(size: 12, weight: .medium))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .foregroundStyle(theme.palette.textTertiary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: Self.footerHeight)
+                } else {
+                    metricsFooter
+                }
             }
-            .foregroundStyle(theme.palette.accentPrimary)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: Self.footerHeight)
-            // A click edits the note in place; no need for the right-click menu.
+            // A click edits the note in place, whether or not it has one yet.
             .contentShape(Rectangle())
             .onTapGesture {
                 guard noteInteractionsEnabled else { return }
                 onToggleNoteEditor()
             }
-            .onHover(perform: updateNotePreviewHover)
-        } else {
-            metricsFooter
         }
     }
 
@@ -1081,7 +1038,8 @@ struct SBHorizontalClipRail: View {
                 }
                 .animation(railAnimation, value: clipIDs)
                 .padding(.top, 5)
-                .padding(.bottom, 2)
+                // Room for the card shadow; the scroll view clips at its edge.
+                .padding(.bottom, 12)
             }
             .contentMargins(.horizontal, theme.spacing.popupPadding, for: .scrollContent)
             .scrollPosition($scrollPosition)
@@ -1280,7 +1238,7 @@ private struct ClipNoteFooterEditor: View {
     // binding to the stored draft would not push the shortened value back.
     @State private var text = ""
 
-    private static let counterThreshold = ClipNoteEditorState.characterLimit - 30
+    private static let counterThreshold = ClipNoteEditorState.characterLimit - 5
 
     // Styled like the popup's search field.
     var body: some View {
@@ -1291,7 +1249,7 @@ private struct ClipNoteFooterEditor: View {
                 TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(theme.palette.textPrimary)
+                .foregroundStyle(theme.palette.textTertiary)
                 .focused($isFocused)
                 .onSubmit(save)
                 .onChange(of: isFocused) { wasFocused, isFocused in
@@ -1342,19 +1300,18 @@ private struct ClipNoteFooterEditor: View {
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, theme.spacing.control10)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
-        .background(theme.palette.subpanel.opacity(theme.headerControlFillOpacity))
-        .clipShape(Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(theme.palette.border, lineWidth: theme.border.hairline)
-        )
+        // Same slot and text position as the footer it replaces.
+        .padding(.horizontal, 12)
+        .padding(.bottom, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 27)
     }
 
     private func save() {
-        guard state.isEditable, state.isDirty else { return }
-        onSave()
+        guard state.isEditable else { return }
+        // Enter on an unchanged note just closes the editor; otherwise the
+        // field stays open with its whole text selected.
+        if state.isDirty { onSave() }
         onCancel()
     }
 }
