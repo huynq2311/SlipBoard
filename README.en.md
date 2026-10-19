@@ -376,8 +376,8 @@ xcodebuild \
   build
 ```
 
-An unsigned build runs. For App Lock, use the ad-hoc build from
-[Packaging a release](#packaging-a-release), which needs no account either.
+An unsigned build runs. For App Lock, run `./build_release.sh` for an ad-hoc
+signed build (no account needed either); the result goes to `Release/`.
 
 **Team-signed build**
 
@@ -404,52 +404,6 @@ next to the encrypted data.
    ([`SlipBoard.entitlements`](SlipBoard.entitlements)) is a restricted
    entitlement. Without it, building fails with
    `No profiles for '<bundle id>' were found`.
-
-### Packaging a release
-
-`build_release.sh` builds the Release configuration and packages a DMG into
-`Release/` (`SlipBoard.app`, `SlipBoard.dmg`, `SlipBoard.dmg.sha256`):
-
-```bash
-./build_release.sh              # signed with SIGN_IDENTITY if set (releases), else ad-hoc
-./build_release.sh --team       # team-signed build, needs a provisioning profile
-./build_release.sh --no-sign    # unsigned build, like CI
-```
-
-Set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and `NOTARY_PROFILE` in a `.env` file
-(see [`.env.example`](.env.example)). Notarization only runs when the app is
-signed with a **Developer ID** certificate. `BUILD_DATE` overrides the build
-number, for example `BUILD_DATE=20261016.2` for a second release on the same
-day.
-
-**Signing.** Official releases are signed with the maintainer's self-signed
-certificate (`SIGN_IDENTITY`) so macOS keeps the Accessibility permission
-across updates. A release signed with any other certificate makes every user
-grant it again, so keep a backup of the certificate with its private key. CI and
-forks build ad-hoc. To sign your own builds the same way, create a certificate
-in **Keychain Access → Certificate Assistant → Create a Certificate…**
-(Self-Signed Root, Code Signing) and put its name or SHA-1 hash in
-`SIGN_IDENTITY`.
-
-**In-app updates.** SlipBoard updates itself with
-[Sparkle](https://sparkle-project.org). A build signed with `SIGN_IDENTITY` also
-writes `Release/appcast.xml`, signing the DMG with the Sparkle EdDSA key in your
-login keychain; upload it to the GitHub release next to the DMG (the app reads
-`releases/latest/download/appcast.xml`). A fork must replace `SUPublicEDKey` in
-[`SlipBoard-Info.plist`](SlipBoard-Info.plist) and `SUFeedURL` with its own.
-Ad-hoc and unsigned builds have updates off. How the app checks the updater's
-signature before loading it is in
-[`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)
-and `build_release.sh`.
-
-**Releasing from GitHub Actions.** Push a tag `v<version>-<yyyymmdd>` on a commit
-of `main`, e.g. `git tag v1.0-20261017 origin/main && git push origin
-v1.0-20261017`. The [`release.yml`](.github/workflows/release.yml) workflow
-builds with the `release` environment's secrets and leaves a draft release with
-the DMG, checksum and appcast. Title it `SlipBoard v<version> (Build <yyyymmdd>)`,
-write a **What's New** section, then publish; publishing starts the
-[Homebrew tap](https://github.com/huynq2311/homebrew-tap)'s bump workflow. Who
-may create tags and the list of secrets are at the top of the workflow.
 
 ---
 
