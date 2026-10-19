@@ -491,7 +491,9 @@ struct SBClipCardShell: View {
             // The editor overlay covers this slot.
             Color.clear.frame(height: Self.footerHeight)
         } else {
-            Group {
+            // A Button, not onTapGesture: next to the card's double-click gesture
+            // a tap gesture waits out the double-click interval before it fires.
+            Button(action: handleFooterTap) {
                 if let footerNoteText {
                     HStack(spacing: 4) {
                         Image(systemName: "note.text")
@@ -510,13 +512,15 @@ struct SBClipCardShell: View {
                     metricsFooter
                 }
             }
+            .buttonStyle(.plain)
             // A click edits the note in place, whether or not it has one yet.
             .contentShape(Rectangle())
-            .onTapGesture {
-                guard noteInteractionsEnabled else { return }
-                onToggleNoteEditor()
-            }
         }
+    }
+
+    private func handleFooterTap() {
+        guard noteInteractionsEnabled else { return }
+        onToggleNoteEditor()
     }
 
     private var metricsFooter: some View {
