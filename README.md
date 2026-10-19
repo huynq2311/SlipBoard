@@ -361,8 +361,8 @@ xcodebuild \
   build
 ```
 
-Bản không ký chạy được. Muốn dùng App Lock, hãy build bản ký ad-hoc ở mục
-[Đóng gói bản phát hành](#đóng-gói-bản-phát-hành), cũng không cần tài khoản.
+Bản không ký chạy được. Muốn dùng App Lock, chạy `./build_release.sh` để có bản
+ký ad-hoc (cũng không cần tài khoản); kết quả nằm trong `Release/`.
 
 **Build ký bằng team**
 
@@ -388,50 +388,6 @@ liệu đã mã hóa.
    Cần profile vì `keychain-access-groups`
    ([`SlipBoard.entitlements`](SlipBoard.entitlements)) là entitlement bị hạn
    chế. Thiếu profile, build báo `No profiles for '<bundle id>' were found`.
-
-### Đóng gói bản phát hành
-
-`build_release.sh` build bản Release và đóng gói DMG vào `Release/`
-(`SlipBoard.app`, `SlipBoard.dmg`, `SlipBoard.dmg.sha256`):
-
-```bash
-./build_release.sh              # ký bằng SIGN_IDENTITY nếu có (bản phát hành), không thì ad-hoc
-./build_release.sh --team       # bản ký bằng team, cần provisioning profile
-./build_release.sh --no-sign    # bản không ký, như CI
-```
-
-Đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và `NOTARY_PROFILE` trong file `.env`
-(xem [`.env.example`](.env.example)). Notarize chỉ chạy khi app được ký bằng
-chứng chỉ **Developer ID**. `BUILD_DATE` ghi đè số build, ví dụ
-`BUILD_DATE=20261016.2` cho bản thứ hai trong cùng ngày.
-
-**Ký.** Bản phát hành chính thức được ký bằng chứng chỉ tự tạo của người bảo
-trì (`SIGN_IDENTITY`) để macOS giữ quyền Trợ năng qua các lần cập nhật. Ký bằng
-chứng chỉ khác thì mọi người dùng phải cấp lại quyền, nên hãy sao lưu chứng chỉ
-kèm private key. CI và các bản fork build ad-hoc. Muốn tự ký theo cách này, tạo
-chứng chỉ trong **Keychain Access → Certificate Assistant → Create a
-Certificate…** (Self-Signed Root, Code Signing) rồi ghi tên hoặc mã SHA-1 của
-nó vào `SIGN_IDENTITY`.
-
-**Cập nhật trong app.** SlipBoard tự cập nhật bằng
-[Sparkle](https://sparkle-project.org). Bản ký bằng `SIGN_IDENTITY` tạo thêm
-`Release/appcast.xml`, ký DMG bằng khóa EdDSA của Sparkle trong login keychain;
-upload cùng DMG lên GitHub release (app đọc
-`releases/latest/download/appcast.xml`). Bản fork phải thay `SUPublicEDKey`
-trong [`SlipBoard-Info.plist`](SlipBoard-Info.plist) và `SUFeedURL` bằng của
-mình. Bản ad-hoc và bản không ký tắt cập nhật. Cách app kiểm chữ ký của bộ cập
-nhật trước khi nạp nằm ở
-[`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)
-và `build_release.sh`.
-
-**Phát hành từ GitHub Actions.** Push tag `v<phiên bản>-<yyyymmdd>` trên một
-commit của `main`, ví dụ `git tag v1.0-20261017 origin/main && git push origin
-v1.0-20261017`. Workflow [`release.yml`](.github/workflows/release.yml) build
-bằng secret của environment `release` và để lại một bản release nháp kèm DMG,
-checksum và appcast. Đặt tiêu đề `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, viết
-mục **What's New**, rồi publish; publish sẽ chạy workflow bump của
-[Homebrew tap](https://github.com/huynq2311/homebrew-tap). Điều kiện tạo tag và
-danh sách secret ghi ở đầu workflow.
 
 ---
 
