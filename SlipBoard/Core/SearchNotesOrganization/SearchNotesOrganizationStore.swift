@@ -149,14 +149,16 @@ final class SearchNotesOrganizationStore: SearchNotesOrganizationStoring {
             return (payloadStore.latestMigrationState, [])
         }
 
+        // Most items need no new payload, so pick those first and sort only them.
         let payloadCandidates = historyItemsByID.values
+            .compactMap { item in makePayloadCandidate(from: item).map { (item, $0) } }
             .sorted { lhs, rhs in
-                if lhs.lastCopiedAt == rhs.lastCopiedAt {
-                    return lhs.id < rhs.id
+                if lhs.0.lastCopiedAt == rhs.0.lastCopiedAt {
+                    return lhs.0.id < rhs.0.id
                 }
-                return lhs.lastCopiedAt < rhs.lastCopiedAt
+                return lhs.0.lastCopiedAt < rhs.0.lastCopiedAt
             }
-            .compactMap(makePayloadCandidate(from:))
+            .map(\.1)
 
         guard payloadCandidates.isEmpty == false else {
             return (payloadStore.latestMigrationState, [])

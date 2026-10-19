@@ -102,7 +102,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                 if let object = objectsByID[clip.id] {
                     if let file = Self.populate(object: object, with: clip, longText: longText) {
                         keptFiles.insert(file)
-                    } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                    } else if LongTextFileStore.isHead(clip.titleText) {
                         protectedIDs.insert(clip.id)
                     }
                 } else {
@@ -113,7 +113,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                     objectsByID[clip.id] = object
                     if let file = Self.populate(object: object, with: clip, longText: longText) {
                         keptFiles.insert(file)
-                    } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                    } else if LongTextFileStore.isHead(clip.titleText) {
                         protectedIDs.insert(clip.id)
                     }
                 }
@@ -137,7 +137,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
                     )
                 if let file = Self.populate(object: object, with: clip, longText: longText) {
                     keptFiles.insert(file)
-                } else if clip.titleText.count == LongTextFileStore.characterLimit {
+                } else if LongTextFileStore.isHead(clip.titleText) {
                     protectedIDs.insert(clip.id)
                 }
             }
