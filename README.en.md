@@ -330,6 +330,13 @@ notarized, so macOS blocks the first launch:
 2. Open **System Settings → Privacy & Security**, scroll to **Security** and
    click **Open Anyway** next to SlipBoard, then confirm.
 
+Or clear the block from the app with one command, without opening System
+Settings:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SlipBoard.app
+```
+
 Then grant **Accessibility** access when asked so SlipBoard can paste into
 other apps.
 
