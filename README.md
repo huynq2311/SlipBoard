@@ -122,6 +122,8 @@ loại trừ ứng dụng, phím tắt, snippet và App Lock.
 | Hình ảnh | Kích thước điểm ảnh | `512x246` |
 | File | Dung lượng (cộng dồn nếu nhiều file) | `2.5 MB` |
 
+Nếu mục có **ghi chú**, chân thẻ hiện ghi chú thay cho số liệu trên.
+
 - Sao chép lại thứ đã có sẽ đưa nó lên đầu thay vì tạo bản trùng.
 - Nội dung đến từ iPhone, iPad hoặc máy Mac khác qua Universal Clipboard
   (Handoff) được gắn nhãn riêng.
@@ -183,6 +185,9 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
   theo giới hạn số lượng hay thời gian. Nút **Ẩn/Hiện đã ghim** thu gọn hàng
   này để hàng Gần đây có thêm chỗ.
 - Gắn **ghi chú** cho một mục để nhớ vì sao bạn giữ nó; ghi chú cũng tìm được.
+  **Bấm vào chân thẻ** để sửa ghi chú ngay tại chỗ, kể cả khi mục chưa có ghi
+  chú. `↩` đóng ô sửa và lưu nếu có thay đổi; bấm ra ngoài ô thì bỏ thay đổi.
+  Ghi chú dài tối đa **30 ký tự** để nằm gọn trên một dòng của chân thẻ.
 
 #### Thao tác trên thẻ
 
@@ -191,6 +196,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 | Click | Chọn thẻ |
 | Click đúp | Dán thẻ vào ứng dụng đang dùng |
 | `⌘` + click | **Dán nhanh**: chọn và dán ngay. Đổi sang `⌥` hoặc `⇧`, hoặc tắt, tại **Cài đặt → Tổ chức → Dán nhanh** |
+| Click chân thẻ | Sửa ghi chú của thẻ ngay tại chỗ |
 | Chuột phải, hoặc `⌃` + click | Mở menu thao tác của thẻ: Dán, Dán dưới dạng, Sao chép, Ghim/Bỏ ghim, Ghi chú, Xóa |
 
 ### 3. Dán theo ý bạn
@@ -305,6 +311,15 @@ Chi tiết xem [PRIVACY.md](PRIVACY.md).
 - **macOS 15** trở lên để chạy.
 - **Xcode 26** để build. Dự án dùng API của SDK macOS 26 (Liquid Glass) sau các
   kiểm tra availability, dù vẫn chạy được từ macOS 15.
+
+### Cài bằng Homebrew
+
+```bash
+brew install --cask huynq2311/tap/slipboard
+```
+
+Bản cài bằng Homebrew cũng chưa được notarize, nên macOS có thể chặn lần mở
+đầu tiên: làm theo các bước trong phần dưới.
 
 ### Cài từ Release
 
@@ -514,6 +529,8 @@ build_release.sh                  build và đóng gói DMG
 ## Giới hạn đã biết
 
 - Danh sách luôn xếp mới nhất trước; chưa có tùy chọn sắp xếp khác.
+- Ghi chú tối đa 30 ký tự. Ghi chú đã lưu từ bản cũ dài hơn vẫn giữ nguyên cho
+  đến khi bạn sửa và lưu lại; chân thẻ cắt bằng `…` nếu không đủ chỗ.
 - Định dạng văn bản có định dạng chỉ được giữ khi ứng dụng đang chạy. Sau khi
   khởi động lại, mục đó vẫn còn trong lịch sử nhưng ở dạng văn bản thuần.
 - Dung lượng file và kích thước ảnh được đọc khi hiển thị thẻ: nếu file đã bị

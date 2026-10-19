@@ -123,6 +123,9 @@ paste key, exclude apps, set hotkeys, snippets and App Lock.
 | Image | Pixel dimensions | `512x246` |
 | File | Size on disk (summed for several files) | `2.5 MB` |
 
+If the item has a **note**, the footer shows the note instead of the figures
+above.
+
 - Copying something you already have moves it to the front instead of adding a
   duplicate.
 - Items that arrive from your iPhone, iPad or another Mac through Universal
@@ -189,7 +192,10 @@ how long ago you copied it. To see only what came from one app:
   cleaned up by the item limit or by age. **Hide/Show pinned** collapses the
   rail to give Recent more room.
 - Attach a **note** to an item to remember why you kept it; notes are
-  searchable too.
+  searchable too. **Click the footer** of a card to edit its note in place,
+  also when the item has no note yet. `↩` closes the editor and saves if
+  anything changed; clicking outside the field discards the edit. A note is at
+  most **30 characters**, so it fits on the footer line.
 
 #### Card actions
 
@@ -198,6 +204,7 @@ how long ago you copied it. To see only what came from one app:
 | Click | Select the card |
 | Double-click | Paste the card into the app you were using |
 | `⌘` + click | **Quick paste**: select and paste immediately. Change it to `⌥` or `⇧`, or turn it off, in **Settings → Organization → Quick paste** |
+| Click the footer | Edit the card's note in place |
 | Right-click, or `⌃` + click | Open the card's action menu: Paste, Paste As, Copy, Pin/Unpin, Note, Delete |
 
 ### 3. Paste how you want
@@ -317,6 +324,15 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 - **macOS 15** or later to run.
 - **Xcode 26** to build. The project uses macOS 26 SDK APIs (Liquid Glass)
   behind availability checks, even though it runs back to macOS 15.
+
+### Install with Homebrew
+
+```bash
+brew install --cask huynq2311/tap/slipboard
+```
+
+A Homebrew install is not notarized either, so macOS may block the first
+launch: follow the steps below.
 
 ### Install from a release
 
@@ -535,6 +551,9 @@ build_release.sh                  build and package a DMG
 ## Known limitations
 
 - Items are always listed newest first; there is no other sort order yet.
+- Notes are limited to 30 characters. A longer note saved by an older version
+  stays as it is until you edit and save it again; the footer cuts it with `…`
+  if it does not fit.
 - Rich-text formatting is kept only while the app is running. After a restart
   the item is still in your history as plain text.
 - File sizes and image dimensions are read when a card is shown: if a file has
