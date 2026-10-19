@@ -257,7 +257,15 @@ else
 fi
 
 rm -rf "$MOUNT_DIR/.fseventsd"
-hdiutil detach "$MOUNT_DIR" -quiet
+# Finder or Spotlight can still hold the volume right after the layout step,
+# and a busy detach fails the whole build (hdiutil exit 16 on CI). Retry, then
+# force it.
+detached=""
+for _ in 1 2 3 4 5; do
+  if hdiutil detach "$MOUNT_DIR"; then detached=1; break; fi
+  sleep 2
+done
+[ -n "$detached" ] || hdiutil detach "$MOUNT_DIR" -force
 MOUNT_DIR=""
 hdiutil convert "$WORK/rw.dmg" -format UDZO -imagekey zlib-level=9 -ov -o "$OUT_DIR/$APP_NAME.dmg" >/dev/null
 
