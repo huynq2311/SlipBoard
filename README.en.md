@@ -123,6 +123,9 @@ paste key, exclude apps, set hotkeys, snippets and App Lock.
 | Image | Pixel dimensions | `512x246` |
 | File | Size on disk (summed for several files) | `2.5 MB` |
 
+If the item has a **note**, the footer shows the note instead of the figures
+above.
+
 - Copying something you already have moves it to the front instead of adding a
   duplicate.
 - Items that arrive from your iPhone, iPad or another Mac through Universal
@@ -189,7 +192,10 @@ how long ago you copied it. To see only what came from one app:
   cleaned up by the item limit or by age. **Hide/Show pinned** collapses the
   rail to give Recent more room.
 - Attach a **note** to an item to remember why you kept it; notes are
-  searchable too.
+  searchable too. **Click the footer** of a card to edit its note in place,
+  also when the item has no note yet. `↩` closes the editor and saves if
+  anything changed; clicking outside the field discards the edit. A note is at
+  most **30 characters**, so it fits on the footer line.
 
 #### Card actions
 
@@ -198,6 +204,7 @@ how long ago you copied it. To see only what came from one app:
 | Click | Select the card |
 | Double-click | Paste the card into the app you were using |
 | `⌘` + click | **Quick paste**: select and paste immediately. Change it to `⌥` or `⇧`, or turn it off, in **Settings → Organization → Quick paste** |
+| Click the footer | Edit the card's note in place |
 | Right-click, or `⌃` + click | Open the card's action menu: Paste, Paste As, Copy, Pin/Unpin, Note, Delete |
 
 ### 3. Paste how you want
@@ -318,6 +325,15 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 - **Xcode 26** to build. The project uses macOS 26 SDK APIs (Liquid Glass)
   behind availability checks, even though it runs back to macOS 15.
 
+### Install with Homebrew
+
+```bash
+brew install --cask huynq2311/tap/slipboard
+```
+
+A Homebrew install is not notarized either, so macOS may block the first
+launch: follow the steps below.
+
 ### Install from a release
 
 Download `SlipBoard.dmg` from [Releases](../../releases), open it and drag
@@ -345,26 +361,6 @@ v1.0-20261016.2 is signed with the same certificate, so macOS sees an update as
 the same app. App Lock does not ask for keychain access after an update either:
 release builds keep its key in a file (see
 [Privacy and security](#privacy-and-security)).
-
-> [!IMPORTANT]
-> **Updating from v1.0-20261016 or earlier?** Those builds were signed
-> differently, so grant Accessibility one last time: in **System Settings →
-> Privacy & Security → Accessibility**, remove SlipBoard with **−**, then
-> reopen SlipBoard and allow it when asked.
->
-> **Updating from v1.0-20261016 with App Lock on?** That release kept the App
-> Lock key in the login keychain. The first launch of a newer release asks
-> once to use “com.slipboard.security.payload-key”: enter your login password
-> and allow it, and SlipBoard moves the key into its file so your notes stay
-> readable. Later updates do not ask again. If you deny it, SlipBoard stays
-> locked; choose Unlock to be asked again. macOS may not let SlipBoard delete
-> the old keychain items; after the move you can delete the
-> `com.slipboard.security.payload-key` items in **Keychain Access** yourself.
->
-> **Coming from an earlier release with App Lock on?** Its key belongs to the
-> old signature and cannot be read by an ad-hoc build, so SlipBoard creates a
-> new one on first launch. Notes saved under the old key cannot be read
-> anymore; clip history is not affected.
 
 ### Build from source
 
@@ -411,7 +407,8 @@ next to the encrypted data.
 
 ### Packaging a release
 
-`build_release.sh` builds the Release configuration and packages it as a DMG:
+`build_release.sh` builds the Release configuration and packages a DMG into
+`Release/` (`SlipBoard.app`, `SlipBoard.dmg`, `SlipBoard.dmg.sha256`):
 
 ```bash
 ./build_release.sh              # signed with SIGN_IDENTITY if set (releases), else ad-hoc
@@ -419,69 +416,40 @@ next to the encrypted data.
 ./build_release.sh --no-sign    # unsigned build, like CI
 ```
 
-Output goes to `Release/`: `SlipBoard.app`, `SlipBoard.dmg` and
-`SlipBoard.dmg.sha256`. The DMG opens a window that shows dragging SlipBoard
-onto Applications; the script asks Finder to lay it out, so the first run asks
-to let your terminal control Finder. The background comes from
-`Tools/dmg/make-background.swift`. You can set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and
-`NOTARY_PROFILE` in a `.env` file (see [`.env.example`](.env.example)).
-Notarization only runs when the app is signed with a **Developer ID**
-certificate.
+Set `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` and `NOTARY_PROFILE` in a `.env` file
+(see [`.env.example`](.env.example)). Notarization only runs when the app is
+signed with a **Developer ID** certificate. `BUILD_DATE` overrides the build
+number, for example `BUILD_DATE=20261016.2` for a second release on the same
+day.
 
-**Release signing.** Official releases are signed with the maintainer's
-self-signed code signing certificate, set as `SIGN_IDENTITY` in `.env`, so
-macOS keeps the Accessibility permission across updates. Only a Mac that holds
-that certificate and its private key can build a release; CI and forks build
-ad-hoc. A release signed with any other certificate counts as a new app, and
-every user has to grant Accessibility again, so keep a backup of the
-certificate with its private key. Gatekeeper still asks for **Open Anyway** on
-first launch.
-
-To sign your own builds the same way, create a certificate in **Keychain
-Access → Certificate Assistant → Create a Certificate…** (**Identity Type**:
-Self-Signed Root, **Certificate Type**: Code Signing) and put its name or
-SHA-1 hash in `SIGN_IDENTITY`.
-
-`BUILD_DATE` overrides the build number, for example `BUILD_DATE=20261016.2`
-for a second release on the same day.
+**Signing.** Official releases are signed with the maintainer's self-signed
+certificate (`SIGN_IDENTITY`) so macOS keeps the Accessibility permission
+across updates. A release signed with any other certificate makes every user
+grant it again, so keep a backup of the certificate with its private key. CI and
+forks build ad-hoc. To sign your own builds the same way, create a certificate
+in **Keychain Access → Certificate Assistant → Create a Certificate…**
+(Self-Signed Root, Code Signing) and put its name or SHA-1 hash in
+`SIGN_IDENTITY`.
 
 **In-app updates.** SlipBoard updates itself with
 [Sparkle](https://sparkle-project.org). A build signed with `SIGN_IDENTITY` also
-writes `Release/appcast.xml`, signing the DMG with the Sparkle EdDSA private key
-in your login keychain (`generate_keys` in
-`build/SourcePackages/artifacts/sparkle/Sparkle/bin/` creates one). Upload
-`appcast.xml` to the GitHub release next to the DMG: the app reads
-`releases/latest/download/appcast.xml`. Sparkle installs a release only when its
-build number is higher than the installed one, and only when the DMG matches the
-`SUPublicEDKey` in [`SlipBoard-Info.plist`](SlipBoard-Info.plist), so a fork must
-replace that key and `SUFeedURL` with its own. Self-signed builds carry the
-`com.apple.security.cs.disable-library-validation` entitlement: without a Team
-ID, macOS refuses to load `Sparkle.framework` otherwise. Only the updater
-plug-in links Sparkle, and the app checks the plug-in's and Sparkle's signatures
-against its own certificate before loading them
-([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
-`build_release.sh` then signs the app with `--library-constraint`, listing the
-CDHash of every architecture of the plug-in and Sparkle, so the app must be
-signed last: re-signing the plug-in or Sparkle afterwards keeps the updater from
-loading. Ad-hoc and unsigned builds have no certificate to compare, so their
-updates are off.
+writes `Release/appcast.xml`, signing the DMG with the Sparkle EdDSA key in your
+login keychain; upload it to the GitHub release next to the DMG (the app reads
+`releases/latest/download/appcast.xml`). A fork must replace `SUPublicEDKey` in
+[`SlipBoard-Info.plist`](SlipBoard-Info.plist) and `SUFeedURL` with its own.
+Ad-hoc and unsigned builds have updates off. How the app checks the updater's
+signature before loading it is in
+[`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)
+and `build_release.sh`.
 
-Release naming: tag `v<version>-<yyyymmdd>`, title
-`SlipBoard v<version> (Build <yyyymmdd>)`, and a **What's New** section as the
-description.
-
-**Releasing from GitHub Actions.** Push a tag on a commit of `main`, e.g.
-`git tag v1.0-20261017 origin/main && git push origin v1.0-20261017` (or run the
-**Release** workflow by hand on `main`). The workflow
-([`release.yml`](.github/workflows/release.yml)) checks that the tag matches the
-app version, runs `./build_release.sh` with the signing certificate and the Sparkle key from the
-`release` environment's secrets, and leaves a draft release with the DMG,
-checksum and appcast. Write the **What's New** notes and publish the draft;
-publishing starts the [Homebrew tap](https://github.com/huynq2311/homebrew-tap)'s
-bump workflow. The secrets it needs are listed at the top of the workflow. These
-two keys can sign an app that keeps SlipBoard's Accessibility permission and an
-update every installed copy accepts, so only admins may create `v*` tags (a tag
-ruleset) and the `release` environment only accepts `v*` tags and `main`.
+**Releasing from GitHub Actions.** Push a tag `v<version>-<yyyymmdd>` on a commit
+of `main`, e.g. `git tag v1.0-20261017 origin/main && git push origin
+v1.0-20261017`. The [`release.yml`](.github/workflows/release.yml) workflow
+builds with the `release` environment's secrets and leaves a draft release with
+the DMG, checksum and appcast. Title it `SlipBoard v<version> (Build <yyyymmdd>)`,
+write a **What's New** section, then publish; publishing starts the
+[Homebrew tap](https://github.com/huynq2311/homebrew-tap)'s bump workflow. Who
+may create tags and the list of secrets are at the top of the workflow.
 
 ---
 
@@ -535,6 +503,9 @@ build_release.sh                  build and package a DMG
 ## Known limitations
 
 - Items are always listed newest first; there is no other sort order yet.
+- Notes are limited to 30 characters. A longer note saved by an older version
+  stays as it is until you edit and save it again; the footer cuts it with `…`
+  if it does not fit.
 - Rich-text formatting is kept only while the app is running. After a restart
   the item is still in your history as plain text.
 - File sizes and image dimensions are read when a card is shown: if a file has
