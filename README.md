@@ -348,26 +348,6 @@ cùng một app. App Lock cũng không hỏi quyền keychain sau khi cập nh�
 hành giữ khóa của nó trong một file (xem
 [Quyền riêng tư và bảo mật](#quyền-riêng-tư-và-bảo-mật)).
 
-> [!IMPORTANT]
-> **Cập nhật từ v1.0-20261016 hoặc cũ hơn?** Các bản đó được ký theo cách khác,
-> nên cần cấp quyền Accessibility lần cuối: vào **Cài đặt hệ thống → Quyền riêng
-> tư & Bảo mật → Trợ năng**, xóa SlipBoard bằng nút **−**, rồi mở lại SlipBoard
-> và cho phép khi được hỏi.
->
-> **Cập nhật từ v1.0-20261016 khi đang bật App Lock?** Bản đó giữ khóa App Lock
-> trong login keychain. Lần mở đầu tiên của bản mới hơn sẽ hỏi một lần để dùng
-> “com.slipboard.security.payload-key”: nhập mật khẩu đăng nhập và cho phép,
-> SlipBoard sẽ chuyển khóa sang file của nó để ghi chú vẫn đọc được. Các lần cập
-> nhật sau không hỏi nữa. Nếu bấm từ chối, SlipBoard đứng ở trạng thái khóa;
-> chọn Mở khóa để được hỏi lại. macOS có thể không cho SlipBoard xóa các item
-> keychain cũ; sau khi chuyển xong, bạn có thể tự xóa các item
-> `com.slipboard.security.payload-key` trong **Keychain Access**.
->
-> **Đã bật App Lock ở bản Release trước?** Khóa cũ gắn với chữ ký cũ, bản ký
-> ad-hoc không đọc được, nên SlipBoard tự tạo khóa mới ở lần mở đầu tiên. Ghi
-> chú đã lưu bằng khóa cũ sẽ không đọc được nữa; lịch sử clipboard không bị ảnh
-> hưởng.
-
 ### Build từ mã nguồn
 
 **Build nhanh (không cần tài khoản Apple Developer)**: đây là lệnh CI đang chạy.

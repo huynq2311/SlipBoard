@@ -362,26 +362,6 @@ the same app. App Lock does not ask for keychain access after an update either:
 release builds keep its key in a file (see
 [Privacy and security](#privacy-and-security)).
 
-> [!IMPORTANT]
-> **Updating from v1.0-20261016 or earlier?** Those builds were signed
-> differently, so grant Accessibility one last time: in **System Settings →
-> Privacy & Security → Accessibility**, remove SlipBoard with **−**, then
-> reopen SlipBoard and allow it when asked.
->
-> **Updating from v1.0-20261016 with App Lock on?** That release kept the App
-> Lock key in the login keychain. The first launch of a newer release asks
-> once to use “com.slipboard.security.payload-key”: enter your login password
-> and allow it, and SlipBoard moves the key into its file so your notes stay
-> readable. Later updates do not ask again. If you deny it, SlipBoard stays
-> locked; choose Unlock to be asked again. macOS may not let SlipBoard delete
-> the old keychain items; after the move you can delete the
-> `com.slipboard.security.payload-key` items in **Keychain Access** yourself.
->
-> **Coming from an earlier release with App Lock on?** Its key belongs to the
-> old signature and cannot be read by an ad-hoc build, so SlipBoard creates a
-> new one on first launch. Notes saved under the old key cannot be read
-> anymore; clip history is not affected.
-
 ### Build from source
 
 **Quick build (no Apple Developer account needed)**: this is the same command
