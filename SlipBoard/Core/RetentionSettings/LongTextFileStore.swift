@@ -86,7 +86,16 @@ nonisolated struct LongTextFileStore {
     }
 
     static func head(of text: String) -> String {
-        String(text.prefix(characterLimit))
+        // Fewer bytes than the limit means fewer characters: the whole text.
+        guard text.utf8.count > characterLimit else { return text }
+        return String(text.prefix(characterLimit))
+    }
+
+    /// True when `text` is a head cut by `head(of:)`: exactly `characterLimit`
+    /// characters. The byte count rules out almost every clip before the
+    /// character count, which walks the whole string.
+    static func isHead(_ text: String) -> Bool {
+        text.utf8.count >= characterLimit && text.count == characterLimit
     }
 
     /// `storedText` is what to store inline: the full text when it is short or

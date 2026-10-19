@@ -214,7 +214,8 @@ struct ClipboardHistoryProjector: ClipboardHistoryProjecting {
         protectedPayload: ProtectedClipPayload?
     ) -> String {
         guard let payloadText = protectedPayload?.primaryText,
-              payloadText.count < LongTextFileStore.characterLimit
+              payloadText.utf8.count < LongTextFileStore.characterLimit
+                || payloadText.count < LongTextFileStore.characterLimit
         else {
             return item.primaryText
         }
