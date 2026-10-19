@@ -391,7 +391,8 @@ liệu đã mã hóa.
 
 ### Đóng gói bản phát hành
 
-Script `build_release.sh` build bản Release và đóng gói thành DMG:
+`build_release.sh` build bản Release và đóng gói DMG vào `Release/`
+(`SlipBoard.app`, `SlipBoard.dmg`, `SlipBoard.dmg.sha256`):
 
 ```bash
 ./build_release.sh              # ký bằng SIGN_IDENTITY nếu có (bản phát hành), không thì ad-hoc
@@ -399,64 +400,38 @@ Script `build_release.sh` build bản Release và đóng gói thành DMG:
 ./build_release.sh --no-sign    # bản không ký, như CI
 ```
 
-Kết quả nằm trong `Release/`: `SlipBoard.app`, `SlipBoard.dmg` và
-`SlipBoard.dmg.sha256`. DMG mở ra một cửa sổ hướng dẫn kéo SlipBoard vào
-Applications; script nhờ Finder sắp xếp cửa sổ này, nên lần chạy đầu macOS sẽ hỏi
-cho phép terminal điều khiển Finder. Ảnh nền được tạo bởi
-`Tools/dmg/make-background.swift`. Có thể đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và
-`NOTARY_PROFILE` trong file `.env` (xem [`.env.example`](.env.example)). Notarize
-chỉ chạy khi app được ký bằng chứng chỉ **Developer ID**.
+Đặt `DEVELOPMENT_TEAM`, `SIGN_IDENTITY` và `NOTARY_PROFILE` trong file `.env`
+(xem [`.env.example`](.env.example)). Notarize chỉ chạy khi app được ký bằng
+chứng chỉ **Developer ID**. `BUILD_DATE` ghi đè số build, ví dụ
+`BUILD_DATE=20261016.2` cho bản thứ hai trong cùng ngày.
 
-**Ký bản phát hành.** Bản phát hành chính thức được ký bằng chứng chỉ ký code
-tự tạo của người bảo trì, khai báo qua `SIGN_IDENTITY` trong `.env`, để macOS
-giữ quyền Trợ năng qua các lần cập nhật. Chỉ máy có chứng chỉ đó kèm private key
-mới build được bản phát hành; CI và các bản fork build ad-hoc. Bản ký bằng chứng
-chỉ khác sẽ bị coi là app mới và mọi người dùng phải cấp lại quyền Trợ năng, nên
-hãy sao lưu chứng chỉ kèm private key. Gatekeeper vẫn hỏi **Vẫn mở** ở lần mở
-đầu tiên.
-
-Muốn tự ký bản build của mình theo cách này, tạo chứng chỉ trong **Keychain
-Access → Certificate Assistant → Create a Certificate…** (**Identity Type**:
-Self-Signed Root, **Certificate Type**: Code Signing) rồi ghi tên hoặc mã SHA-1
-của nó vào `SIGN_IDENTITY`.
-
-`BUILD_DATE` ghi đè số build, ví dụ `BUILD_DATE=20261016.2` cho bản phát hành
-thứ hai trong cùng ngày.
+**Ký.** Bản phát hành chính thức được ký bằng chứng chỉ tự tạo của người bảo
+trì (`SIGN_IDENTITY`) để macOS giữ quyền Trợ năng qua các lần cập nhật. Ký bằng
+chứng chỉ khác thì mọi người dùng phải cấp lại quyền, nên hãy sao lưu chứng chỉ
+kèm private key. CI và các bản fork build ad-hoc. Muốn tự ký theo cách này, tạo
+chứng chỉ trong **Keychain Access → Certificate Assistant → Create a
+Certificate…** (Self-Signed Root, Code Signing) rồi ghi tên hoặc mã SHA-1 của
+nó vào `SIGN_IDENTITY`.
 
 **Cập nhật trong app.** SlipBoard tự cập nhật bằng
-[Sparkle](https://sparkle-project.org). Bản build ký bằng `SIGN_IDENTITY` tạo
-thêm `Release/appcast.xml`, ký DMG bằng private key EdDSA của Sparkle trong login
-keychain (tạo bằng `generate_keys` trong
-`build/SourcePackages/artifacts/sparkle/Sparkle/bin/`). Upload `appcast.xml` lên
-GitHub release cùng DMG: app đọc `releases/latest/download/appcast.xml`. Sparkle
-chỉ cài bản có số build lớn hơn bản đang cài, và chỉ khi DMG khớp
-`SUPublicEDKey` trong [`SlipBoard-Info.plist`](SlipBoard-Info.plist), nên bản
-fork phải thay key đó và `SUFeedURL` bằng của mình. Bản ký self-signed mang
-entitlement `com.apple.security.cs.disable-library-validation`: không có Team
-ID thì macOS không cho nạp `Sparkle.framework`. Chỉ plug-in cập nhật link tới
-Sparkle, và app kiểm chữ ký của plug-in và Sparkle với chứng chỉ của chính nó
-trước khi nạp
-([`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)).
-Sau đó `build_release.sh` ký app với `--library-constraint`, liệt kê CDHash của
-mọi kiến trúc của plug-in và Sparkle, nên app phải được ký sau cùng: ký lại
-plug-in hay Sparkle sau đó sẽ khiến app không nạp được bộ cập nhật. Bản ad-hoc và
-bản không ký không có chứng chỉ để so, nên tắt cập nhật.
+[Sparkle](https://sparkle-project.org). Bản ký bằng `SIGN_IDENTITY` tạo thêm
+`Release/appcast.xml`, ký DMG bằng khóa EdDSA của Sparkle trong login keychain;
+upload cùng DMG lên GitHub release (app đọc
+`releases/latest/download/appcast.xml`). Bản fork phải thay `SUPublicEDKey`
+trong [`SlipBoard-Info.plist`](SlipBoard-Info.plist) và `SUFeedURL` bằng của
+mình. Bản ad-hoc và bản không ký tắt cập nhật. Cách app kiểm chữ ký của bộ cập
+nhật trước khi nạp nằm ở
+[`UpdaterSignatureCheck.swift`](SlipBoard/Core/Updates/UpdaterSignatureCheck.swift)
+và `build_release.sh`.
 
-Quy ước đặt tên khi phát hành: tag `v<phiên bản>-<yyyymmdd>`, tiêu đề
-`SlipBoard v<phiên bản> (Build <yyyymmdd>)`, phần mô tả là mục **What's New**.
-
-**Phát hành từ GitHub Actions.** Push một tag trên commit của `main`, ví dụ
-`git tag v1.0-20261017 origin/main && git push origin v1.0-20261017` (hoặc chạy
-tay workflow **Release** trên `main`). Workflow
-([`release.yml`](.github/workflows/release.yml)) kiểm tag khớp phiên bản app, gọi
-`./build_release.sh` với chứng chỉ ký và khóa Sparkle lấy từ secret của
-environment `release`, rồi để lại một bản release nháp kèm DMG, checksum và
-appcast. Viết phần **What's New** rồi publish bản nháp; publish sẽ chạy workflow
-bump của [Homebrew tap](https://github.com/huynq2311/homebrew-tap). Danh sách
-secret cần có ghi ở đầu workflow. Hai khóa này ký được app giữ nguyên quyền
-Accessibility của SlipBoard và bản cập nhật mà mọi máy đã cài đều chấp nhận, nên
-chỉ admin được tạo tag `v*` (tag ruleset) và environment `release` chỉ nhận tag
-`v*` và `main`.
+**Phát hành từ GitHub Actions.** Push tag `v<phiên bản>-<yyyymmdd>` trên một
+commit của `main`, ví dụ `git tag v1.0-20261017 origin/main && git push origin
+v1.0-20261017`. Workflow [`release.yml`](.github/workflows/release.yml) build
+bằng secret của environment `release` và để lại một bản release nháp kèm DMG,
+checksum và appcast. Đặt tiêu đề `SlipBoard v<phiên bản> (Build <yyyymmdd>)`, viết
+mục **What's New**, rồi publish; publish sẽ chạy workflow bump của
+[Homebrew tap](https://github.com/huynq2311/homebrew-tap). Điều kiện tạo tag và
+danh sách secret ghi ở đầu workflow.
 
 ---
 
