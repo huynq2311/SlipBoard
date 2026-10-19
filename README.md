@@ -318,6 +318,12 @@ macOS chặn lần mở đầu tiên:
 2. Mở **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, cuộn tới mục **Bảo mật**
    và bấm **Vẫn mở** cạnh SlipBoard, rồi xác nhận.
 
+Hoặc bỏ cờ chặn của app bằng một dòng lệnh, không cần vào Cài đặt hệ thống:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SlipBoard.app
+```
+
 Sau đó cấp quyền **Accessibility** khi được hỏi để SlipBoard dán được vào ứng
 dụng khác.
 
