@@ -511,12 +511,16 @@ struct SBClipCardShell: View {
                 }
             }
             // A click edits the note in place, whether or not it has one yet.
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard noteInteractionsEnabled else { return }
-                onToggleNoteEditor()
-            }
+            // The card's double-click gesture makes SwiftUI hold every tap and
+            // Button action on it for the double-click interval (about 0.35 s),
+            // so the footer takes the click in AppKit instead.
+            .overlay(SBInstantClick(action: handleFooterTap))
         }
+    }
+
+    private func handleFooterTap() {
+        guard noteInteractionsEnabled else { return }
+        onToggleNoteEditor()
     }
 
     private var metricsFooter: some View {
@@ -737,6 +741,32 @@ struct SBClipCardShell: View {
         }
 
         return copy.text(.clipRedactionPrivacy)
+    }
+}
+
+/// Calls `action` on mouse up right away, without waiting for a double click.
+private struct SBInstantClick: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> ClickView {
+        let view = ClickView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ nsView: ClickView, context: Context) {
+        nsView.action = action
+    }
+
+    final class ClickView: NSView {
+        var action: () -> Void = {}
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) {}
+        override func mouseUp(with event: NSEvent) {
+            guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+            action()
+        }
     }
 }
 

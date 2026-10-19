@@ -187,7 +187,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 - Gắn **ghi chú** cho một mục để nhớ vì sao bạn giữ nó; ghi chú cũng tìm được.
   **Bấm vào chân thẻ** để sửa ghi chú ngay tại chỗ, kể cả khi mục chưa có ghi
   chú. `↩` đóng ô sửa và lưu nếu có thay đổi; bấm ra ngoài ô thì bỏ thay đổi.
-  Ghi chú dài tối đa **30 ký tự** để nằm gọn trên một dòng của chân thẻ.
+  Ghi chú dài tối đa **28 ký tự** để nằm gọn trên một dòng của chân thẻ.
 
 #### Thao tác trên thẻ
 
@@ -484,7 +484,7 @@ build_release.sh                  build và đóng gói DMG
 ## Giới hạn đã biết
 
 - Danh sách luôn xếp mới nhất trước; chưa có tùy chọn sắp xếp khác.
-- Ghi chú tối đa 30 ký tự. Ghi chú đã lưu từ bản cũ dài hơn vẫn giữ nguyên cho
+- Ghi chú tối đa 28 ký tự. Ghi chú đã lưu từ bản cũ dài hơn vẫn giữ nguyên cho
   đến khi bạn sửa và lưu lại; chân thẻ cắt bằng `…` nếu không đủ chỗ.
 - Định dạng văn bản có định dạng chỉ được giữ khi ứng dụng đang chạy. Sau khi
   khởi động lại, mục đó vẫn còn trong lịch sử nhưng ở dạng văn bản thuần.
