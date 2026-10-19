@@ -491,9 +491,7 @@ struct SBClipCardShell: View {
             // The editor overlay covers this slot.
             Color.clear.frame(height: Self.footerHeight)
         } else {
-            // A Button, not onTapGesture: next to the card's double-click gesture
-            // a tap gesture waits out the double-click interval before it fires.
-            Button(action: handleFooterTap) {
+            Group {
                 if let footerNoteText {
                     HStack(spacing: 4) {
                         Image(systemName: "note.text")
@@ -512,9 +510,11 @@ struct SBClipCardShell: View {
                     metricsFooter
                 }
             }
-            .buttonStyle(.plain)
             // A click edits the note in place, whether or not it has one yet.
-            .contentShape(Rectangle())
+            // The card's double-click gesture makes SwiftUI hold every tap and
+            // Button action on it for the double-click interval (about 0.35 s),
+            // so the footer takes the click in AppKit instead.
+            .overlay(SBInstantClick(action: handleFooterTap))
         }
     }
 
@@ -741,6 +741,32 @@ struct SBClipCardShell: View {
         }
 
         return copy.text(.clipRedactionPrivacy)
+    }
+}
+
+/// Calls `action` on mouse up right away, without waiting for a double click.
+private struct SBInstantClick: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> ClickView {
+        let view = ClickView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ nsView: ClickView, context: Context) {
+        nsView.action = action
+    }
+
+    final class ClickView: NSView {
+        var action: () -> Void = {}
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) {}
+        override func mouseUp(with event: NSEvent) {
+            guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+            action()
+        }
     }
 }
 

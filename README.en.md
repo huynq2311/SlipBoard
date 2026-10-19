@@ -195,7 +195,7 @@ how long ago you copied it. To see only what came from one app:
   searchable too. **Click the footer** of a card to edit its note in place,
   also when the item has no note yet. `↩` closes the editor and saves if
   anything changed; clicking outside the field discards the edit. A note is at
-  most **30 characters**, so it fits on the footer line.
+  most **28 characters**, so it fits on the footer line.
 
 #### Card actions
 
@@ -503,7 +503,7 @@ build_release.sh                  build and package a DMG
 ## Known limitations
 
 - Items are always listed newest first; there is no other sort order yet.
-- Notes are limited to 30 characters. A longer note saved by an older version
+- Notes are limited to 28 characters. A longer note saved by an older version
   stays as it is until you edit and save it again; the footer cuts it with `…`
   if it does not fit.
 - Rich-text formatting is kept only while the app is running. After a restart

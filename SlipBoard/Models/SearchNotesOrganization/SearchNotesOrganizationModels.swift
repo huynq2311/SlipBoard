@@ -120,7 +120,7 @@ struct OrganizationChipSummary: Identifiable, Hashable {
 
 struct ClipNoteEditorState: Hashable {
     /// Notes are short labels shown on one footer line.
-    static let characterLimit = 30
+    static let characterLimit = 28
 
     var clipID: String
     var isPresented: Bool
