@@ -22,7 +22,10 @@ nonisolated struct LongTextFileStore {
     private final class Memo: @unchecked Sendable {
         let lock = NSLock()
         var textByFileName: [String: String] = [:]
-        var fileNameByID: [String: (text: String, fileName: String)] = [:]
+        var fileNameByID: [String: (text: String, fileName: String, head: String)] = [:]
+        /// Clips whose stored text is over `characterLimit` bytes but not over
+        /// it in characters (multi-byte scripts), by id and byte count.
+        var shortByID: [String: Int] = [:]
     }
 
     private static let memo = Memo()
@@ -34,15 +37,32 @@ nonisolated struct LongTextFileStore {
 
     /// Comparing against the remembered text is a pointer check when the caller
     /// passes the same string again, which is the common case.
-    private static func knownFileName(id: String, text: String) -> String? {
+    private static func knownEntry(id: String, text: String) -> (fileName: String, head: String)? {
         memo.lock.lock(); defer { memo.lock.unlock() }
         guard let entry = memo.fileNameByID[id], entry.text == text else { return nil }
-        return entry.fileName
+        return (entry.fileName, entry.head)
+    }
+
+    private static func isKnownShort(id: String, byteCount: Int) -> Bool {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        return memo.shortByID[id] == byteCount
+    }
+
+    private static func rememberShort(id: String, byteCount: Int) {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        memo.shortByID[id] = byteCount
+    }
+
+    /// The remembered full text for `id` when its head is `storedText`.
+    private static func knownText(id: String, head: String) -> String? {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        guard let entry = memo.fileNameByID[id], entry.head == head else { return nil }
+        return entry.text
     }
 
     private static func remember(id: String, text: String, fileName: String) {
         memo.lock.lock(); defer { memo.lock.unlock() }
-        memo.fileNameByID[id] = (text, fileName)
+        memo.fileNameByID[id] = (text, fileName, head(of: text))
         memo.textByFileName[fileName] = text
     }
 
@@ -68,11 +88,14 @@ nonisolated struct LongTextFileStore {
     /// the file could not be written, otherwise its head. `fileName` is the file
     /// that holds the full text, if any.
     func spillIfNeeded(id: String, text: String) -> (storedText: String, fileName: String?) {
-        guard Self.exceedsLimit(text) else {
+        // A text seen before is known to be long; skip measuring it and cutting
+        // its head again, which walks 100,000 characters per clip per save.
+        let known = Self.knownEntry(id: id, text: text)
+        guard known != nil || Self.exceedsLimit(text) else {
             return (text, nil)
         }
 
-        let name = Self.knownFileName(id: id, text: text) ?? fileName(for: id, text: text)
+        let name = known?.fileName ?? fileName(for: id, text: text)
         let fileURL = directoryURL.appendingPathComponent(name)
         let existingSize = (try? fileManager.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? nil
         if existingSize != text.utf8.count {
@@ -81,6 +104,9 @@ nonisolated struct LongTextFileStore {
                 return (text, nil)
             }
         }
+        if let known {
+            return (known.head, name)
+        }
         Self.remember(id: id, text: text, fileName: name)
         return (Self.head(of: text), name)
     }
@@ -88,7 +114,23 @@ nonisolated struct LongTextFileStore {
     /// Restores the full text when `storedText` is a head with a matching file
     /// behind it. A missing or damaged file leaves the head.
     func restore(id: String, storedText: String) -> String {
+        // A head of `characterLimit` characters has at least that many bytes;
+        // the O(1) byte count rules out almost every clip.
+        let byteCount = storedText.utf8.count
+        guard byteCount >= Self.characterLimit,
+              Self.isKnownShort(id: id, byteCount: byteCount) == false else {
+            return storedText
+        }
+
+        // Same clip as last time: no directory listing, no file read. Checked
+        // before the character count below, which is slow on the bridged
+        // strings Core Data returns; a match is a head of the right length.
+        if let fullText = Self.knownText(id: id, head: storedText) {
+            return fullText
+        }
+
         guard storedText.count == Self.characterLimit else {
+            Self.rememberShort(id: id, byteCount: byteCount)
             return storedText
         }
 
