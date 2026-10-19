@@ -53,6 +53,11 @@ nonisolated struct LongTextFileStore {
         memo.shortByID[id] = byteCount
     }
 
+    private static func forgetShort(_ ids: [String]) {
+        memo.lock.lock(); defer { memo.lock.unlock() }
+        for id in ids { memo.shortByID.removeValue(forKey: id) }
+    }
+
     /// The remembered full text for `id` when its head is `storedText`.
     private static func knownText(id: String, head: String) -> String? {
         memo.lock.lock(); defer { memo.lock.unlock() }
@@ -161,6 +166,7 @@ nonisolated struct LongTextFileStore {
     }
 
     func remove(ids: [String]) {
+        Self.forgetShort(ids)
         for id in ids {
             for url in files(forIDHash: idHash(id)) {
                 try? fileManager.removeItem(at: url)
