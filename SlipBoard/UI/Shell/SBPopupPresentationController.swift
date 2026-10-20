@@ -18,11 +18,16 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         // Enough room for the Paste As menu above a recent card. This region
         // stays transparent, allowing the menu to overlap the app underneath.
         static let overlayHeadroom: CGFloat = 420
-        static let presentationDuration: TimeInterval = 0.18
-        static let dismissalDuration: TimeInterval = 0.14
+        /// Perceptual duration of the opening spring; it settles a bit later.
+        static let presentationDuration: TimeInterval = 0.25
+        static let presentationBounce: CGFloat = 0.25
+        static let presentationFadeDuration: TimeInterval = 0.15
+        static let dismissalDuration: TimeInterval = 0.18
         /// Points the content travels while the window fades; negative y is
         /// down in the window's layer space.
-        static let riseDistance: CGFloat = 14
+        static let riseDistance: CGFloat = 28
+        /// Scale of the hidden popup, around the bottom center of the shell.
+        static let hiddenScale: CGFloat = 0.85
     }
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -100,6 +105,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
             updatePanelAppearance(isLocked: isLocked)
             if let panel {
                 if panel.isVisible {
+                    let wasDismissing = isDismissing
                     transitionGeneration += 1
                     isDismissing = false
                     panel.alphaValue = 1
@@ -110,6 +116,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
                     // every frame until AppKit aborted with an exception.
                     panel.setFrame(newFrame, display: true)
                     panel.makeKeyAndOrderFront(nil)
+                    if wasDismissing {
+                        // Reverse from wherever the closing animation got to.
+                        springContentIn(of: panel, fromCurrent: true)
+                    }
                 } else {
                     presentPanel(panel, on: presentationScreen())
                 }
@@ -353,10 +363,10 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
         panel.alphaValue = 0
         panel.setFrame(targetFrame(for: screen), display: true)
         panel.makeKeyAndOrderFront(nil)
-        slideContent(of: panel, fromY: -Layout.riseDistance, toY: 0, duration: Layout.presentationDuration, timing: .easeOut)
+        springContentIn(of: panel, fromCurrent: false)
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Layout.presentationDuration
+            context.duration = Layout.presentationFadeDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
         }
@@ -377,7 +387,7 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
             onVisibilityChange?(false)
         }
 
-        slideContent(of: panel, fromY: 0, toY: -Layout.riseDistance, duration: Layout.dismissalDuration, timing: .easeIn)
+        shrinkContentOut(of: panel)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.dismissalDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -400,29 +410,58 @@ final class SBPopupPresentationController: NSObject, NSWindowDelegate {
 
     private static let slideAnimationKey = "SlipBoard.popupSlide"
 
-    /// Moves the popup content up into place (or down out of it) with Core
-    /// Animation, which runs off the main thread. Animating the SwiftUI shell
-    /// instead re-ran every card's scroll-geometry callbacks on each frame and
-    /// stalled the main thread for up to a few hundred milliseconds.
-    private func slideContent(
-        of panel: NSPanel,
-        fromY: CGFloat,
-        toY: CGFloat,
-        duration: TimeInterval,
-        timing: CAMediaTimingFunctionName
-    ) {
-        guard let view = panel.contentViewController?.view else { return }
-        view.wantsLayer = true
-        guard let layer = view.layer else { return }
-        let animation = CABasicAnimation(keyPath: "transform.translation.y")
-        animation.fromValue = fromY
-        animation.toValue = toY
-        animation.duration = duration
-        animation.timingFunction = CAMediaTimingFunction(name: timing)
-        // Holds the end offset until finishDismissal removes it.
+    // The popup content is moved and scaled with Core Animation, which runs
+    // off the main thread. Animating the SwiftUI shell instead re-ran every
+    // card's scroll-geometry callbacks on each frame and stalled the main
+    // thread for up to a few hundred milliseconds.
+
+    /// Springs the content up into place from its hidden state, or from
+    /// wherever an interrupted dismissal left it.
+    private func springContentIn(of panel: NSPanel, fromCurrent: Bool) {
+        guard let (view, layer) = contentLayer(of: panel) else { return }
+        let hidden = hiddenTransform(of: view, layer: layer)
+        let animation = CASpringAnimation(
+            perceptualDuration: Layout.presentationDuration,
+            bounce: Layout.presentationBounce
+        )
+        animation.keyPath = "transform"
+        let start = fromCurrent ? (layer.presentation()?.transform ?? hidden) : hidden
+        animation.fromValue = NSValue(caTransform3D: start)
+        animation.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        animation.duration = animation.settlingDuration
+        layer.add(animation, forKey: Self.slideAnimationKey)
+    }
+
+    /// Shrinks the content back toward its origin, faster than it opened.
+    private func shrinkContentOut(of panel: NSPanel) {
+        guard let (view, layer) = contentLayer(of: panel) else { return }
+        let animation = CABasicAnimation(keyPath: "transform")
+        let start = layer.presentation()?.transform ?? CATransform3DIdentity
+        animation.fromValue = NSValue(caTransform3D: start)
+        animation.toValue = NSValue(caTransform3D: hiddenTransform(of: view, layer: layer))
+        animation.duration = Layout.dismissalDuration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        // Holds the end state until finishDismissal removes it.
         animation.fillMode = .forwards
         animation.isRemovedOnCompletion = false
         layer.add(animation, forKey: Self.slideAnimationKey)
+    }
+
+    private func contentLayer(of panel: NSPanel) -> (NSView, CALayer)? {
+        guard let view = panel.contentViewController?.view else { return nil }
+        view.wantsLayer = true
+        guard let layer = view.layer else { return nil }
+        return (view, layer)
+    }
+
+    /// Lowered and scaled down around the bottom center of the shell, the
+    /// edge the popup rises from.
+    private func hiddenTransform(of view: NSView, layer: CALayer) -> CATransform3D {
+        let pivotX = view.bounds.midX - layer.anchorPoint.x * view.bounds.width
+        let pivotY = shellMargin.bottom - layer.anchorPoint.y * view.bounds.height
+        var transform = CATransform3DMakeTranslation(pivotX, pivotY - Layout.riseDistance, 0)
+        transform = CATransform3DScale(transform, Layout.hiddenScale, Layout.hiddenScale, 1)
+        return CATransform3DTranslate(transform, -pivotX, -pivotY, 0)
     }
 
     private func installEscapeKeyMonitorIfNeeded() {
