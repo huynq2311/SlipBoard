@@ -1,8 +1,10 @@
 <div align="center">
 
-<img src="docs/images/logo.png" alt="SlipBoard" width="128" height="128">
+<img src="docs/images/logo.png" alt="SlipTray" width="128" height="128">
 
-# SlipBoard
+# SlipTray
+
+*Formerly SlipBoard.*
 
 **A fast, private clipboard manager that lives in your macOS menu bar**
 
@@ -20,7 +22,7 @@ Press a hotkey, pick what you copied recently, paste it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/popup-en-dark.png">
-  <img src="docs/images/popup-en-light.png" alt="SlipBoard clipboard history popup" width="900">
+  <img src="docs/images/popup-en-light.png" alt="SlipTray clipboard history popup" width="900">
 </picture>
 
 </div>
@@ -29,12 +31,12 @@ Press a hotkey, pick what you copied recently, paste it.
 
 ## Overview
 
-SlipBoard watches the system clipboard and keeps a searchable history of
+SlipTray watches the system clipboard and keeps a searchable history of
 everything you copy: text, code, links, colors, images, files and rich text. A
 global hotkey opens a popup with your **Pinned** and **Recent** items. Pick one
-with the keyboard and SlipBoard pastes it into the app you were just using.
+with the keyboard and SlipTray pastes it into the app you were just using.
 
-### Why SlipBoard?
+### Why SlipTray?
 
 - **Private by design:** no analytics, no telemetry, no account. The only
   network connection is the update check.
@@ -234,7 +236,7 @@ how long ago you copied it. To see only what came from one app:
 
 ### 5. App Lock
 
-- Locks within a session only: SlipBoard opens unlocked after launch or
+- Locks within a session only: SlipTray opens unlocked after launch or
   reinstall, then locks when you choose Lock or after the auto-lock timeout.
 - Unlock with **Touch ID** or your system password.
 - Lock automatically after 1 minute, 5 minutes, 15 minutes or 1 hour of
@@ -251,7 +253,7 @@ how long ago you copied it. To see only what came from one app:
 - A dedicated menu bar icon. Click it to see capture status, pause capture,
   change retention quickly, or open the popup or Settings.
 - Optional **launch at login** and customizable global hotkeys.
-- **Settings → About** shows the version and checks for updates. SlipBoard
+- **Settings → About** shows the version and checks for updates. SlipTray
   downloads, verifies and installs a new version itself (Sparkle).
 
 ---
@@ -276,16 +278,16 @@ in Settings → Hotkeys). Inside the popup:
 
 ## Privacy and security
 
-- **Offline except for update checks.** SlipBoard connects only to GitHub, to
+- **Offline except for update checks.** SlipTray connects only to GitHub, to
   check for updates: when you click **Check for Updates**, or daily if you
   allow automatic checks when it asks on the second launch (change it in
   Settings → About). Nothing about your
   Mac or your clipboard is sent. No analytics, no telemetry, no crash-reporting
   service, no account or sign-in.
-- **Library validation is off in releases; SlipBoard checks Sparkle itself.**
+- **Library validation is off in releases; SlipTray checks Sparkle itself.**
   Without an Apple Team ID, macOS only loads `Sparkle.framework` into the app if
   library validation is turned off. So Sparkle sits inside a separate plug-in
-  (`Contents/PlugIns/SlipBoardUpdater.bundle`) that SlipBoard loads only when an
+  (`Contents/PlugIns/SlipTrayUpdater.bundle`) that SlipTray loads only when an
   update check needs it, and only after checking, right before loading, that
   the plug-in, Sparkle and everything nested in Sparkle are signed with the same
   certificate as the running app. If that check fails, nothing is loaded and
@@ -293,16 +295,16 @@ in Settings → Hotkeys). Inside the popup:
   that lists the exact builds of the plug-in and Sparkle, so macOS itself
   refuses a file swapped between that check and the load. The
   hardened runtime still blocks `DYLD_*` injection, and macOS protects apps in
-  `/Applications` from changes by other apps, so install SlipBoard there.
+  `/Applications` from changes by other apps, so install SlipTray there.
 - **Local storage only.** History, notes, snippets and settings live in
-  `~/Library/Application Support/SlipBoard/` on your Mac.
+  `~/Library/Application Support/SlipTray/` on your Mac.
 - **App Lock locks the window, not the disk.** It hides your history until you
   unlock with Touch ID or your system password. Clip text, long-text files and
   copied images are stored unencrypted in the folder above, so use FileVault
   to protect them at rest.
 - **Notes are encrypted, but on release builds the key sits next to them.**
   With App Lock on, notes and a copy of clip content are encrypted. Release
-  builds (signed with SlipBoard's own certificate, or ad-hoc) keep that key
+  builds (signed with SlipTray's own certificate, or ad-hoc) keep that key
   in `PayloadKey.json` in the same folder,
   readable only by your user account, so anyone who can read your files can
   read the key too: this only keeps notes out of casual view. Team-signed
@@ -311,7 +313,7 @@ in Settings → Hotkeys). Inside the popup:
   password manager. Exclude that app in Settings, or pause capture, to keep
   them out of the history.
 - **One permission: Accessibility.** It is used only to send the ⌘V keystroke
-  when you pick an item. SlipBoard does not log or transmit keystrokes.
+  when you pick an item. SlipTray does not log or transmit keystrokes.
 
 Read the full policy in [PRIVACY.md](PRIVACY.md).
 
@@ -328,7 +330,7 @@ Read the full policy in [PRIVACY.md](PRIVACY.md).
 ### Install with Homebrew
 
 ```bash
-brew install --cask huynq2311/tap/slipboard
+brew install --cask huynq2311/tap/sliptray
 ```
 
 A Homebrew install is not notarized either, so macOS may block the first
@@ -336,24 +338,24 @@ launch: follow the steps below.
 
 ### Install from a release
 
-Download `SlipBoard.dmg` from [Releases](../../releases), open it and drag
-**SlipBoard** into **Applications**.
+Download `SlipTray.dmg` from [Releases](../../releases), open it and drag
+**SlipTray** into **Applications**.
 
-Releases are signed with SlipBoard's own self-signed certificate and are not
+Releases are signed with SlipTray's own self-signed certificate and are not
 notarized, so macOS blocks the first launch:
 
-1. Open SlipBoard. macOS says it cannot verify the app; click **Done**.
+1. Open SlipTray. macOS says it cannot verify the app; click **Done**.
 2. Open **System Settings → Privacy & Security**, scroll to **Security** and
-   click **Open Anyway** next to SlipBoard, then confirm.
+   click **Open Anyway** next to SlipTray, then confirm.
 
 Or clear the block from the app with one command, without opening System
 Settings:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/SlipBoard.app
+xattr -dr com.apple.quarantine /Applications/SlipTray.app
 ```
 
-Then grant **Accessibility** access when asked so SlipBoard can paste into
+Then grant **Accessibility** access when asked so SlipTray can paste into
 other apps.
 
 Updates keep the Accessibility permission: every release since
@@ -369,8 +371,8 @@ the CI runs.
 
 ```bash
 xcodebuild \
-  -project SlipBoard.xcodeproj \
-  -target SlipBoard \
+  -project SlipTray.xcodeproj \
+  -target SlipTray \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
   build
@@ -386,22 +388,22 @@ wrapped by a Secure Enclave key when the Mac has one. Ad-hoc builds cannot carry
 the keychain entitlement, so they keep it in a file only your user can read,
 next to the encrypted data.
 
-1. In Xcode, open `SlipBoard.xcodeproj`, select the **SlipBoard** target and
+1. In Xcode, open `SlipTray.xcodeproj`, select the **SlipTray** target and
    set **Signing & Capabilities** to your own team. Change the bundle
    identifier to one you own.
 2. Build, letting Xcode create the provisioning profile:
 
    ```bash
    xcodebuild \
-     -project SlipBoard.xcodeproj \
-     -scheme SlipBoard \
+     -project SlipTray.xcodeproj \
+     -scheme SlipTray \
      -configuration Release \
      -allowProvisioningUpdates \
      build
    ```
 
    The profile is required because `keychain-access-groups`
-   ([`SlipBoard.entitlements`](SlipBoard.entitlements)) is a restricted
+   ([`SlipTray.entitlements`](SlipTray.entitlements)) is a restricted
    entitlement. Without it, building fails with
    `No profiles for '<bundle id>' were found`.
 
@@ -436,7 +438,7 @@ builds. The Core Data store itself is not encrypted.
 ## Project layout
 
 ```text
-SlipBoard/
+SlipTray/
 ├── Core/         Application logic, one folder per area
 │   ├── ClipboardHistory/         pasteboard monitor, classifier, store, projector
 │   ├── SearchNotesOrganization/  search index, notes, collections
@@ -448,7 +450,7 @@ SlipBoard/
 │   └── Localization/             English / Tiếng Việt catalog
 ├── Models/       Value types shared across the app
 ├── UI/           SwiftUI views: popup shell, menu bar, settings, themes
-└── SlipBoardApp.swift            app entry point and runtime wiring
+└── SlipTrayApp.swift            app entry point and runtime wiring
 Tools/
 └── LocalizationHarness/          standalone harness to test the string catalog
 build_release.sh                  build and package a DMG
@@ -471,7 +473,7 @@ Released under the [MIT License](LICENSE).
 
 ## Third-party notices
 
-SlipBoard bundles one third-party library:
+SlipTray bundles one third-party library:
 
 - **[Sparkle](https://sparkle-project.org)** 2, the in-app update framework
   (MIT License; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems GmbH,
@@ -488,7 +490,7 @@ It bundles no other third-party code, fonts or artwork, and relies on these:
   Apple platforms. No symbol is used in the app icon or logo.
 - **San Francisco** (© Apple Inc.). Text, including the DMG background, uses the
   macOS system font, which is not bundled.
-- **App icon and menu bar icon.** Made for SlipBoard with an AI image tool; they
+- **App icon and menu bar icon.** Made for SlipTray with an AI image tool; they
   contain no third-party artwork.
 - **Other apps' names and icons.** Cards show the name and icon of the app a
   clip came from, read from your Mac at run time. The screenshots in this README

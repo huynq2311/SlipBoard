@@ -5,7 +5,7 @@ import Foundation
 struct LocalizationHarness {
     static func main() async {
         await MainActor.run {
-            let suiteName = "SlipBoard.LocalizationHarness.\(UUID().uuidString)"
+            let suiteName = "SlipTray.LocalizationHarness.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!
             defer {
                 defaults.removePersistentDomain(forName: suiteName)
@@ -60,7 +60,7 @@ struct LocalizationHarness {
             )
             incompleteStore.setLanguage(.vietnamese)
             expect(incompleteStore.text(.menuSettings) == "Settings...", "Missing translations fall back to English")
-            expect(incompleteStore.text(.menuQuit) == "Quit SlipBoard", "Missing catalog entries use deterministic English fallback")
+            expect(incompleteStore.text(.menuQuit) == "Quit SlipTray", "Missing catalog entries use deterministic English fallback")
             expect(incompleteStore.lastFallback?.key == .menuQuit, "Missing catalog fallback is observable")
 
             withExtendedLifetime(observation) {}

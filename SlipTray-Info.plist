@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SUFeedURL</key>
+	<string>https://github.com/huynq2311/SlipTray/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MF51akVI4/NzPpDNvdT6dH1xZ7yfGGR58VlWVCrhUQY=</string>
+</dict>
+</plist>

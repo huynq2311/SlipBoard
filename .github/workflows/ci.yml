@@ -1,4 +1,4 @@
-name: SlipBoard CI
+name: SlipTray CI
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
       - name: Build
         run: |
           xcodebuild \
-            -project SlipBoard.xcodeproj \
-            -target SlipBoard \
+            -project SlipTray.xcodeproj \
+            -target SlipTray \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -36,8 +36,8 @@ jobs:
       - name: Build (Release)
         run: |
           xcodebuild \
-            -project SlipBoard.xcodeproj \
-            -target SlipBoard \
+            -project SlipTray.xcodeproj \
+            -target SlipTray \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             build

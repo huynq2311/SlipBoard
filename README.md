@@ -1,8 +1,10 @@
 <div align="center">
 
-<img src="docs/images/logo.png" alt="SlipBoard" width="128" height="128">
+<img src="docs/images/logo.png" alt="SlipTray" width="128" height="128">
 
-# SlipBoard
+# SlipTray
+
+*Trước đây là SlipBoard.*
 
 **Trình quản lý clipboard nhanh, riêng tư, nằm gọn trên thanh menu macOS**
 
@@ -20,7 +22,7 @@ Nhấn phím tắt, chọn thứ bạn vừa sao chép, dán.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/popup-vi-dark.png">
-  <img src="docs/images/popup-vi-light.png" alt="Popup lịch sử clipboard của SlipBoard" width="900">
+  <img src="docs/images/popup-vi-light.png" alt="Popup lịch sử clipboard của SlipTray" width="900">
 </picture>
 
 </div>
@@ -29,13 +31,13 @@ Nhấn phím tắt, chọn thứ bạn vừa sao chép, dán.
 
 ## Giới thiệu
 
-SlipBoard theo dõi clipboard của hệ thống và lưu lại một lịch sử có thể tìm
+SlipTray theo dõi clipboard của hệ thống và lưu lại một lịch sử có thể tìm
 kiếm của mọi thứ bạn sao chép: văn bản, code, liên kết, màu sắc, hình ảnh, file
 và văn bản có định dạng. Một phím tắt toàn cục mở popup với các mục **Đã ghim**
-và **Gần đây**. Chọn một mục bằng bàn phím, SlipBoard sẽ dán nó vào ứng dụng bạn
+và **Gần đây**. Chọn một mục bằng bàn phím, SlipTray sẽ dán nó vào ứng dụng bạn
 vừa dùng.
 
-### Vì sao chọn SlipBoard?
+### Vì sao chọn SlipTray?
 
 - **Riêng tư:** không analytics, không telemetry, không cần tài khoản. Kết nối
   mạng duy nhất là kiểm tra cập nhật.
@@ -224,7 +226,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 
 ### 5. Khóa ứng dụng (App Lock)
 
-- Chỉ khóa trong phiên dùng: SlipBoard mở sẵn sau khi khởi động hoặc cài lại,
+- Chỉ khóa trong phiên dùng: SlipTray mở sẵn sau khi khởi động hoặc cài lại,
   rồi khóa khi bạn bấm Khóa hoặc khi hết thời gian tự khóa.
 - Mở khóa bằng **Touch ID** hoặc mật khẩu hệ thống.
 - Tự khóa sau 1 phút, 5 phút, 15 phút hoặc 1 giờ không hoạt động.
@@ -240,7 +242,7 @@ và thời gian sao chép. Để chỉ xem những gì đến từ một ứng d
 - Biểu tượng riêng trên thanh menu. Bấm vào để xem trạng thái ghi, tạm dừng
   ghi, đổi nhanh thời gian lưu giữ, mở popup hoặc Cài đặt.
 - Tùy chọn **mở khi đăng nhập**, phím tắt toàn cục tùy chỉnh.
-- **Cài đặt → Giới thiệu** hiện phiên bản và kiểm tra cập nhật. SlipBoard tự
+- **Cài đặt → Giới thiệu** hiện phiên bản và kiểm tra cập nhật. SlipTray tự
   tải, xác minh và cài bản mới (Sparkle).
 
 ---
@@ -265,31 +267,31 @@ Cài đặt → Phím tắt). Trong popup:
 
 ## Quyền riêng tư và bảo mật
 
-- **Offline, trừ kiểm tra cập nhật.** SlipBoard chỉ kết nối GitHub để kiểm tra
+- **Offline, trừ kiểm tra cập nhật.** SlipTray chỉ kết nối GitHub để kiểm tra
   cập nhật: khi bạn bấm **Kiểm tra cập nhật**, hoặc mỗi ngày nếu bạn cho phép tự
   kiểm tra khi app hỏi ở lần mở thứ hai (đổi lại trong Cài đặt → Giới thiệu). Không gửi thông tin gì về máy hay
   clipboard của bạn. Không analytics, không telemetry, không dịch vụ báo lỗi,
   không cần tài khoản.
-- **Bản phát hành tắt library validation; SlipBoard tự kiểm Sparkle.** Không có
+- **Bản phát hành tắt library validation; SlipTray tự kiểm Sparkle.** Không có
   Apple Team ID thì macOS chỉ nạp `Sparkle.framework` vào app khi tắt library
   validation. Vì vậy Sparkle nằm trong một plug-in riêng
-  (`Contents/PlugIns/SlipBoardUpdater.bundle`), SlipBoard chỉ nạp khi cần kiểm
+  (`Contents/PlugIns/SlipTrayUpdater.bundle`), SlipTray chỉ nạp khi cần kiểm
   tra cập nhật, và chỉ sau khi xác nhận, ngay trước lúc nạp, rằng plug-in,
   Sparkle và mọi thành phần bên trong Sparkle được ký bằng đúng chứng chỉ của app
   đang chạy. Kiểm tra thất bại thì không nạp gì và tắt cập nhật. Bản phát hành
   còn được ký kèm library load constraint liệt kê đúng bản build của plug-in và
   Sparkle, nên chính macOS từ chối file bị đổi giữa lúc kiểm và lúc nạp.
   Hardened runtime vẫn chặn chèn thư viện qua `DYLD_*`, và macOS bảo vệ app
-  trong `/Applications` khỏi bị app khác sửa, nên hãy cài SlipBoard vào đó.
+  trong `/Applications` khỏi bị app khác sửa, nên hãy cài SlipTray vào đó.
 - **Chỉ lưu trên máy.** Lịch sử, ghi chú, snippet và cài đặt nằm trong
-  `~/Library/Application Support/SlipBoard/`.
+  `~/Library/Application Support/SlipTray/`.
 - **App Lock khóa cửa sổ, không mã hóa ổ đĩa.** Nó ẩn lịch sử cho tới khi bạn
   mở khóa bằng Touch ID hoặc mật khẩu hệ thống. Nội dung clip, file văn bản dài
   và ảnh đã copy vẫn lưu không mã hóa trong thư mục trên, nên hãy bật FileVault
   để bảo vệ dữ liệu khi máy tắt.
 - **Ghi chú được mã hóa, nhưng ở bản phát hành khóa nằm ngay cạnh.** Khi bật
   App Lock, ghi chú và một bản sao nội dung clip được mã hóa. Bản phát hành (ký
-  bằng chứng chỉ riêng của SlipBoard, hoặc ad-hoc) giữ khóa đó trong
+  bằng chứng chỉ riêng của SlipTray, hoặc ad-hoc) giữ khóa đó trong
   `PayloadKey.json` ở cùng thư mục, chỉ tài khoản của
   bạn đọc được, nên ai đọc được file của bạn cũng đọc được khóa: việc mã hóa
   này chỉ giúp ghi chú không bị xem lướt qua. Bản ký bằng team giữ khóa trong
@@ -298,7 +300,7 @@ Cài đặt → Phím tắt). Trong popup:
   mật khẩu. Hãy loại trừ ứng dụng đó trong Cài đặt, hoặc tạm dừng ghi, nếu
   không muốn chúng nằm trong lịch sử.
 - **Chỉ cần một quyền: Accessibility.** Dùng duy nhất để gửi phím ⌘V khi bạn
-  chọn một mục. SlipBoard không ghi lại hay gửi đi các phím bạn gõ.
+  chọn một mục. SlipTray không ghi lại hay gửi đi các phím bạn gõ.
 
 Chi tiết xem [PRIVACY.md](PRIVACY.md).
 
@@ -315,7 +317,7 @@ Chi tiết xem [PRIVACY.md](PRIVACY.md).
 ### Cài bằng Homebrew
 
 ```bash
-brew install --cask huynq2311/tap/slipboard
+brew install --cask huynq2311/tap/sliptray
 ```
 
 Bản cài bằng Homebrew cũng chưa được notarize, nên macOS có thể chặn lần mở
@@ -323,23 +325,23 @@ Bản cài bằng Homebrew cũng chưa được notarize, nên macOS có thể c
 
 ### Cài từ Release
 
-Tải `SlipBoard.dmg` ở trang [Releases](../../releases), mở file và kéo
-**SlipBoard** vào thư mục **Applications**.
+Tải `SlipTray.dmg` ở trang [Releases](../../releases), mở file và kéo
+**SlipTray** vào thư mục **Applications**.
 
-Bản Release được ký bằng chứng chỉ tự tạo của SlipBoard và chưa notarize, nên
+Bản Release được ký bằng chứng chỉ tự tạo của SlipTray và chưa notarize, nên
 macOS chặn lần mở đầu tiên:
 
-1. Mở SlipBoard. macOS báo không xác minh được ứng dụng; bấm **Xong**.
+1. Mở SlipTray. macOS báo không xác minh được ứng dụng; bấm **Xong**.
 2. Mở **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, cuộn tới mục **Bảo mật**
-   và bấm **Vẫn mở** cạnh SlipBoard, rồi xác nhận.
+   và bấm **Vẫn mở** cạnh SlipTray, rồi xác nhận.
 
 Hoặc bỏ cờ chặn của app bằng một dòng lệnh, không cần vào Cài đặt hệ thống:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/SlipBoard.app
+xattr -dr com.apple.quarantine /Applications/SlipTray.app
 ```
 
-Sau đó cấp quyền **Accessibility** khi được hỏi để SlipBoard dán được vào ứng
+Sau đó cấp quyền **Accessibility** khi được hỏi để SlipTray dán được vào ứng
 dụng khác.
 
 Cập nhật không làm mất quyền Accessibility: mọi bản phát hành từ
@@ -354,8 +356,8 @@ hành giữ khóa của nó trong một file (xem
 
 ```bash
 xcodebuild \
-  -project SlipBoard.xcodeproj \
-  -target SlipBoard \
+  -project SlipTray.xcodeproj \
+  -target SlipTray \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
   build
@@ -371,22 +373,22 @@ một khóa Secure Enclave nếu máy có. Bản ký ad-hoc không mang được
 keychain nên giữ khóa trong một file chỉ tài khoản của bạn đọc được, cạnh dữ
 liệu đã mã hóa.
 
-1. Mở `SlipBoard.xcodeproj` trong Xcode, chọn target **SlipBoard**, vào
+1. Mở `SlipTray.xcodeproj` trong Xcode, chọn target **SlipTray**, vào
    **Signing & Capabilities** và chọn team của bạn. Đổi bundle identifier thành
    một giá trị bạn sở hữu.
 2. Build, để Xcode tự tạo provisioning profile:
 
    ```bash
    xcodebuild \
-     -project SlipBoard.xcodeproj \
-     -scheme SlipBoard \
+     -project SlipTray.xcodeproj \
+     -scheme SlipTray \
      -configuration Release \
      -allowProvisioningUpdates \
      build
    ```
 
    Cần profile vì `keychain-access-groups`
-   ([`SlipBoard.entitlements`](SlipBoard.entitlements)) là entitlement bị hạn
+   ([`SlipTray.entitlements`](SlipTray.entitlements)) là entitlement bị hạn
    chế. Thiếu profile, build báo `No profiles for '<bundle id>' were found`.
 
 ---
@@ -419,7 +421,7 @@ bản ký ad-hoc. Bản thân kho Core Data không được mã hóa.
 ## Cấu trúc dự án
 
 ```text
-SlipBoard/
+SlipTray/
 ├── Core/         Logic ứng dụng, mỗi mảng một thư mục
 │   ├── ClipboardHistory/         theo dõi pasteboard, phân loại, kho, projector
 │   ├── SearchNotesOrganization/  chỉ mục tìm kiếm, ghi chú, bộ sưu tập
@@ -431,7 +433,7 @@ SlipBoard/
 │   └── Localization/             danh mục chuỗi English / Tiếng Việt
 ├── Models/       Kiểu dữ liệu dùng chung
 ├── UI/           View SwiftUI: popup, thanh menu, cài đặt, giao diện
-└── SlipBoardApp.swift            điểm vào ứng dụng và kết nối runtime
+└── SlipTrayApp.swift            điểm vào ứng dụng và kết nối runtime
 Tools/
 └── LocalizationHarness/          chương trình kiểm tra danh mục chuỗi
 build_release.sh                  build và đóng gói DMG
@@ -453,7 +455,7 @@ Phát hành theo giấy phép [MIT](LICENSE).
 
 ## Thông báo bên thứ ba
 
-SlipBoard đóng gói một thư viện của bên thứ ba:
+SlipTray đóng gói một thư viện của bên thứ ba:
 
 - **[Sparkle](https://sparkle-project.org)** 2, framework cập nhật trong ứng
   dụng (giấy phép MIT; © 2006-2013 Andy Matuschak, © 2009-2013 Elgato Systems
@@ -463,7 +465,7 @@ SlipBoard đóng gói một thư viện của bên thứ ba:
   riêng của từng thành phần. Toàn văn:
   [LICENSE của Sparkle](https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE).
 
-Ngoài Sparkle, SlipBoard không đóng gói code, font hay hình ảnh nào của bên thứ
+Ngoài Sparkle, SlipTray không đóng gói code, font hay hình ảnh nào của bên thứ
 ba. Ứng dụng dựa vào các thành phần sau:
 
 - **SF Symbols** (© Apple Inc.). Giao diện dùng biểu tượng từ bộ SF Symbols có
@@ -471,7 +473,7 @@ ba. Ứng dụng dựa vào các thành phần sau:
   nền tảng Apple. Không biểu tượng nào được dùng làm icon ứng dụng hay logo.
 - **San Francisco** (© Apple Inc.). Chữ trong ứng dụng, kể cả ảnh nền DMG, dùng
   font hệ thống của macOS, không được đóng gói kèm.
-- **Icon ứng dụng và icon thanh menu.** Được tạo riêng cho SlipBoard bằng công
+- **Icon ứng dụng và icon thanh menu.** Được tạo riêng cho SlipTray bằng công
   cụ tạo ảnh AI; không chứa hình ảnh của bên thứ ba.
 - **Tên và icon của ứng dụng khác.** Thẻ hiển thị tên và icon của ứng dụng nguồn
   của clip, lấy từ máy của bạn lúc chạy. Ảnh chụp màn hình trong README có hiện
