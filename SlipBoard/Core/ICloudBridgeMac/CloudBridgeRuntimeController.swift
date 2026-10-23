@@ -1,6 +1,7 @@
 import Foundation
 
 final class CloudBridgeRuntimeController: BridgeRuntimeProviding {
+    private static let logger = DiagnosticLogger(category: "Bridge")
     private let settingsStore: BridgeSettingsStoring
     private let transport: BridgeTransporting
     private let evaluator: BridgeEligibilityEvaluating
@@ -206,6 +207,9 @@ final class CloudBridgeRuntimeController: BridgeRuntimeProviding {
                 consumedRecordIDsToMark.append(envelope.recordID)
                 knownConsumedRecordIDs.insert(envelope.recordID)
             } else if let transport = transport as? CloudBridgeRecordStore {
+                // Inbound IDs come from another device: log only a well-formed UUID.
+                let loggedRecordID = UUID(uuidString: envelope.recordID)?.uuidString ?? "unrecognized"
+                Self.logger.error("Bridge import could not enter local history (record \(loggedRecordID))")
                 transport.recordFailure(
                     "Bridge import could not enter local history.",
                     at: referenceDate
