@@ -69,8 +69,8 @@ func render(scale: CGFloat) -> Data {
         let rect = NSRect(x: 0, y: height - top - size * 1.5, width: width, height: size * 1.5)
         (text as NSString).draw(in: rect, withAttributes: attributes)
     }
-    drawCaption("Drag SlipBoard to Applications to install", top: 316, size: 15, weight: .medium, alpha: 1)
-    drawCaption("Kéo SlipBoard vào Applications để cài đặt", top: 342, size: 13, weight: .regular, alpha: 0.7)
+    drawCaption("Drag SlipTray to Applications to install", top: 316, size: 15, weight: .medium, alpha: 1)
+    drawCaption("Kéo SlipTray vào Applications để cài đặt", top: 342, size: 13, weight: .regular, alpha: 0.7)
 
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!

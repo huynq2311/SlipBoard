@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Build SlipBoard in Release configuration and package it as a DMG.
+# Build SlipTray in Release configuration and package it as a DMG.
 #
 #   ./build_release.sh              signed with SIGN_IDENTITY if set (releases), else ad-hoc;
 #                                   runs on any Mac, never expires
 #   ./build_release.sh --team       team-signed build (Apple Development + provisioning profile)
 #   ./build_release.sh --no-sign    unsigned build (what CI builds)
 #
-# Output: Release/SlipBoard.app, Release/SlipBoard.dmg, Release/SlipBoard.dmg.sha256,
+# Output: Release/SlipTray.app, Release/SlipTray.dmg, Release/SlipTray.dmg.sha256,
 #         and Release/appcast.xml for signed releases
 #
 # Optional settings, read from a .env file next to this script (see .env.example):
@@ -23,9 +23,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PROJECT="SlipBoard.xcodeproj"
-SCHEME="SlipBoard"
-APP_NAME="SlipBoard"
+PROJECT="SlipTray.xcodeproj"
+SCHEME="SlipTray"
+APP_NAME="SlipTray"
 BUILD_DIR="build"
 OUT_DIR="Release"
 
@@ -33,9 +33,9 @@ OUT_DIR="Release"
 # claims keychain-access-groups, so App Lock keeps its key in a 0600 file instead.
 # Its only entitlement turns off library validation: without a Team ID, macOS
 # refuses to load Sparkle.framework into the app even when both share a certificate.
-# The app makes up for it: Sparkle lives inside PlugIns/SlipBoardUpdater.bundle, which
+# The app makes up for it: Sparkle lives inside PlugIns/SlipTrayUpdater.bundle, which
 # the app loads only after checking that the plug-in and the framework carry its own
-# certificate (SlipBoard/Core/Updates/UpdaterSignatureCheck.swift).
+# certificate (SlipTray/Core/Updates/UpdaterSignatureCheck.swift).
 # team: needs a valid profile; a free team's profile lasts 7 days.
 SIGN_MODE=adhoc
 for arg in "$@"; do
@@ -90,7 +90,7 @@ case "$SIGN_MODE" in
     ;;
   adhoc)
     XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-      PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS=SlipBoard-NoTeam.entitlements \
+      PROVISIONING_PROFILE_SPECIFIER= CODE_SIGN_ENTITLEMENTS=SlipTray-NoTeam.entitlements \
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
   none)
@@ -109,7 +109,7 @@ if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   sign() { codesign --force --options runtime --timestamp=none --sign "$SIGN_IDENTITY" "$@"; }
   # Inside out, as Sparkle's docs list it, then the plug-in that holds Sparkle.
   # The app loads them only if they carry this same certificate.
-  PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipBoardUpdater.bundle"
+  PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipTrayUpdater.bundle"
   SPARKLE="$PLUGIN/Contents/Frameworks/Sparkle.framework"
   sign "$SPARKLE/Versions/B/XPCServices/Installer.xpc"
   sign --preserve-metadata=entitlements "$SPARKLE/Versions/B/XPCServices/Downloader.xpc"
@@ -129,14 +129,14 @@ if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
   library_cdhashes "$PLUGIN" "$SPARKLE" | while read -r cdhash; do
     plutil -insert 'cdhash.$in' -data "$(xxd -r -p <<<"$cdhash" | base64)" -append "$LIBRARY_CONSTRAINT"
   done
-  sign --entitlements SlipBoard-NoTeam.entitlements --library-constraint "$LIBRARY_CONSTRAINT" \
+  sign --entitlements SlipTray-NoTeam.entitlements --library-constraint "$LIBRARY_CONSTRAINT" \
     "$OUT_DIR/$APP_NAME.app"
 fi
 
 # Sparkle must reach the app only through the plug-in, after its signature check.
 LINKED="$(otool -L "$OUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME")"
 if grep -q Sparkle <<<"$LINKED"; then
-  echo "The app executable links Sparkle; only SlipBoardUpdater.bundle may." >&2
+  echo "The app executable links Sparkle; only SlipTrayUpdater.bundle may." >&2
   exit 1
 fi
 
@@ -150,12 +150,12 @@ if [ "$SIGN_MODE" != none ]; then
   codesign -d --extract-certificates="$CERT_DIR/cert" "$OUT_DIR/$APP_NAME.app" 2>/dev/null || true
   if [ -f "$CERT_DIR/cert0" ]; then
     LEAF="$(shasum -a 1 "$CERT_DIR/cert0" | cut -d' ' -f1)"
-    PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipBoardUpdater.bundle"
+    PLUGIN="$OUT_DIR/$APP_NAME.app/Contents/PlugIns/SlipTrayUpdater.bundle"
     codesign --verify --deep --strict \
       -R="identifier \"org.sparkle-project.Sparkle\" and certificate leaf = H\"$LEAF\"" \
       "$PLUGIN/Contents/Frameworks/Sparkle.framework"
     codesign --verify --deep --strict \
-      -R="identifier \"huynq.SlipBoard.Updater\" and certificate leaf = H\"$LEAF\"" "$PLUGIN"
+      -R="identifier \"huynq.SlipTray.Updater\" and certificate leaf = H\"$LEAF\"" "$PLUGIN"
   fi
   rm -rf "$CERT_DIR"
   if [ -n "${LIBRARY_CONSTRAINT:-}" ]; then
@@ -295,7 +295,7 @@ if [ "$SIGN_MODE" = adhoc ] && [ -n "${SIGN_IDENTITY:-}" ]; then
     ED_KEY_ARGS=(--ed-key-file "$SPARKLE_ED_KEY_FILE")
   fi
   "$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast" ${ED_KEY_ARGS[@]+"${ED_KEY_ARGS[@]}"} \
-    --download-url-prefix "https://github.com/huynq2311/SlipBoard/releases/download/$TAG/" \
+    --download-url-prefix "https://github.com/huynq2311/SlipTray/releases/download/$TAG/" \
     -o "$OUT_DIR/appcast.xml" "$WORK/appcast"
   # Without the private key the appcast is written unsigned, and every client rejects it.
   grep -q 'sparkle:edSignature=' "$OUT_DIR/appcast.xml" \

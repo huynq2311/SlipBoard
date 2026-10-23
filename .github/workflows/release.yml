@@ -124,7 +124,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PLIST=Release/SlipBoard.app/Contents/Info.plist
+          PLIST=Release/SlipTray.app/Contents/Info.plist
           VERSION="$(plutil -extract CFBundleShortVersionString raw "$PLIST")"
           TAG="v$VERSION-$BUILD_DATE"
           if [ "$GITHUB_EVENT_NAME" = push ]; then
@@ -137,7 +137,7 @@ jobs:
           else
             TARGET=(--target "$GITHUB_SHA")
           fi
-          SHA256="$(cut -d' ' -f1 Release/SlipBoard.dmg.sha256)"
+          SHA256="$(cut -d' ' -f1 Release/SlipTray.dmg.sha256)"
           cat > "$RUNNER_TEMP/notes.md" <<EOF
           ## What's New
 
@@ -145,13 +145,13 @@ jobs:
 
           ## Checksum
 
-          \`SlipBoard.dmg\` SHA-256: \`$SHA256\`
+          \`SlipTray.dmg\` SHA-256: \`$SHA256\`
 
           Built from \`${GITHUB_SHA:0:7}\`, the head of \`main\`, by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).
           EOF
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft "${TARGET[@]}" \
-            --title "SlipBoard v$VERSION (Build $BUILD_DATE)" --notes-file "$RUNNER_TEMP/notes.md" \
-            Release/SlipBoard.dmg Release/SlipBoard.dmg.sha256 Release/appcast.xml
+            --title "SlipTray v$VERSION (Build $BUILD_DATE)" --notes-file "$RUNNER_TEMP/notes.md" \
+            Release/SlipTray.dmg Release/SlipTray.dmg.sha256 Release/appcast.xml
           echo "Draft: $TAG. Edit the notes and publish it on the Releases page." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove the keychain and key
