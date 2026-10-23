@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum ClipboardHistoryRailKind: String, Identifiable, Hashable {
     case pinned
@@ -51,6 +52,11 @@ struct ClipboardHistoryRailSection: View {
     var onPrimaryAction: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
+    var dragPasteboardWriter: (String) -> NSPasteboardWriting? = { _ in nil }
+    /// A card dropped on the rail lands after the given clip, or first when
+    /// that is nil.
+    var onPlaceClip: ((String, String?) -> Void)? = nil
+    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,11 +127,32 @@ struct ClipboardHistoryRailSection: View {
                         onCancelNoteEditing: onCancelNoteEditing,
                         onPrimaryAction: onPrimaryAction,
                         onOpenContextMenu: onOpenContextMenu,
-                        onPerformContextAction: onPerformContextAction
+                        onPerformContextAction: onPerformContextAction,
+                        dragPasteboardWriter: dragPasteboardWriter,
+                        onPlaceClip: onPlaceClip
                     )
                 }
             }
         }
+        // A card from the other rail dropped on the header, an empty or a
+        // folded rail goes first; the rail itself places it where it is dropped.
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(theme.palette.borderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                    .padding(.horizontal, theme.spacing.popupPadding / 2)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.item], delegate: SBRailSectionDropDelegate(
+            railClipIDs: clips.map(\.id),
+            isTargeted: $isDropTargeted,
+            onDrop: sectionDropAction
+        ))
+    }
+
+    private var sectionDropAction: ((String) -> Void)? {
+        onPlaceClip.map { onPlaceClip in { onPlaceClip($0, nil) } }
     }
 
     private var emptyStateTitle: String {
@@ -320,5 +347,40 @@ struct ClipboardHistoryEmptyRailCard: View {
 
     private func localizedUppercase(_ value: String) -> String {
         value.uppercased(with: Locale(identifier: localizationLanguage.localeIdentifier))
+    }
+}
+
+/// Takes a card dragged from the other rail.
+private struct SBRailSectionDropDelegate: DropDelegate {
+    let railClipIDs: [String]
+    @Binding var isTargeted: Bool
+    let onDrop: ((String) -> Void)?
+
+    func validateDrop(info: DropInfo) -> Bool {
+        let session = SBClipDragSession.shared
+        guard onDrop != nil, session.isActive, let clipID = session.clipID else { return false }
+        return railClipIDs.contains(clipID) == false
+    }
+
+    func dropEntered(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) {
+            isTargeted = true
+        }
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) {
+            isTargeted = false
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        isTargeted = false
+        guard let onDrop, let clipID = SBClipDragSession.shared.clipID,
+              railClipIDs.contains(clipID) == false else {
+            return false
+        }
+        onDrop(clipID)
+        return true
     }
 }

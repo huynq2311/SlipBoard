@@ -1,6 +1,10 @@
 import Foundation
 
 final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHistoryRetentionBacking {
+    /// Neighbours closer than this are spaced out before a clip is put
+    /// between them.
+    private static let minimumRecentGap: TimeInterval = 0.002
+
     private(set) var snapshot: ClipboardHistorySnapshot
 
     init(snapshot: ClipboardHistorySnapshot = ClipboardHistorySnapshot()) {
@@ -72,6 +76,8 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             recentItem.colorSwatches = candidate.colorSwatches
             recentItem.richTextAvailable = candidate.richTextAvailable
             recentItem.richTextRTFData = candidate.richTextRTFData
+            // Copied again, so it goes back to the top.
+            recentItem.recentSortAt = nil
 
             snapshot.recentItems.insert(recentItem, at: 0)
         } else {
@@ -158,12 +164,85 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             item.isPinned = isPinned
 
             if isPinned {
+                // A newly pinned clip opens the pinned rail.
+                item.pinnedAt = Date()
                 snapshot.pinnedItems.append(item)
             } else {
                 snapshot.recentItems.append(item)
             }
         }
 
+        snapshot = normalizedSnapshot(from: snapshot)
+    }
+
+    /// Pins the clip if it is not pinned yet and puts it right after
+    /// `previousID` in the pinned rail, or first when that is nil.
+    func placePinnedItem(id: String, after previousID: String?) {
+        guard id != previousID else { return }
+        if snapshot.pinnedItems.contains(where: { $0.id == id }) == false {
+            setPinned(true, for: id)
+        }
+
+        var items = snapshot.pinnedItems
+        guard let fromIndex = items.firstIndex(where: { $0.id == id }) else { return }
+        let item = items.remove(at: fromIndex)
+        let toIndex = previousID.flatMap { previousID in
+            items.firstIndex(where: { $0.id == previousID }).map { $0 + 1 }
+        } ?? 0
+        items.insert(item, at: toIndex)
+        let newest = items.compactMap(\.pinnedAt).max() ?? Date()
+        for index in items.indices {
+            items[index].pinnedAt = newest.addingTimeInterval(-Double(index))
+        }
+        snapshot.pinnedItems = items
+        snapshot = normalizedSnapshot(from: snapshot)
+    }
+
+    /// Unpins the clip if it is pinned and moves it right after `previousID`
+    /// in the recent rail, or first when that is nil. Only `recentSortAt`
+    /// changes; the copy time that retention expires clips by stays put.
+    func placeRecentItem(id: String, after previousID: String?) {
+        guard id != previousID else { return }
+        if snapshot.pinnedItems.contains(where: { $0.id == id }) {
+            setPinned(false, for: id)
+        }
+        guard let index = snapshot.recentItems.firstIndex(where: { $0.id == id }) else { return }
+
+        var items = snapshot.recentItems
+        var item = items.remove(at: index)
+        let previousIndex = previousID.flatMap { previousID in items.firstIndex { $0.id == previousID } }
+        let olderIndex = previousIndex.map { $0 + 1 } ?? 0
+        func neighbourKeys() -> (newer: Date?, older: Date?) {
+            (
+                previousIndex.map { recentSortKey(items[$0]) },
+                items.indices.contains(olderIndex) ? recentSortKey(items[olderIndex]) : nil
+            )
+        }
+
+        var keys = neighbourKeys()
+        // Halving the same gap again and again runs out of precision, and
+        // equal neighbours leave no gap at all: space the rail out first.
+        if let newer = keys.newer, let older = keys.older,
+           newer.timeIntervalSince(older) < Self.minimumRecentGap {
+            let newest = recentSortKey(items[0])
+            for itemIndex in items.indices {
+                items[itemIndex].recentSortAt = newest.addingTimeInterval(-Double(itemIndex))
+            }
+            keys = neighbourKeys()
+        }
+
+        switch (keys.newer, keys.older) {
+        case let (newer?, older?):
+            item.recentSortAt = Date(timeIntervalSinceReferenceDate: (newer.timeIntervalSinceReferenceDate + older.timeIntervalSinceReferenceDate) / 2)
+        case let (newer?, nil):
+            item.recentSortAt = newer.addingTimeInterval(-1)
+        case let (nil, older?):
+            item.recentSortAt = max(Date(), older.addingTimeInterval(Self.minimumRecentGap))
+        case (nil, nil):
+            item.recentSortAt = Date()
+        }
+        items.append(item)
+        snapshot.recentItems = items
         snapshot = normalizedSnapshot(from: snapshot)
     }
 
@@ -179,6 +258,7 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             snapshot.pinnedItems[index].lastCopiedAt = date
         } else if let index = snapshot.recentItems.firstIndex(where: { $0.id == id }) {
             snapshot.recentItems[index].lastCopiedAt = date
+            snapshot.recentItems[index].recentSortAt = nil
         } else {
             return
         }
@@ -219,16 +299,21 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             .map { item in
                 var updatedItem = item
                 updatedItem.isPinned = true
+                // Clips pinned before the rail could be reordered keep their
+                // copy-time order.
+                updatedItem.pinnedAt = item.pinnedAt ?? item.lastCopiedAt
+                updatedItem.recentSortAt = nil
                 return updatedItem
             }
-            .sorted(by: sortByLastCopiedDescending)
+            .sorted(by: sortByPinnedDescending)
         normalized.recentItems = normalized.recentItems
             .map { item in
                 var updatedItem = item
                 updatedItem.isPinned = false
+                updatedItem.pinnedAt = nil
                 return updatedItem
             }
-            .sorted(by: sortByLastCopiedDescending)
+            .sorted(by: sortByRecentDescending)
 
         if let selectedID = normalized.selectedItemID,
            normalized.visibleItems.contains(where: { $0.id == selectedID }) == false {
@@ -368,6 +453,28 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
         return lhs.lastCopiedAt > rhs.lastCopiedAt
     }
 
+    private func recentSortKey(_ item: ClipboardHistoryItem) -> Date {
+        item.recentSortAt ?? item.lastCopiedAt
+    }
+
+    private func sortByRecentDescending(_ lhs: ClipboardHistoryItem, _ rhs: ClipboardHistoryItem) -> Bool {
+        let lhsKey = recentSortKey(lhs)
+        let rhsKey = recentSortKey(rhs)
+        if lhsKey == rhsKey {
+            return sortByLastCopiedDescending(lhs, rhs)
+        }
+
+        return lhsKey > rhsKey
+    }
+
+    private func sortByPinnedDescending(_ lhs: ClipboardHistoryItem, _ rhs: ClipboardHistoryItem) -> Bool {
+        if lhs.pinnedAt == rhs.pinnedAt {
+            return sortByLastCopiedDescending(lhs, rhs)
+        }
+
+        return (lhs.pinnedAt ?? .distantPast) > (rhs.pinnedAt ?? .distantPast)
+    }
+
     private func languageHint(for text: String?) -> String? {
         guard let text else { return nil }
         let lowercased = text.lowercased()
@@ -398,7 +505,8 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
             capturedAt: item.capturedAt,
             lastCopiedAt: item.lastCopiedAt,
             isPinned: item.isPinned,
-            pinnedAt: item.isPinned ? item.lastCopiedAt : nil,
+            pinnedAt: item.isPinned ? item.pinnedAt : nil,
+            recentSortAt: item.isPinned ? nil : item.recentSortAt,
             titleText: item.primaryText,
             secondaryText: item.secondaryText,
             metadataText: item.metadataText,
@@ -436,6 +544,8 @@ final class InMemoryClipboardHistoryStore: ClipboardHistoryStoring, ClipboardHis
                 accentToken: clip.sourceAppAccentToken
             ),
             isPinned: clip.isPinned,
+            pinnedAt: clip.pinnedAt,
+            recentSortAt: clip.recentSortAt,
             filePaths: clip.filePaths,
             colorSwatches: clip.colorSwatches,
             richTextAvailable: clip.richTextAvailable

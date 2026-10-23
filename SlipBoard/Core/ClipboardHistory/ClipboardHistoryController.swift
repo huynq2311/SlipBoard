@@ -46,6 +46,10 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
     let retentionRuntime: RetentionRuntimeController
     let searchNotesRuntime: SearchNotesRuntimeController
     private var pendingCaptureSuppression: PendingCaptureSuppression?
+    private var pendingDropPersistence: DispatchWorkItem?
+    /// Whether a mouse button is held, so saving after a drop waits for the
+    /// next drag to finish.
+    var isPointerBusy: () -> Bool = { false }
     var onRetentionSnapshotDidChange: ((RetentionRuntimeSnapshot) -> Void)?
     var onRetentionCleanupDidRun: ((RetentionCleanupResult) -> Void)?
 
@@ -199,6 +203,46 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
         publishState()
     }
 
+    /// The caller publishes the projection, inside the drop's animation;
+    /// publishing here too built and applied it a second time.
+    func placePinnedItem(id: String, after previousID: String?) {
+        store.placePinnedItem(id: id, after: previousID)
+        normalizeSelectionIfNeeded()
+        persistAfterDrop()
+    }
+
+    /// The caller publishes the projection, as for `placePinnedItem`.
+    func placeRecentItem(id: String, after previousID: String?) {
+        store.placeRecentItem(id: id, after: previousID)
+        normalizeSelectionIfNeeded()
+        persistAfterDrop()
+    }
+
+    /// Re-indexing and saving every clip blocks for about 0.1 s, which stalled
+    /// the cards settling after a drop, so it waits until they have.
+    private func persistAfterDrop(delay: TimeInterval = 1) {
+        pendingDropPersistence?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard isPointerBusy() == false else {
+                persistAfterDrop(delay: 0.5)
+                return
+            }
+            flushDropPersistence()
+        }
+        pendingDropPersistence = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func flushDropPersistence() {
+        pendingDropPersistence?.cancel()
+        pendingDropPersistence = nil
+        beginPublishBatch(); defer { endPublishBatch() }
+        synchronizeSearchNotesRuntime()
+        retentionRuntime.recordHistoryMutation()
+        publishState()
+    }
+
     /// Removes every item, including ones hidden by the current search or filter.
     func deleteAllItems() {
         beginPublishBatch(); defer { endPublishBatch() }
@@ -329,7 +373,12 @@ final class ClipboardHistoryController: ClipboardHistoryRuntimeProviding {
 
     @discardableResult
     func prepareForAppQuit() -> RetentionCleanupResult? {
-        retentionRuntime.prepareForAppQuit()
+        // Saved now even with a mouse button held, which would otherwise
+        // postpone it past the quit.
+        if pendingDropPersistence != nil {
+            flushDropPersistence()
+        }
+        return retentionRuntime.prepareForAppQuit()
     }
 
     private func bindMonitor() {
@@ -496,8 +545,14 @@ extension ClipboardHistoryController {
     }
 
     func selectedPasteActionSourceItem() -> PasteActionSourceItem? {
-        guard let item = selectedHistoryItem else { return nil }
+        selectedHistoryItem.map(makePasteActionSourceItem)
+    }
 
+    func pasteActionSourceItem(for itemID: String) -> PasteActionSourceItem? {
+        store.item(for: itemID).map(makePasteActionSourceItem)
+    }
+
+    private func makePasteActionSourceItem(from item: ClipboardHistoryItem) -> PasteActionSourceItem {
         let rawText: String?
         let plainText: String?
 

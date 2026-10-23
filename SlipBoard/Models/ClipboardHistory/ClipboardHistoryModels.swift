@@ -136,6 +136,13 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
     var previewStyle: ClipboardHistoryPreviewStyle
     var sourceApp: ClipboardSourceAppSummary
     var isPinned: Bool
+    /// Orders the pinned rail, newest first. Moving a pinned clip rewrites it;
+    /// copying or pasting the clip again does not.
+    var pinnedAt: Date?
+    /// Orders the recent rail, newest first, once the clip has been moved
+    /// there by hand; nil falls back to `lastCopiedAt`. Kept apart from
+    /// `lastCopiedAt`, which retention cleanup expires clips by.
+    var recentSortAt: Date?
     var filePaths: [String]
     var colorSwatches: [String]
     var richTextAvailable: Bool
@@ -154,6 +161,8 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
         previewStyle: ClipboardHistoryPreviewStyle,
         sourceApp: ClipboardSourceAppSummary,
         isPinned: Bool = false,
+        pinnedAt: Date? = nil,
+        recentSortAt: Date? = nil,
         filePaths: [String] = [],
         colorSwatches: [String] = [],
         richTextAvailable: Bool = false,
@@ -171,6 +180,8 @@ struct ClipboardHistoryItem: Identifiable, Hashable {
         self.previewStyle = previewStyle
         self.sourceApp = sourceApp
         self.isPinned = isPinned
+        self.pinnedAt = pinnedAt
+        self.recentSortAt = recentSortAt
         self.filePaths = filePaths
         self.colorSwatches = colorSwatches
         self.richTextAvailable = richTextAvailable
