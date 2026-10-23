@@ -24,6 +24,17 @@ Settings, or pause capture before you copy.
 - **No analytics, no telemetry, no crash reporting services.**
 - **No account, no sign-in.**
 
+## Diagnostic log
+
+Off by default. When you turn on **Record diagnostic log** in Settings →
+About, SlipTray writes a log of its own activity and errors (error codes,
+clip kinds, settings values) to
+`~/Library/Application Support/SlipTray/Logs`. It never includes what you
+copy. Nothing is sent: **Export Diagnostic Log…** saves a zip with the log,
+your app and macOS versions, a few settings and SlipTray's crash reports,
+which you can send to the developer yourself. Turning the setting off
+deletes the log.
+
 ## Update checks
 
 SlipTray's only network connection is the update check, done by the

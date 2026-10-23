@@ -7,6 +7,7 @@ struct SBSettingsWindowShell: View {
     @Environment(\.sbLocalizationLanguage) private var localizationLanguage
     @AppStorage(QuickPasteModifier.storageKey) private var quickPasteModifier = QuickPasteModifier.command.rawValue
     @AppStorage(ClipboardHistoryAppRuntime.clearSearchOnCloseDefaultsKey) private var clearsSearchOnClose = false
+    @AppStorage(DiagnosticLogFileSink.recordingDefaultsKey) private var isRecordingDiagnosticLog = false
     var securitySnapshot: Any? = nil
     var bridgeSnapshot: BridgeRuntimeSnapshot? = nil
     var exclusionsPauseSnapshot: ExclusionsPauseSnapshot? = nil
@@ -1157,6 +1158,27 @@ struct SBSettingsWindowShell: View {
                 theme: theme,
                 updater: .shared
             )
+        }
+
+        SBPaneSection(title: copy.text(.aboutDiagnostics), theme: theme) {
+            InteractiveToggleRow(
+                item: SettingsToggleItem(
+                    id: "about.record-diagnostic-log",
+                    title: copy.text(.aboutRecordDiagnosticLog),
+                    detailText: copy.text(.aboutRecordDiagnosticLogDetail),
+                    isOn: isRecordingDiagnosticLog
+                ),
+                theme: theme,
+                onToggle: { DiagnosticLogFileSink.shared.setRecording($0) }
+            )
+
+            if isRecordingDiagnosticLog {
+                SBControlPillButton(
+                    title: copy.text(.aboutExportDiagnosticLog),
+                    theme: theme,
+                    action: { onSelectAction("about.export-diagnostic-log") }
+                )
+            }
         }
 
         SBPaneSection(title: copy.text(.aboutLinks), theme: theme) {

@@ -1,6 +1,5 @@
 import AppKit
 import Combine
-import OSLog
 
 /// Front for the updater plug-in, the only code that links Sparkle. The
 /// plug-in is loaded on first need: when the user clicks Check for Updates, when
@@ -31,7 +30,7 @@ final class AppUpdater: ObservableObject {
 
     private static let plugInName = "SlipTrayUpdater.bundle"
     private static let plugInIdentifier = "huynq.SlipTray.Updater"
-    private static let logger = Logger(subsystem: "huynq.SlipTray", category: "Updates")
+    private static let logger = DiagnosticLogger(category: "Updates")
 
     private let defaults = UserDefaults.standard
     private var state = State.idle
@@ -182,7 +181,7 @@ final class AppUpdater: ObservableObject {
     }
 
     private func fail(_ reason: String) {
-        Self.logger.error("Updates are off: \(reason, privacy: .public)")
+        Self.logger.error("Updates are off: \(reason)")
         state = .unavailable
         pendingActions = []
         isUnavailable = true

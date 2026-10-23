@@ -2,6 +2,7 @@ import CoreData
 import Foundation
 
 final class CoreDataSnippetsStore: SnippetStoring {
+    private nonisolated static let logger = DiagnosticLogger(category: "Snippets")
     struct Configuration: Hashable {
         var modelName: String
         var storeURL: URL
@@ -203,7 +204,11 @@ final class CoreDataSnippetsStore: SnippetStoring {
         context.performAndWait {
             work(context)
             if context.hasChanges {
-                try? context.save()
+                do {
+                    try context.save()
+                } catch {
+                    Self.logger.error("Snippets store could not save: \(DiagnosticLogger.describe(error))")
+                }
             }
         }
         reloadSnapshot()
@@ -221,7 +226,11 @@ final class CoreDataSnippetsStore: SnippetStoring {
         description.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
         description.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
         persistentContainer.persistentStoreDescriptions = [description]
-        persistentContainer.loadPersistentStores { _, _ in }
+        persistentContainer.loadPersistentStores { _, error in
+            if let error {
+                Self.logger.error("Snippets store could not load: \(DiagnosticLogger.describe(error))")
+            }
+        }
         persistentContainer.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         persistentContainer.viewContext.undoManager = nil
     }
