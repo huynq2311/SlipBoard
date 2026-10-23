@@ -31,6 +31,8 @@ protocol ClipboardHistoryStoreMutating: AnyObject {
     func selectItem(id: String?)
     func moveSelection(by delta: Int)
     func setPinned(_ isPinned: Bool, for itemID: String)
+    func placePinnedItem(id: String, after previousID: String?)
+    func placeRecentItem(id: String, after previousID: String?)
     func removeItem(id: String, selecting itemID: String?)
     func touchItem(id: String, at date: Date)
 }

@@ -458,6 +458,9 @@ struct SBPopupShell: View {
     var onCloseActiveOverlay: () -> Void = {}
     var isPinnedCollapsed: Bool = false
     var onTogglePinnedCollapsed: () -> Void = {}
+    var onPlacePinnedClip: (String, String?) -> Void = { _, _ in }
+    var onPlaceRecentClip: (String, String?) -> Void = { _, _ in }
+    var dragPasteboardWriter: (String) -> NSPasteboardWriting? = { _ in nil }
 
     @State private var activeHeaderMenu: SBHeaderMenuKind? = nil
 
@@ -542,7 +545,9 @@ struct SBPopupShell: View {
                                     onCancelNoteEditing: onCancelNoteEditing,
                                     onPrimaryAction: onPrimaryAction,
                                     onOpenContextMenu: onOpenContextMenu,
-                                    onPerformContextAction: onPerformContextAction
+                                    onPerformContextAction: onPerformContextAction,
+                                    dragPasteboardWriter: dragPasteboardWriter,
+                                    onPlaceClip: onPlacePinnedClip
                                 )
 
                                 ClipboardHistoryRailSection(
@@ -564,7 +569,9 @@ struct SBPopupShell: View {
                                     onCancelNoteEditing: onCancelNoteEditing,
                                     onPrimaryAction: onPrimaryAction,
                                     onOpenContextMenu: onOpenContextMenu,
-                                    onPerformContextAction: onPerformContextAction
+                                    onPerformContextAction: onPerformContextAction,
+                                    dragPasteboardWriter: dragPasteboardWriter,
+                                    onPlaceClip: onPlaceRecentClip
                                 )
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)

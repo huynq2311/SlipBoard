@@ -272,6 +272,7 @@ struct RetentionManagedClip: Identifiable, Hashable {
     var lastCopiedAt: Date
     var isPinned: Bool
     var pinnedAt: Date?
+    var recentSortAt: Date?
     var titleText: String
     var secondaryText: String?
     var metadataText: String
@@ -296,6 +297,7 @@ struct RetentionManagedClip: Identifiable, Hashable {
         lastCopiedAt: Date,
         isPinned: Bool = false,
         pinnedAt: Date? = nil,
+        recentSortAt: Date? = nil,
         titleText: String,
         secondaryText: String? = nil,
         metadataText: String,
@@ -319,6 +321,7 @@ struct RetentionManagedClip: Identifiable, Hashable {
         self.lastCopiedAt = lastCopiedAt
         self.isPinned = isPinned
         self.pinnedAt = pinnedAt
+        self.recentSortAt = recentSortAt
         self.titleText = titleText
         self.secondaryText = secondaryText
         self.metadataText = metadataText
