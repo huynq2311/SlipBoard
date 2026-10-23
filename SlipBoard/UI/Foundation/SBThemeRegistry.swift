@@ -1,4 +1,3 @@
-import OSLog
 import SwiftUI
 
 /// One bundled `*.theme.json` file, resolved into its light and dark themes.
@@ -39,7 +38,7 @@ enum SBThemeRegistry {
         return fallback
     }
 
-    private static let logger = Logger(subsystem: "huynq.SlipBoard", category: "Themes")
+    private static let logger = DiagnosticLogger(category: "Themes")
 
     private static var isGlassAvailable: Bool {
         if #available(macOS 26.0, *) {
@@ -62,12 +61,12 @@ enum SBThemeRegistry {
                     continue
                 }
                 guard definitions.contains(where: { $0.id == definition.id }) == false else {
-                    logger.error("Skipping \(url.lastPathComponent, privacy: .public): duplicate theme id \(definition.id, privacy: .public)")
+                    logger.error("Skipping \(url.lastPathComponent): duplicate theme id \(definition.id)")
                     continue
                 }
                 definitions.append(definition)
             } catch {
-                logger.error("Skipping \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+                logger.error("Skipping \(url.lastPathComponent): \(String(describing: error))")
             }
         }
 

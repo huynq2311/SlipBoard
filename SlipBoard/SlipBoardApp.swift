@@ -528,6 +528,8 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             }
         case "about.check-updates":
             AppUpdater.shared.checkForUpdates()
+        case "about.export-diagnostic-log":
+            exportDiagnosticLog()
         case "about.github":
             openInBrowser("https://github.com/huynq2311/SlipBoard")
         case "about.privacy-policy":
@@ -544,6 +546,24 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             }
             break
         }
+    }
+
+    private func exportDiagnosticLog() {
+        let retention = retentionSnapshot.retentionSettings
+        let bridge = bridgeSnapshot
+        let settingsSummary = [
+            "Language: \(appLanguage.rawValue)",
+            "Capturing: \(isMonitoring ? "on" : "paused")",
+            "Retention: ttl=\(retention.ttlPolicy.rawValue) maxItems=\(retention.maxItemCount) clearOnQuit=\(retention.clearOnQuit)",
+            "App Lock: \(securitySnapshot.settings.isAppLockEnabled ? "on" : "off") state=\(securitySnapshot.lockState.rawValue)",
+            "iCloud bridge: \(bridge.settings.isBridgeEnabled ? "on" : "off") effective=\(bridge.isBridgeEnabledEffective) account=\(bridge.accountStatus.rawValue)",
+        ]
+        guard DiagnosticLogExporter.exportWithSavePanel(settingsSummary: settingsSummary) == false else { return }
+
+        let alert = NSAlert()
+        alert.messageText = localization.text(.aboutExportDiagnosticLogFailed)
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     private func openInBrowser(_ string: String) {
@@ -2515,6 +2535,8 @@ struct SlipBoardApp: App {
             return
         }
 
+        DiagnosticLogFileSink.shared.removeAllIfNotRecording()
+        DiagnosticLogger(category: "App").info("Launched; \(DiagnosticLogFileSink.environmentSummary)")
         _ = AppUpdater.shared
 
         popupPresentationController.onVisibilityChange = { isVisible in

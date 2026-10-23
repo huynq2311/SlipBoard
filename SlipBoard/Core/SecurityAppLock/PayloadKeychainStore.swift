@@ -1,6 +1,5 @@
 import Foundation
 import LocalAuthentication
-import OSLog
 import Security
 
 final class PayloadKeychainStore: PayloadKeyWrapping {
@@ -48,7 +47,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         case unavailable
     }
 
-    private static let logger = Logger(subsystem: "huynq.SlipBoard", category: "AppLock")
+    private static let logger = DiagnosticLogger(category: "AppLock")
 
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -103,7 +102,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
                 isKeyRecordMissing = true
                 hasLoadedKeyRecord = true
             } else {
-                Self.logger.error("App Lock key record unreadable: \(lookup.status, privacy: .public)")
+                Self.logger.error("App Lock key record unreadable: \(lookup.status)")
             }
         case .file:
             switch keyFile.read() {
@@ -119,7 +118,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
                     isKeyRecordMissing = true
                     hasLoadedKeyRecord = true
                 } else {
-                    Self.logger.error("App Lock login keychain key unreadable: \(legacyLookup.status, privacy: .public)")
+                    Self.logger.error("App Lock login keychain key unreadable: \(legacyLookup.status)")
                 }
             case .inaccessible, .corrupt:
                 Self.logger.error("App Lock key file unreadable")
@@ -466,7 +465,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess, let keyData = item as? Data, keyData.count == Constants.payloadKeySize else {
-            Self.logger.error("App Lock login keychain key unreadable: \(status, privacy: .public)")
+            Self.logger.error("App Lock login keychain key unreadable: \(status)")
             activeKeyData = nil
             keyMaterialState = .wrappedOnly(legacyKey)
             return keyMaterialState
@@ -563,7 +562,7 @@ final class PayloadKeychainStore: PayloadKeyWrapping {
                 SecItemDelete(query as CFDictionary)
             }
             if status != errSecSuccess, status != errSecItemNotFound {
-                logger.info("App Lock left login keychain item \(account, privacy: .public): \(status, privacy: .public)")
+                logger.info("App Lock left login keychain item \(account): \(status)")
             }
         }
     }

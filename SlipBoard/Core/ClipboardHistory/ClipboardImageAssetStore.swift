@@ -1,11 +1,10 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-import OSLog
 import UniformTypeIdentifiers
 
 final class ClipboardImageAssetStore {
-    private nonisolated static let logger = Logger(subsystem: "huynq.SlipBoard", category: "ImageAssets")
+    private nonisolated static let logger = DiagnosticLogger(category: "ImageAssets")
 
     /// Shared by every store instance so clip cards and paste actions do not
     /// each keep their own copy of the same image bytes.

@@ -509,6 +509,11 @@ enum LocalizationKey: String, CaseIterable, Sendable {
     case aboutLinks
     case aboutGitHub
     case aboutPrivacyPolicy
+    case aboutDiagnostics
+    case aboutRecordDiagnosticLog
+    case aboutRecordDiagnosticLogDetail
+    case aboutExportDiagnosticLog
+    case aboutExportDiagnosticLogFailed
 
     var englishFallback: String {
         switch self {
@@ -1020,6 +1025,11 @@ enum LocalizationKey: String, CaseIterable, Sendable {
         case .aboutLinks: "Links"
         case .aboutGitHub: "GitHub"
         case .aboutPrivacyPolicy: "Privacy Policy"
+        case .aboutDiagnostics: "Diagnostics"
+        case .aboutRecordDiagnosticLog: "Record diagnostic log"
+        case .aboutRecordDiagnosticLogDetail: "Keeps a log of what SlipBoard does, on this Mac only, so you can send it with a bug report. It never includes what you copy. Export adds SlipBoard's crash reports. Turning this off deletes the recorded log."
+        case .aboutExportDiagnosticLog: "Export Diagnostic Log…"
+        case .aboutExportDiagnosticLogFailed: "Could not export the diagnostic log."
         }
     }
 }
@@ -1571,6 +1581,11 @@ struct LocalizationCatalog: Sendable {
         .aboutUpdatesUnavailable: "Bản SlipBoard này đã tắt cập nhật vì không xác minh được thành phần cập nhật. Hãy tải bản mới nhất từ GitHub.",
         .aboutLinks: "Liên kết",
         .aboutGitHub: "GitHub",
-        .aboutPrivacyPolicy: "Chính sách quyền riêng tư"
+        .aboutPrivacyPolicy: "Chính sách quyền riêng tư",
+        .aboutDiagnostics: "Chẩn đoán",
+        .aboutRecordDiagnosticLog: "Ghi nhật ký chẩn đoán",
+        .aboutRecordDiagnosticLogDetail: "Ghi lại hoạt động của SlipBoard, chỉ lưu trên máy này, để bạn gửi kèm khi báo lỗi. Không bao giờ chứa nội dung bạn sao chép. Bản xuất kèm báo cáo sự cố của SlipBoard. Tắt mục này sẽ xoá nhật ký đã ghi.",
+        .aboutExportDiagnosticLog: "Xuất nhật ký chẩn đoán…",
+        .aboutExportDiagnosticLogFailed: "Không xuất được nhật ký chẩn đoán."
     ]
 }

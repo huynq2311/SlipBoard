@@ -1,6 +1,8 @@
 import Foundation
 
 final class CloudBridgeRecordStore: BridgeTransporting {
+    private static let logger = DiagnosticLogger(category: "Bridge")
+
     private enum DefaultsKey {
         static let state = "SlipBoard.ICloudBridgeMac.RecordStore"
     }
@@ -49,10 +51,16 @@ final class CloudBridgeRecordStore: BridgeTransporting {
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
 
-        if
-            let data = defaults.data(forKey: storageKey),
-            let persistedState = try? decoder.decode(PersistedState.self, from: data)
-        {
+        var persistedState: PersistedState?
+        if let data = defaults.data(forKey: storageKey) {
+            do {
+                persistedState = try decoder.decode(PersistedState.self, from: data)
+            } catch {
+                Self.logger.error("Bridge record state unreadable, starting empty: \(DiagnosticLogger.describe(error))")
+            }
+        }
+
+        if let persistedState {
             self.state = persistedState
         } else {
             self.state = PersistedState(
@@ -199,7 +207,11 @@ final class CloudBridgeRecordStore: BridgeTransporting {
     }
 
     private func persist() {
-        guard let data = try? encoder.encode(state) else {
+        let data: Data
+        do {
+            data = try encoder.encode(state)
+        } catch {
+            Self.logger.error("Bridge record state could not be saved: \(DiagnosticLogger.describe(error))")
             return
         }
 
