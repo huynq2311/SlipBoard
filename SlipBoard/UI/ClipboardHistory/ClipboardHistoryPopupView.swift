@@ -42,6 +42,9 @@ struct ClipboardHistoryPopupView: View {
     var onExecutePasteAction: (PasteActionID, PasteActionCloseBehavior) -> Void = { _, _ in }
     var isPinnedCollapsed: Bool = false
     var onTogglePinnedCollapsed: () -> Void = {}
+    var onPlacePinnedClip: (String, String?) -> Void = { _, _ in }
+    var onPlaceRecentClip: (String, String?) -> Void = { _, _ in }
+    var dragPasteboardWriter: (String) -> NSPasteboardWriting? = { _ in nil }
 
     var body: some View {
         SBPopupShell(
@@ -83,7 +86,10 @@ struct ClipboardHistoryPopupView: View {
             onConfirmTransformAction: confirmHighlightedTransformAction,
             onCloseActiveOverlay: onCloseActiveOverlay,
             isPinnedCollapsed: isPinnedCollapsed,
-            onTogglePinnedCollapsed: onTogglePinnedCollapsed
+            onTogglePinnedCollapsed: onTogglePinnedCollapsed,
+            onPlacePinnedClip: onPlacePinnedClip,
+            onPlaceRecentClip: onPlaceRecentClip,
+            dragPasteboardWriter: dragPasteboardWriter
         )
         .focusable()
         .focusEffectDisabled()
