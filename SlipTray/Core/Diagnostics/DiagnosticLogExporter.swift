@@ -5,10 +5,11 @@ import UniformTypeIdentifiers
 /// Writes one zip with an environment header, the recorded log files and
 /// SlipTray's crash reports, for the user to send to the developer.
 enum DiagnosticLogExporter {
-    private static let logger = DiagnosticLogger(category: "Diagnostics")
+    private nonisolated static let logger = DiagnosticLogger(category: "Diagnostics")
 
     /// Returns false when the user picked a destination but the export failed.
-    static func exportWithSavePanel(settingsSummary: [String]) -> Bool {
+    /// Copying and zipping run off the main thread.
+    static func exportWithSavePanel(settingsSummary: [String]) async -> Bool {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.zip]
         panel.canCreateDirectories = true
@@ -16,8 +17,13 @@ enum DiagnosticLogExporter {
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let destinationURL = panel.url else { return true }
 
+        let summary = settingsSummary + [
+            "Accessibility: \(AccessibilityPermission.isTrusted ? "granted" : "not granted")",
+        ]
         do {
-            try export(settingsSummary: settingsSummary, to: destinationURL)
+            try await Task.detached(priority: .userInitiated) {
+                try export(settingsSummary: summary, to: destinationURL)
+            }.value
             return true
         } catch {
             logger.error("Export failed: \(DiagnosticLogger.describe(error))")
@@ -25,7 +31,7 @@ enum DiagnosticLogExporter {
         }
     }
 
-    static func export(settingsSummary: [String], to destinationURL: URL) throws {
+    nonisolated static func export(settingsSummary: [String], to destinationURL: URL) throws {
         let fileManager = FileManager.default
         let stagingParentURL = fileManager.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -77,7 +83,7 @@ enum DiagnosticLogExporter {
         logger.info("Exported \(logFiles.count) log files and \(crashReports.count) crash reports")
     }
 
-    private static func headerText(
+    private nonisolated static func headerText(
         settingsSummary: [String],
         logFileCount: Int,
         crashReportNames: [String]
@@ -86,7 +92,6 @@ enum DiagnosticLogExporter {
             "SlipTray diagnostic report",
             "Generated: \(ISO8601DateFormatter().string(from: Date()))",
             DiagnosticLogFileSink.environmentSummary,
-            "Accessibility: \(AccessibilityPermission.isTrusted ? "granted" : "not granted")",
         ]
         lines += settingsSummary
         lines.append("Log files: \(logFileCount)")
@@ -94,26 +99,31 @@ enum DiagnosticLogExporter {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    private static func crashReportURLs() -> [URL] {
+    /// "SlipTray-<date>.ips" only, not other apps whose names start the same way.
+    private nonisolated static func crashReportURLs() -> [URL] {
         let reportsURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
         let urls = (try? FileManager.default.contentsOfDirectory(at: reportsURL, includingPropertiesForKeys: nil)) ?? []
         return urls
-            .filter { $0.lastPathComponent.hasPrefix("SlipTray") && $0.pathExtension == "ips" }
+            .filter { $0.lastPathComponent.hasPrefix("SlipTray-") && $0.pathExtension == "ips" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Skips files that vanish or cannot be read (a log rotating meanwhile);
-    /// returns the ones copied.
-    private static func copy(_ urls: [URL], into directoryURL: URL) throws -> [URL] {
+    /// Skips files that vanished meanwhile (a log rotating); any other copy
+    /// error fails the export. Returns the ones copied.
+    private nonisolated static func copy(_ urls: [URL], into directoryURL: URL) throws -> [URL] {
         guard urls.isEmpty == false else { return [] }
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-        return urls.filter { url in
-            (try? FileManager.default.copyItem(
-                at: url,
-                to: directoryURL.appendingPathComponent(url.lastPathComponent)
-            )) != nil
+        var copied: [URL] = []
+        for url in urls {
+            do {
+                try FileManager.default.copyItem(at: url, to: directoryURL.appendingPathComponent(url.lastPathComponent))
+                copied.append(url)
+            } catch {
+                if FileManager.default.fileExists(atPath: url.path) { throw error }
+            }
         }
+        return copied
     }
 
     private static func fileDateStamp() -> String {

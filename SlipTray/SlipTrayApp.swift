@@ -558,12 +558,14 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             "App Lock: \(securitySnapshot.settings.isAppLockEnabled ? "on" : "off") state=\(securitySnapshot.lockState.rawValue)",
             "iCloud bridge: \(bridge.settings.isBridgeEnabled ? "on" : "off") effective=\(bridge.isBridgeEnabledEffective) account=\(bridge.accountStatus.rawValue)",
         ]
-        guard DiagnosticLogExporter.exportWithSavePanel(settingsSummary: settingsSummary) == false else { return }
+        Task {
+            guard await DiagnosticLogExporter.exportWithSavePanel(settingsSummary: settingsSummary) == false else { return }
 
-        let alert = NSAlert()
-        alert.messageText = localization.text(.aboutExportDiagnosticLogFailed)
-        alert.alertStyle = .warning
-        alert.runModal()
+            let alert = NSAlert()
+            alert.messageText = localization.text(.aboutExportDiagnosticLogFailed)
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
     }
 
     private func openInBrowser(_ string: String) {

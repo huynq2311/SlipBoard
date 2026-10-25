@@ -32,8 +32,10 @@ clip kinds, settings values) to
 `~/Library/Application Support/SlipTray/Logs`. It never includes what you
 copy. Nothing is sent: **Export Diagnostic Log…** saves a zip with the log,
 your app and macOS versions, a few settings and SlipTray's crash reports,
-which you can send to the developer yourself. Turning the setting off
-deletes the log.
+which you can send to the developer yourself. Crash reports are macOS's own
+files, added as they are; they can include your user name in file paths, so
+look through the zip before you send it. Turning the setting off deletes the
+log.
 
 ## Update checks
 

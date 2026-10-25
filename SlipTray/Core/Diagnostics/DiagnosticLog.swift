@@ -42,6 +42,8 @@ nonisolated final class DiagnosticLogFileSink: @unchecked Sendable {
     static let recordingDefaultsKey = "SlipTray.Diagnostics.recordLog"
     static let shared = DiagnosticLogFileSink()
     private static let maxMessageLength = 2_000
+    /// A single character can take many bytes (combining marks).
+    private static let maxMessageBytes = 8_000
 
     let directoryURL: URL
     private let maxFileBytes: UInt64
@@ -93,7 +95,7 @@ nonisolated final class DiagnosticLogFileSink: @unchecked Sendable {
         at date: Date = Date(),
         requiresRecording: Bool = false
     ) {
-        let singleLine = String(message.prefix(Self.maxMessageLength))
+        let singleLine = String(decoding: message.prefix(Self.maxMessageLength).utf8.prefix(Self.maxMessageBytes), as: UTF8.self)
             .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
         queue.async { [self] in
@@ -122,10 +124,18 @@ nonisolated final class DiagnosticLogFileSink: @unchecked Sendable {
         }
     }
 
+    /// Synchronous, so quitting right after a switch-off cannot leave the log behind.
     func removeAll() {
-        queue.async { [self] in
+        queue.sync { [self] in
             closeHandle()
-            try? fileManager.removeItem(at: directoryURL)
+            do {
+                try fileManager.removeItem(at: directoryURL)
+            } catch {
+                let nsError = error as NSError
+                guard nsError.code != NSFileNoSuchFileError else { return }
+                Logger(subsystem: "huynq.SlipTray", category: "Diagnostics")
+                    .error("Could not delete the diagnostic log: \(nsError.domain, privacy: .public) \(nsError.code)")
+            }
         }
     }
 
@@ -175,11 +185,20 @@ nonisolated final class DiagnosticLogFileSink: @unchecked Sendable {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
-        if fileManager.fileExists(atPath: url.path) == false {
-            fileManager.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        // Refuse a symlinked Logs folder (switching off would only remove the
+        // link), and tighten one that already existed with wider permissions.
+        guard let attributes = try? fileManager.attributesOfItem(atPath: directoryURL.path),
+              attributes[.type] as? FileAttributeType == .typeDirectory else {
+            return nil
         }
-        guard let opened = try? FileHandle(forWritingTo: url),
-              let size = try? opened.seekToEnd() else {
+        try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directoryURL.path)
+        // O_NOFOLLOW: never append through a symlink in place of the log file.
+        let descriptor = open(url.path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else { return nil }
+        fchmod(descriptor, 0o600)
+        let opened = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        guard let size = try? opened.seekToEnd() else {
+            try? opened.close()
             return nil
         }
         handle = opened
