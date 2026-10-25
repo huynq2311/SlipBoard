@@ -314,6 +314,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         object.setValue(clip.lastCopiedAt, forKey: "lastCopiedAt")
         object.setValue(clip.isPinned, forKey: "isPinned")
         object.setValue(clip.pinnedAt, forKey: "pinnedAt")
+        object.setValue(clip.recentSortAt, forKey: "recentSortAt")
         object.setValue(spilled.storedText, forKey: "titleText")
         object.setValue(clip.secondaryText, forKey: "secondaryText")
         object.setValue(clip.metadataText, forKey: "metadataText")
@@ -360,6 +361,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             lastCopiedAt: lastCopiedAt,
             isPinned: object.value(forKey: "isPinned") as? Bool ?? false,
             pinnedAt: object.value(forKey: "pinnedAt") as? Date,
+            recentSortAt: object.value(forKey: "recentSortAt") as? Date,
             titleText: longText.restore(id: id, storedText: titleText),
             secondaryText: object.value(forKey: "secondaryText") as? String,
             metadataText: metadataText,
@@ -416,6 +418,7 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
             makeAttribute(name: "lastCopiedAt", type: .dateAttributeType),
             makeAttribute(name: "isPinned", type: .booleanAttributeType, optional: false, defaultValue: false),
             makeAttribute(name: "pinnedAt", type: .dateAttributeType, optional: true),
+            makeAttribute(name: "recentSortAt", type: .dateAttributeType, optional: true),
             makeAttribute(name: "titleText", type: .stringAttributeType),
             makeAttribute(name: "secondaryText", type: .stringAttributeType, optional: true),
             makeAttribute(name: "metadataText", type: .stringAttributeType),

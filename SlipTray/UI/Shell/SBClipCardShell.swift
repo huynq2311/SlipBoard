@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private nonisolated enum SBClipThumbnailCache {
     static let shared: NSCache<NSString, NSImage> = {
@@ -41,6 +42,9 @@ struct SBClipCardShell: View {
     var onPrimaryAction: () -> Void = {}
     var onOpenContextMenu: () -> Void = {}
     var onPerformContextAction: (String) -> Void = { _ in }
+    /// Drawn offscreen for the pointer to carry while the card is dragged;
+    /// AppKit-backed click layers would show as placeholders there.
+    var isDragImage: Bool = false
 
     @AppStorage(QuickPasteModifier.storageKey) private var quickPasteModifierRawValue = QuickPasteModifier.command.rawValue
     private var quickPasteModifier: QuickPasteModifier {
@@ -137,7 +141,11 @@ struct SBClipCardShell: View {
         // Right-click opens the card's action menu next to the card, instead
         // of a separate native NSMenu with a second action path. It has to sit
         // above the card: as a background it never received the click.
-        .overlay(SBRightClickGesture(action: onOpenContextMenu))
+        .overlay {
+            if isDragImage == false {
+                SBRightClickGesture(action: onOpenContextMenu)
+            }
+        }
         .anchorPreference(key: SBClipCardAnchorPreferenceKey.self, value: .bounds) {
             [clip.id: $0]
         }
@@ -514,7 +522,11 @@ struct SBClipCardShell: View {
             // The card's double-click gesture makes SwiftUI hold every tap and
             // Button action on it for the double-click interval (about 0.35 s),
             // so the footer takes the click in AppKit instead.
-            .overlay(SBInstantClick(action: handleFooterTap))
+            .overlay {
+                if isDragImage == false {
+                    SBInstantClick(action: handleFooterTap)
+                }
+            }
         }
     }
 
@@ -960,7 +972,14 @@ struct SBHorizontalClipRail: View {
     var onPrimaryAction: (String) -> Void = { _ in }
     var onOpenContextMenu: (String) -> Void = { _ in }
     var onPerformContextAction: (String) -> Void = { _ in }
+    var dragPasteboardWriter: (String) -> NSPasteboardWriting? = { _ in nil }
+    /// Set on a rail that takes dropped cards: a card dropped on it lands
+    /// after the given clip, or first when that is nil.
+    var onPlaceClip: ((String, String?) -> Void)? = nil
     @State private var visibleClipIDs: Set<String> = []
+    /// Where a card dragged over this rail would land. A model object, so
+    /// only the cards it pushes aside redraw, not the whole rail.
+    @State private var dropModel = SBRailDropModel()
     @State private var scrollMetrics = SBRailScrollMetrics()
     @State private var scrollPosition = ScrollPosition(x: 0)
     @State private var isHoveringRail = false
@@ -968,8 +987,26 @@ struct SBHorizontalClipRail: View {
     @State private var lastClipIDsChangeAt = Date.distantPast
     @Environment(\.sbPopupPresentationID) private var popupPresentationID
     @Environment(\.sbPopupIsPresented) private var isPopupPresented
+    @Environment(\.sbLocalization) private var localization
+    @Environment(\.sbLocalizationLanguage) private var localizationLanguage
 
     private var clipIDs: [String] { clips.map(\.id) }
+
+    private var dragSession: SBClipDragSession { .shared }
+
+    private var dragPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(theme.palette.border.opacity(0.25))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(theme.palette.borderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            }
+    }
+
+    private var revealsClipContent: Bool {
+        securitySnapshot?.lockState.revealsProtectedContent != false
+            && securitySnapshot?.isPreviewRedactionActive != true
+    }
 
     // Animating every change to the rail stacked transitions on top of each
     // other when clips arrived in quick succession or hundreds were pruned at
@@ -1054,7 +1091,19 @@ struct SBHorizontalClipRail: View {
                                 },
                                 onPerformContextAction: onPerformContextAction
                             )
+                            .opacity(dragSession.isDragging(clip.id) ? 0 : 1)
+                            .overlay {
+                                if dragSession.isDragging(clip.id) {
+                                    dragPlaceholder
+                                }
+                            }
+                            .modifier(SBRailSlotOffset(model: dropModel, clipID: clip.id))
                             .id(clip.id)
+                            // Dragging in the open note editor selects text.
+                            .modifier(SBClipDragSource(isEnabled: revealsClipContent && noteEditorState?.clipID != clip.id) { offsetInCard in
+                                guard let writer = dragPasteboardWriter(clip.id) else { return }
+                                dragSession.begin(clip.id, writer: writer, image: dragImage(for: clip), offsetInImage: offsetInCard)
+                            })
                             .onScrollVisibilityChange(threshold: 0.85) { isVisible in
                                 if isVisible {
                                     visibleClipIDs.insert(clip.id)
@@ -1066,6 +1115,29 @@ struct SBHorizontalClipRail: View {
                         }
                     }
                 }
+                // A free slot after the last card while a card is dragged, so
+                // it can land there on a rail longer than the screen.
+                .padding(.trailing, onPlaceClip != nil && dragSession.isActive ? cardWidth + theme.spacing.railGap : 0)
+                // Fills the rail so a card dropped past the last one still lands.
+                .frame(
+                    minWidth: onPlaceClip == nil ? nil : max(0, scrollMetrics.viewportWidth - theme.spacing.popupPadding * 2),
+                    alignment: .leading
+                )
+                .overlay(alignment: .topLeading) {
+                    SBRailIncomingSlot(
+                        model: dropModel,
+                        slotWidth: cardWidth + theme.spacing.railGap,
+                        placeholder: dragPlaceholder.frame(width: cardWidth, height: cardHeight)
+                    )
+                }
+                .modifier(SBRailDropTarget(delegate: onPlaceClip.map { onPlaceClip in
+                    SBRailDropDelegate(
+                        clipIDs: clipIDs,
+                        slotWidth: cardWidth + theme.spacing.railGap,
+                        model: dropModel,
+                        onPlace: onPlaceClip
+                    )
+                }))
                 .animation(railAnimation, value: clipIDs)
                 .padding(.top, 5)
                 // Room for the card shadow; the scroll view clips at its edge.
@@ -1080,6 +1152,19 @@ struct SBHorizontalClipRail: View {
             .onChange(of: clipIDs) { _, newIDs in
                 lastClipIDs = newIDs
                 lastClipIDsChangeAt = Date()
+                // The open slot was worked out for the old cards.
+                dropModel.clear()
+            }
+            .onChange(of: dragSession.isActive) { _, isActive in
+                // A drag cancelled over the rail may never report leaving it.
+                // Waits a moment so a drop still being delivered keeps its slot.
+                guard isActive == false else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    guard dragSession.isActive == false, dropModel.preview != nil else { return }
+                    withAnimation(SBMotion.rail) {
+                        dropModel.clear()
+                    }
+                }
             }
             .onChange(of: selectedClipID) { _, _ in
                 scrollToSelectionIfNeeded(using: proxy, animated: true)
@@ -1135,6 +1220,16 @@ struct SBHorizontalClipRail: View {
     /// seen growing in anyway.
     private static let maxAnimatedInsertions = 16
 
+    /// The card, drawn on its own for the pointer to carry. Taking it from
+    /// the window instead redrew the whole popup, a fifth of a second.
+    private func dragImage(for clip: ClipPreviewSummary) -> NSImage? {
+        var card = SBClipCardShell(clip: clip, theme: theme, width: cardWidth, height: cardHeight, securitySnapshot: securitySnapshot)
+        card.isDragImage = true
+        let renderer = ImageRenderer(content: card.environment(\.sbLocalization, localization).environment(\.sbLocalizationLanguage, localizationLanguage))
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        return renderer.nsImage
+    }
+
     private func scrollToSelectionIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
         guard let selectedClipID,
               clips.contains(where: { $0.id == selectedClipID }),
@@ -1149,6 +1244,238 @@ struct SBHorizontalClipRail: View {
         } else {
             proxy.scrollTo(selectedClipID, anchor: .leading)
         }
+    }
+}
+
+/// The card being dragged out of any rail. Shared, so one rail can take a
+/// card dragged from the other.
+///
+/// The drag is an AppKit session rather than SwiftUI's `onDrag`, so other
+/// apps are offered a copy of the clip and the end of the drag is reported.
+@Observable
+final class SBClipDragSession: NSObject, NSDraggingSource {
+    static let shared = SBClipDragSession()
+
+    /// Kept after the drag ends: SwiftUI can deliver the drop after AppKit
+    /// reports the end.
+    private(set) var clipID: String?
+    private(set) var isActive = false
+
+    func isDragging(_ clipID: String) -> Bool {
+        isActive && self.clipID == clipID
+    }
+
+    /// Starts dragging a card from the current mouse-dragged event.
+    /// `offsetInImage` is where the drag started, from the image's top left,
+    /// so the card stays under the pointer where it was grabbed.
+    func begin(_ clipID: String, writer: NSPasteboardWriting, image: NSImage?, offsetInImage: CGPoint) {
+        guard isActive == false,
+              let event = NSApp.currentEvent,
+              event.type == .leftMouseDragged,
+              let view = event.window?.contentView else {
+            return
+        }
+
+        let mouse = view.convert(event.locationInWindow, from: nil)
+        let size = image?.size ?? NSSize(width: 40, height: 40)
+        let frame = NSRect(
+            x: mouse.x - offsetInImage.x,
+            y: view.isFlipped ? mouse.y - offsetInImage.y : mouse.y - (size.height - offsetInImage.y),
+            width: size.width,
+            height: size.height
+        )
+        let item = NSDraggingItem(pasteboardWriter: writer)
+        item.setDraggingFrame(frame, contents: image)
+        view.beginDraggingSession(with: [item], event: event, source: self)
+        self.clipID = clipID
+        withAnimation(.easeOut(duration: 0.15)) {
+            isActive = true
+        }
+    }
+
+    func draggingSession(
+        _ session: NSDraggingSession,
+        sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        context == .outsideApplication ? .copy : [.copy, .move, .generic]
+    }
+
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        withAnimation(.easeOut(duration: 0.15)) {
+            isActive = false
+        }
+    }
+}
+
+struct SBRailDropPreview: Equatable {
+    var clipID: String
+    /// Where the card would go among the rail's other cards.
+    var index: Int
+}
+
+@Observable
+final class SBRailDropModel {
+    private(set) var preview: SBRailDropPreview?
+    /// How far each card is pushed aside to open the slot, by clip id.
+    private(set) var offsets: [String: CGFloat] = [:]
+    /// The open slot for a card coming from the other rail.
+    private(set) var incomingIndex: Int?
+
+    func show(_ preview: SBRailDropPreview, in clipIDs: [String], slotWidth: CGFloat) {
+        var offsets: [String: CGFloat] = [:]
+        let index = preview.index
+        if let ownIndex = clipIDs.firstIndex(of: preview.clipID) {
+            // The dragged card's own slot travels to the new one and the
+            // cards in between close up behind it.
+            if index > ownIndex {
+                for id in clipIDs[(ownIndex + 1)...index] { offsets[id] = -slotWidth }
+            } else if index < ownIndex {
+                for id in clipIDs[index..<ownIndex] { offsets[id] = slotWidth }
+            }
+            offsets[preview.clipID] = CGFloat(index - ownIndex) * slotWidth
+            incomingIndex = nil
+        } else {
+            for id in clipIDs[min(index, clipIDs.count)...] { offsets[id] = slotWidth }
+            incomingIndex = index
+        }
+        self.preview = preview
+        self.offsets = offsets
+    }
+
+    func clear() {
+        preview = nil
+        offsets = [:]
+        incomingIndex = nil
+    }
+}
+
+/// Moves a card aside, without laying the rail out again, while a dragged
+/// card hovers over it.
+private struct SBRailSlotOffset: ViewModifier {
+    let model: SBRailDropModel
+    let clipID: String
+
+    func body(content: Content) -> some View {
+        content.offset(x: model.offsets[clipID] ?? 0)
+    }
+}
+
+private struct SBRailIncomingSlot<Placeholder: View>: View {
+    let model: SBRailDropModel
+    let slotWidth: CGFloat
+    let placeholder: Placeholder
+
+    var body: some View {
+        if let index = model.incomingIndex {
+            placeholder
+                .offset(x: CGFloat(index) * slotWidth)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// Lets a card be dragged into another app or onto the other rail.
+private struct SBClipDragSource: ViewModifier {
+    let isEnabled: Bool
+    /// Called once per drag with where it started inside the card.
+    let onBegin: (CGPoint) -> Void
+    /// Where the current gesture started, once it has tried to start a drag.
+    @State private var attemptedStart: CGPoint?
+
+    // Always attached and switched with `including:`: swapping the modifier
+    // in and out rebuilt the card, losing the note editor's focus and text.
+    func body(content: Content) -> some View {
+        content
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        // Every mouse move reports a change; only the first
+                        // one loads the clip and tries to start the drag, even
+                        // when that fails.
+                        guard SBClipDragSession.shared.isActive == false,
+                              attemptedStart != value.startLocation else { return }
+                        attemptedStart = value.startLocation
+                        onBegin(value.startLocation)
+                    }
+                    .onEnded { _ in
+                        attemptedStart = nil
+                    },
+                including: isEnabled ? .all : .subviews
+            )
+            // A drag handed to AppKit may never report its end here.
+            .onChange(of: SBClipDragSession.shared.isActive) { _, isActive in
+                if isActive == false {
+                    attemptedStart = nil
+                }
+            }
+    }
+}
+
+private struct SBRailDropTarget: ViewModifier {
+    let delegate: SBRailDropDelegate?
+
+    func body(content: Content) -> some View {
+        if let delegate {
+            content.onDrop(of: [.item], delegate: delegate)
+        } else {
+            content
+        }
+    }
+}
+
+/// Shows where a card dragged over the rail would land and places it there
+/// on drop.
+private struct SBRailDropDelegate: DropDelegate {
+    let clipIDs: [String]
+    let slotWidth: CGFloat
+    let model: SBRailDropModel
+    let onPlace: (String, String?) -> Void
+
+    private var droppableClipID: String? {
+        let session = SBClipDragSession.shared
+        return session.isActive ? session.clipID : nil
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        droppableClipID != nil
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        if let clipID = droppableClipID {
+            let otherCount = clipIDs.contains(clipID) ? clipIDs.count - 1 : clipIDs.count
+            // Over slot n the card takes slot n. The cards are already pushed
+            // aside to open it, so this stays put while the card hovers.
+            let index = min(max(Int(info.location.x / slotWidth), 0), otherCount)
+            let preview = SBRailDropPreview(clipID: clipID, index: index)
+            if model.preview != preview {
+                withAnimation(SBMotion.rail) {
+                    model.show(preview, in: clipIDs, slotWidth: slotWidth)
+                }
+            }
+        }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(SBMotion.rail) {
+            model.clear()
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let preview = model.preview else { return false }
+        let others = clipIDs.filter { $0 != preview.clipID }
+        let index = min(preview.index, others.count)
+        // One spring for both: the cards drop their push-aside offset while
+        // the rail lays them out around the placed card, so they stay put.
+        withAnimation(SBMotion.rail) {
+            if clipIDs.firstIndex(of: preview.clipID) != index {
+                onPlace(preview.clipID, index > 0 ? others[index - 1] : nil)
+            }
+            model.clear()
+        }
+        return true
     }
 }
 

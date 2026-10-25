@@ -109,6 +109,7 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             for: resolvedController.pasteActions.selectedSourceItem
         )
 
+        resolvedController.isPointerBusy = { NSEvent.pressedMouseButtons != 0 }
         resolvedController.onProjectionDidChange = { [weak self] projection in
             DispatchQueue.main.async {
                 self?.apply(projection)
@@ -637,6 +638,48 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
         manualPinnedCollapsed = !isPinnedCollapsed
     }
 
+    func placePinnedClip(id: String, after previousID: String?) {
+        recordSecurityInteraction()
+        let wasPinned = controller.latestSnapshot.pinnedItems.contains { $0.id == id }
+        controller.placePinnedItem(id: id, after: previousID)
+        if wasPinned == false {
+            runtimeStatusOverride = RuntimeStatusOverride(
+                message: localization.text(.statusPinnedItem),
+                tone: .success
+            )
+        }
+        publishCurrentProjection()
+    }
+
+    func placeRecentClip(id: String, after previousID: String?) {
+        recordSecurityInteraction()
+        let wasPinned = controller.latestSnapshot.pinnedItems.contains { $0.id == id }
+        controller.placeRecentItem(id: id, after: previousID)
+        if wasPinned {
+            runtimeStatusOverride = RuntimeStatusOverride(
+                message: localization.text(.statusUnpinnedItem),
+                tone: .success
+            )
+        }
+        publishCurrentProjection()
+    }
+
+    /// What a clip card carries when dragged into another app: the same text
+    /// or image a paste would insert. Nil while clip contents are hidden.
+    func dragPasteboardWriter(for clipID: String) -> NSPasteboardWriting? {
+        guard securitySnapshot.lockState.revealsProtectedContent,
+              securitySnapshot.isPreviewRedactionActive == false,
+              let source = controller.pasteActionSourceItem(for: clipID) else {
+            return nil
+        }
+
+        if let imageData = source.imageData, let image = NSImage(data: imageData) {
+            return image
+        }
+        guard let text = source.plainText, text.isEmpty == false else { return nil }
+        return text as NSString
+    }
+
     func selectClip(id: String?) {
         recordSecurityInteraction()
         controller.selectItem(id: id)
@@ -873,7 +916,12 @@ final class ClipboardHistoryAppRuntime: ObservableObject {
             publishCurrentProjection()
         case "pin":
             guard let item = controller.selectedHistoryItem else { return }
-            controller.setPinned(item.isPinned == false, for: item.id)
+            if item.isPinned {
+                // An unpinned clip opens the recent rail, where it is easy to find.
+                controller.placeRecentItem(id: item.id, after: nil)
+            } else {
+                controller.setPinned(true, for: item.id)
+            }
             runtimeStatusOverride = RuntimeStatusOverride(
                 message: localization.text(item.isPinned ? .statusUnpinnedItem : .statusPinnedItem),
                 tone: .success
@@ -2847,7 +2895,10 @@ private struct SBPopupRootView: View {
             onSelectTransformAction: runtime.selectTransformAction,
             onExecutePasteAction: onExecutePasteAction,
             isPinnedCollapsed: runtime.isPinnedCollapsed,
-            onTogglePinnedCollapsed: runtime.togglePinnedCollapsed
+            onTogglePinnedCollapsed: runtime.togglePinnedCollapsed,
+            onPlacePinnedClip: runtime.placePinnedClip,
+            onPlaceRecentClip: runtime.placeRecentClip,
+            dragPasteboardWriter: runtime.dragPasteboardWriter
         )
         .padding(runtime.popupTheme.treatment == .liquidGlass ? SBPopupLayoutMetrics.glassShellMargin : EdgeInsets())
         .environment(\.sbPopupPresentationID, runtime.popupPresentationID)

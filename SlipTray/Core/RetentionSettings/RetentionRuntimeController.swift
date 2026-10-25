@@ -130,7 +130,10 @@ final class RetentionRuntimeController: RetentionRuntimeControlling {
         }
 
         let managedClips = historyStore.retentionManagedClips
-        if retentionStore.snapshot.storedClips != managedClips {
+        // Compared as sets: the store reads clips back by copy time, while the
+        // history keeps the rails' hand-made order, so a plain array
+        // comparison rewrote every clip on every change after a reorder.
+        if Set(retentionStore.snapshot.storedClips) != Set(managedClips) {
             _ = retentionStore.replaceStoredClips(managedClips)
         }
     }
@@ -141,7 +144,7 @@ final class RetentionRuntimeController: RetentionRuntimeControlling {
         }
 
         let persistedClips = retentionStore.snapshot.storedClips
-        if historyStore.retentionManagedClips != persistedClips {
+        if Set(historyStore.retentionManagedClips) != Set(persistedClips) {
             _ = historyStore.replaceRetentionManagedClips(
                 persistedClips,
                 captureStatus: historyStore.snapshot.captureStatus
