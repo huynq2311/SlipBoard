@@ -5,6 +5,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 final class PasteActionExecutor: PasteActionExecuting {
+    private static let logger = DiagnosticLogger(category: "Paste")
     private let pasteboard: NSPasteboard
     /// Keeps the on-demand TIFF conversion of the last pasted image alive.
     private var imageTIFFProvider: ImageTIFFDataProvider?
@@ -18,6 +19,7 @@ final class PasteActionExecutor: PasteActionExecuting {
         let imageData = request.imageData
 
         guard imageData?.isEmpty == false || payloadText.isEmpty == false else {
+            Self.logger.error("Paste skipped: no payload (kind \(request.sourceItem.kind.rawValue))")
             return PasteActionExecutionResult(
                 actionID: request.actionID,
                 closeBehavior: request.closeBehavior,
@@ -29,6 +31,9 @@ final class PasteActionExecutor: PasteActionExecuting {
         }
 
         guard AccessibilityPermission.isTrusted else {
+            Self.logger.error(
+                "Paste blocked: Accessibility not granted (grantedToEarlierBuild \(AccessibilityPermission.wasGrantedToEarlierBuild))"
+            )
             return PasteActionExecutionResult(
                 actionID: request.actionID,
                 closeBehavior: request.closeBehavior,
@@ -53,6 +58,9 @@ final class PasteActionExecutor: PasteActionExecuting {
         }
 
         guard directPasteResult.didWrite else {
+            Self.logger.error(
+                "Pasteboard write failed (kind \(request.sourceItem.kind.rawValue), image \(imageData != nil))"
+            )
             return PasteActionExecutionResult(
                 actionID: request.actionID,
                 closeBehavior: request.closeBehavior,
@@ -62,6 +70,10 @@ final class PasteActionExecutor: PasteActionExecuting {
                 pastedPreviewText: payloadText,
                 captureSuppressionToken: directPasteResult.captureSuppressionToken
             )
+        }
+
+        if directPasteResult.didDispatchPasteShortcut == false {
+            Self.logger.error("Paste shortcut could not be posted (kind \(request.sourceItem.kind.rawValue))")
         }
 
         return PasteActionExecutionResult(

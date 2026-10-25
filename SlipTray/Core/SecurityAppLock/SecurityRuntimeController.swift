@@ -2,6 +2,7 @@ import Foundation
 import LocalAuthentication
 
 final class SecurityRuntimeController: SecurityStateProviding, SearchLockStateProviding {
+    private nonisolated static let logger = DiagnosticLogger(category: "AppLock")
     private let settingsStore: SecuritySettingsStoring
     private let payloadStore: ProtectedPayloadManaging
     private let searchNotesStore: SearchNotesOrganizationStoring?
@@ -241,7 +242,10 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
 
         let context = LAContext()
         context.localizedReason = "Unlock SlipTray"
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock SlipTray") { [weak self] success, _ in
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock SlipTray") { [weak self] success, error in
+            if let error {
+                Self.logger.info("Unlock authentication did not succeed: \(DiagnosticLogger.describe(error))")
+            }
             DispatchQueue.main.async {
                 guard let self else { return }
                 if success {
@@ -310,6 +314,7 @@ final class SecurityRuntimeController: SecurityStateProviding, SearchLockStatePr
     }
 
     func failUnlock(_ failure: SecurityFailureState) {
+        Self.logger.error("App Lock failure: \(failure.kind.rawValue)")
         publishSnapshot(
             SecurityRuntimeSnapshot(
                 lockState: .unlockFailed,

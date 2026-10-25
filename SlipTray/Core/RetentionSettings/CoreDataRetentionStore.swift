@@ -2,6 +2,7 @@ import CoreData
 import Foundation
 
 final class CoreDataRetentionStore: RetentionSettingsStoring {
+    private nonisolated static let logger = DiagnosticLogger(category: "History")
     private let configuration: RetentionStoreConfiguration
     private let fileManager: FileManager
     private let persistentContainer: NSPersistentContainer
@@ -275,7 +276,12 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         context.performAndWait {
             work(context)
             if context.hasChanges {
-                guard (try? context.save()) != nil else { return }
+                do {
+                    try context.save()
+                } catch {
+                    Self.logger.error("History store could not save: \(DiagnosticLogger.describe(error))")
+                    return
+                }
             }
             afterSave?()
         }
@@ -295,7 +301,11 @@ final class CoreDataRetentionStore: RetentionSettingsStoring {
         description.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
         description.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
         persistentContainer.persistentStoreDescriptions = [description]
-        persistentContainer.loadPersistentStores { _, _ in }
+        persistentContainer.loadPersistentStores { _, error in
+            if let error {
+                Self.logger.error("History store could not load: \(DiagnosticLogger.describe(error))")
+            }
+        }
         persistentContainer.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         persistentContainer.viewContext.undoManager = nil
     }
